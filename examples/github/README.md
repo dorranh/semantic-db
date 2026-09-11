@@ -15,6 +15,9 @@ Ossie model. See GitHub's [authentication guide](https://docs.github.com/en/grap
 # Default: apache/ossie; count open issues by locally assigned team.
 cargo run -p semantic-db --features ossie,github --example github
 
+# Interactive SQL and natural-language queries over the same scoped tables.
+cargo run -p semantic-db --features ossie,github --example github -- --repl
+
 # Repeat --repo for multiple repositories.
 cargo run -p semantic-db --features ossie,github --example github -- \
   --repo apache/ossie --repo apache/datafusion \
@@ -47,6 +50,26 @@ plan; it does not prove permissions or estimate network cost.
 and one row per repository, unique ignoring case. The supplied teams are example
 labels, not actual GitHub organization teams. Unmapped repositories remain
 visible in the default query.
+
+In the REPL, SQL can span lines and runs when a line ends with `;`:
+
+```text
+github> .tables
+github> .schema issues
+github> SELECT repository, number, title FROM issues WHERE state = 'OPEN' LIMIT 10;
+github> .view open_issues=SELECT * FROM issues WHERE state = 'OPEN'
+github> .ask Count open issues by team and repository
+github> .plan Which teams have stale issues?
+github> .quit
+```
+
+`.ask` executes grounded SQL; `.plan` only compiles it. Both call the configured
+model and initialize it on first use, so SQL-only sessions need no OpenAI key.
+Query/command errors leave the session open. Ctrl-C clears unfinished input;
+Ctrl-D exits. History is session-local. Requests are reported per query, and
+each query gets fresh scans with the configured per-scan budgets. Add `--repo`
+to the launch command to change scope. `--repl` cannot be combined with batch
+`--query`, `--file`, `--ask`, or `--dry-run` options.
 
 ## Model contract
 

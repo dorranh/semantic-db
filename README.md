@@ -145,7 +145,7 @@ Set `GITHUB_TOKEN` in the environment or `.env`, then run:
 cargo run -p semantic-db --features ossie,github --example github
 ```
 
-The example supports `--repo`, `--query`, `--file`, `--ask`, and `--dry-run`.
+The example supports `--repl`, `--repo`, `--query`, `--file`, `--ask`, and `--dry-run`.
 It demonstrates lazy pagination, request budgets, and failure on partial GraphQL
 responses. Filters and joins currently execute locally; the guide records the
 architecture gaps. Offline connector tests need no API token.
