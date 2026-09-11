@@ -1,0 +1,18 @@
+[package]
+name = "semantic-engine"
+description = "DataFusion-backed sessions, source registration, and derived relations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+semantic-catalog.workspace = true
+datafusion.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

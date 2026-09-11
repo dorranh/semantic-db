@@ -1,0 +1,34 @@
+[workspace]
+members = ["crates/*", "apps/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[workspace.dependencies]
+semantic-catalog = { path = "crates/semantic-catalog" }
+semantic-plan = { path = "crates/semantic-plan" }
+semantic-engine = { path = "crates/semantic-engine" }
+arrow-schema = "59.2.0"
+datafusion = { version = "55.0.0", default-features = false, features = ["sql", "recursive_protection"] }
+clap = { version = "4.5", features = ["derive"] }
+rustyline = "17"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.dev]
+debug = 1
+
+[profile.test]
+debug = 1

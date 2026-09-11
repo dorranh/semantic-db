@@ -1,0 +1,6 @@
+well_id,well_name,basin,latitude_deg,longitude_deg,total_depth_m,status
+W-001,Juniper-1,North Basin,56.12,2.45,3200.0,active
+W-002,Cedar-2,North Basin,56.18,2.53,1800.0,suspended
+W-003,Willow-3,South Basin,54.82,1.91,4100.0,active
+W-004,Birch-4,North Basin,56.25,2.61,2750.0,active
+W-005,Aspen-5,South Basin,54.93,2.02,2500.0,abandoned
