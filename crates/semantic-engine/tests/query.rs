@@ -117,3 +117,46 @@ async fn excludes_cte_names_from_lineage_and_rejects_non_query_views() {
     );
     assert_eq!(engine.catalog().relations().count(), 2);
 }
+
+#[tokio::test]
+async fn generated_queries_only_use_registered_relations_and_query_statements() {
+    let engine = fixture().await;
+    for sql in [
+        "DROP TABLE wells",
+        "CREATE TABLE x AS SELECT 1",
+        "INSERT INTO wells SELECT * FROM wells",
+        "EXPLAIN SELECT * FROM wells",
+        "SET datafusion.execution.batch_size = 1",
+        "SELECT * FROM information_schema.tables",
+        "SELECT * FROM public.wells",
+        "SELECT * FROM wells WHERE EXISTS (SELECT 1 FROM information_schema.tables)",
+        "SELECT * FROM wells; SELECT 1",
+        "SELECT * FROM '/tmp/private.csv'",
+    ] {
+        assert!(
+            engine.plan_generated_sql(sql).await.is_err(),
+            "accepted: {sql}"
+        );
+    }
+    assert!(
+        engine
+            .plan_generated_sql(
+                "WITH selected AS (SELECT * FROM wells) SELECT well_id FROM selected"
+            )
+            .await
+            .is_ok()
+    );
+    assert!(
+        engine
+            .plan_generated_sql("SELECT (SELECT count(*) FROM wells) AS total")
+            .await
+            .is_ok()
+    );
+    // The existing direct-SQL entry point still allows introspection.
+    assert!(
+        engine
+            .plan_sql("SELECT * FROM information_schema.tables")
+            .await
+            .is_ok()
+    );
+}

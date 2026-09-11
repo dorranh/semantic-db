@@ -25,6 +25,10 @@ pub enum EngineError {
     InvalidName(String),
     #[error("a view definition must be a SELECT, WITH, or VALUES query")]
     InvalidViewDefinition,
+    #[error("generated SQL must be a SELECT, WITH, or VALUES query")]
+    InvalidGeneratedQuery,
+    #[error("generated SQL may only reference unqualified registered catalog relations")]
+    UnregisteredQueryRelation,
 }
 
 pub type Result<T> = std::result::Result<T, EngineError>;
@@ -115,6 +119,27 @@ impl Engine {
             .with_allow_dml(false)
             .with_allow_statements(false);
         Ok(self.context.sql_with_options(sql, options).await?)
+    }
+
+    /// More restrictive entry point for model output: query statements and
+    /// registered relations only, excluding internal schemas and external paths.
+    /// Planning validates names/types but cannot establish semantic correctness.
+    pub async fn plan_generated_sql(&self, sql: &str) -> Result<DataFrame> {
+        let state = self.context.state();
+        let statement = state.sql_to_statement(sql, &state.config_options().sql_parser.dialect)?;
+        if !matches!(&statement, Statement::Statement(inner) if matches!(inner.as_ref(), SqlStatement::Query(_)))
+        {
+            return Err(EngineError::InvalidGeneratedQuery);
+        }
+        for reference in state.resolve_table_references(&statement)? {
+            if reference.schema().is_some()
+                || reference.catalog().is_some()
+                || self.catalog.relation(reference.table()).is_none()
+            {
+                return Err(EngineError::UnregisteredQueryRelation);
+            }
+        }
+        self.plan_sql(sql).await
     }
 
     /// Convenience for small interactive results. Large consumers should call

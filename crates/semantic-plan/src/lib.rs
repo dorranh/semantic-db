@@ -1,8 +1,8 @@
-//! Initial interchange contracts for a future semantic compiler.
+//! Interchange contracts for semantic interpretation and compilation.
 //!
 //! Intent contains meaning, not guessed physical column names. Grounded SQL is
 //! still untrusted input: the engine must plan and validate it before execution.
-//! No LLM, retrieval backend, or automatic grounding is implemented here yet.
+//! Provider and compilation logic live in semantic-compiler.
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +24,7 @@ pub enum SemanticPredicate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GroundingEvidence {
     pub phrase: String,
     pub catalog_reference: String,
@@ -31,6 +32,7 @@ pub struct GroundingEvidence {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GroundedQuery {
     pub sql: String,
     pub evidence: Vec<GroundingEvidence>,
@@ -38,7 +40,7 @@ pub struct GroundedQuery {
 
 /// Ambiguity is explicit; unresolved concepts must not silently become SQL.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GroundingOutcome {
     Grounded {
         query: GroundedQuery,

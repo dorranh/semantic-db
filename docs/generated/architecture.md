@@ -44,9 +44,11 @@ flowchart LR
   Engine --> Catalog[crates/semantic-catalog]
   Engine --> DF[DataFusion]
   Catalog --> Arrow[Arrow schema]
-  Compiler[Future semantic compiler] -.-> Intent[crates/semantic-plan]
-  Compiler -.-> Catalog
-  Compiler -.-> Engine
+  CLI --> Compiler[crates/semantic-compiler]
+  Compiler --> Intent[crates/semantic-plan]
+  Compiler --> Catalog
+  Compiler --> Engine
+  Compiler --> Provider[OpenAI-compatible Chat Completions]
 ```
 
 | Component | Owns | Does not own |
@@ -54,6 +56,7 @@ flowchart LR
 | Catalog | Descriptive relation metadata, Arrow schemas, view definitions, vocabulary | Execution or LLM inference |
 | Semantic plan | Serializable unresolved intent, grounding evidence, ambiguity outcomes | DataFusion internals or backend credentials |
 | Engine | Session state, provider registration, SQL planning, result execution | Terminal interaction or prompt templates |
+| Compiler | Catalog projection, provider calls, grounding outcomes, validation, bounded repair | Query execution or deterministic domain definitions |
 | CLI | Arguments, line editing, display, user-facing errors | Relational optimization |
 
 The initial engine intentionally exposes DataFusion `DataFrame` for advanced
@@ -61,9 +64,33 @@ consumers. This avoids inventing a second query API while the design is young;
 it also means DataFusion upgrades can affect the engine's public API. Arrow
 schemas define row types and Arrow batches define result interchange.
 
-Create new crates when they have working responsibilities: a compiler, a retrieval
-service, and individual connector implementations are likely next candidates.
-Empty federation and LLM crates would imply interfaces we have not validated yet.
+Create new crates when they have working responsibilities. The compiler now owns
+the first natural-language slice; retrieval and individual remote connectors are
+future candidates.
+
+## Current compiler slice
+
+`Compiler<P: ModelProvider>` combines interpretation and SQL proposal in one
+model call. It sends a projection of the full in-memory catalog, then parses a
+strict `GroundingOutcome`. Grounded output requires nonempty evidence with valid
+catalog references and successful `Engine::plan_generated_sql`. Invalid JSON,
+outcome shape, evidence, or SQL can receive one repair by default (configurable
+in the library, capped at three). Clarification and unsupported outcomes return
+immediately. Compilation plans but never collects rows; the CLI executes only a
+grounded result, unless dry-run was requested.
+
+The OpenAI-compatible adapter calls `/chat/completions` with JSON mode by default.
+The model, API root, timeout, and JSON mode are configurable. Responses are checked
+for refusal, normal completion, size, and envelope shape. HTTP/transport failures
+are not retried, redirects are disabled, and provider bodies/credentials are not
+included in errors. See the [official JSON mode guidance](https://developers.openai.com/api/docs/guides/structured-outputs#json-mode)
+for why JSON validity still requires local schema validation.
+
+This is a combined proposal flow, not the full target pipeline. `SemanticPlan`
+is not yet lowered deterministically. Evidence existence and SQL validity cannot
+prove meaning, coverage, units, or grain; those need curated catalog constraints
+and future semantic validation. The whole catalog is sent without retrieval or
+access filtering, appropriate only to the current local single-user scope.
 
 ## Runnable slice
 

@@ -18,7 +18,11 @@ records with uncertain locations.”
 `semantic-plan` currently models concept predicates with Boolean composition and
 explicit grounding outcomes. Temporal relations, projections, aggregates, typed
 parameters, and spatial operators require future IR extensions. It is not yet a
-complete semantic query language or an executable compiler.
+complete semantic query language. `semantic-compiler` now uses its grounding
+outcomes for a combined model-to-SQL proposal, but does not yet lower this intent
+IR. The model is prompted to preserve all constraints and return clarification or
+unsupported where appropriate; deterministic validation currently checks output
+shape, evidence-reference existence, and SQL planning, not semantic completeness.
 
 For the supplied fixture, “active,” `North Basin`, and an explicitly selected
 depth cutoff can be expressed as:
@@ -33,7 +37,7 @@ WHERE status = 'active'
 
 This returns W-001 and W-004. The fixture has no location-quality field, so it
 cannot satisfy the exclusion about uncertain locations. The SQL above represents
-only the supported portion, and a future compiler must not present it as the
+only the supported portion, and the compiler is instructed not to present it as the
 complete answer to the original request.
 
 ## Structured and semantic predicates
@@ -65,6 +69,8 @@ does not assume that illustrative pattern syntax is available in DataFusion.
 | SQL syntax, relation/column resolution, supported functions and type coercion | DataFusion during planning |
 | Duplicate relation names and registration consistency | Engine |
 | SQL DDL/DML and session statements excluded from query path | Engine via DataFusion SQL options |
+| Generated query statement shape and restriction to registered relations | Engine via `plan_generated_sql` |
+| Outcome shape, nonempty evidence, existing evidence references, bounded repairs | Compiler |
 | Meaningful joins, grain, enum membership, units, CRS, and definition applicability | Future semantic validator |
 | Authorization, query budgets, connector access, and execution policy | Future service/runtime layer |
 
