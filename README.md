@@ -104,6 +104,10 @@ for exploratory queries over large inputs. Library consumers can stream results.
 
 ## Natural-language queries
 
+The [wells Ossie mapping](examples/geospatial/README.md) describes the CSV's fields
+and query meaning in a portable semantic model. It is a validated example;
+Ossie loading remains future work.
+
 Copy `.env.example` to `.env` in the repository root and fill in `OPENAI_API_KEY`.
 The default model is `gpt-4.1-mini`; set `OPENAI_MODEL` and `OPENAI_BASE_URL` for
 another OpenAI-compatible provider. The base URL is the API root, including its

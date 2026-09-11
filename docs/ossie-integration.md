@@ -130,6 +130,11 @@ has been imported. It deliberately covers only the base `orders` relation; the
 application continues to supply Arrow nullability, owner/grain, and the
 `completed_orders` view.
 
+The [wells mapping](../examples/geospatial/README.md) also expresses the existing
+geospatial fixture in Ossie, including its key, field descriptions, units in
+prose, and AI context. It is a richer metadata-preservation example beyond the
+minimal orders profile; the existing query still returns W-001 and W-004.
+
 Acceptance criteria for that implementation:
 
 1. Import the fixture using the existing in-memory orders provider. Compose the

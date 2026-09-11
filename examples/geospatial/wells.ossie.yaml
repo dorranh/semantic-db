@@ -1,0 +1,98 @@
+# Authored mapping of the synthetic wells.csv fixture, not yet an engine input.
+# Schema: apache/ossie commit 28365cd638f3833765c5b940ada5b8cbc65f1c42
+#         core-spec/ossie-schema.json
+# The application binds fixtures.geospatial.wells to wells.csv; this source name
+# is a local convention, not an Ossie connector protocol.
+version: "0.2.0.dev0"
+semantic_model:
+  - name: geospatial_wells
+    description: Synthetic well inventory used by the semantic-db geospatial example.
+    ai_context:
+      instructions: >-
+        A request for deep wells needs an explicit depth cutoff; this model does
+        not define a universal meaning of deep. The example query uses 2500
+        metres. Location quality and coordinate reference system are not supplied;
+        do not infer either from the coordinate values.
+      examples:
+        - List well IDs, names, and total depths for active wells in North Basin with total depth at least 2500 metres, ordered by well ID.
+    datasets:
+      - name: wells
+        source: fixtures.geospatial.wells
+        description: >-
+          One row per well in the synthetic fixture. well_id identifies the row.
+          Basin and status are source labels; coordinates are in degrees and
+          total depth is in metres. No location-quality or observation-time
+          field is available.
+        primary_key: [well_id]
+        ai_context:
+          synonyms: [well inventory, well records]
+        fields:
+          - name: well_id
+            description: Unique well identifier in this fixture; preserve as text, including the W- prefix and leading zeros.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: well_id
+            ai_context:
+              synonyms: [well identifier]
+          - name: well_name
+            description: Display name of the well; no uniqueness guarantee is declared for this field.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: well_name
+          - name: basin
+            description: >-
+              Basin label. The fixture contains North Basin and South Basin.
+              Use the exact label North Basin for the northern-basin example;
+              it is a category filter, not a latitude threshold.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: basin
+          - name: latitude_deg
+            description: Latitude in degrees. The fixture does not specify a coordinate reference system or location accuracy.
+            datatype: Float
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: latitude_deg
+            ai_context:
+              synonyms: [latitude]
+          - name: longitude_deg
+            description: Longitude in degrees. The fixture does not specify a coordinate reference system or location accuracy.
+            datatype: Float
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: longitude_deg
+            ai_context:
+              synonyms: [longitude]
+          - name: total_depth_m
+            description: >-
+              Total depth in metres. The fixture does not distinguish measured
+              depth from true vertical depth. A cutoff of at least 2500 metres
+              means total_depth_m >= 2500, inclusive; it is an example query
+              parameter, not a general definition of deep.
+            datatype: Float
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: total_depth_m
+            ai_context:
+              synonyms: [total depth, well depth]
+          - name: status
+            description: >-
+              Status label. The fixture contains active, suspended, and abandoned.
+              Active wells are rows where status = 'active'. No status history
+              or as-of timestamp is supplied.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: status
+            ai_context:
+              synonyms: [well status]
