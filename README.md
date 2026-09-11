@@ -1,5 +1,8 @@
 # Semantic DB
 
+> Warning! This is an experimental piece of software which I've quickly conjured up with the help of
+> Codex. Use at your own risk.
+
 A Rust library for teams to query their own catalog through their own data
 backends, using Apache DataFusion and Arrow. The CLI is a runnable example of
 embedding the engine.
@@ -180,15 +183,15 @@ work. Use a view with an explicit definition or put definitions in the request.
 
 ## Workspace
 
-| Package | Responsibility |
-| --- | --- |
-| `crates/semantic-db` | Single dependency for embedding; re-exports catalog, engine, optional compiler, DataFusion, and Arrow |
-| `crates/semantic-catalog` | Relation schemas, definitions, lineage, and concept metadata |
-| `crates/semantic-ossie` | Pinned schema validation, source bindings, field projections, and semantic metadata import |
-| `crates/semantic-plan` | Serializable semantic intent and grounding result contracts |
-| `crates/semantic-engine` | Catalog loading, relation backends, DataFusion sessions, views, and SQL execution |
-| `crates/semantic-compiler` | Provider adapter, catalog prompt, grounding outcomes, validation, bounded repair |
-| `apps/semantic-cli` | Interactive and batch SQL/natural-language frontend; binary name `semantic-db` |
+| Package                    | Responsibility                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `crates/semantic-db`       | Single dependency for embedding; re-exports catalog, engine, optional compiler, DataFusion, and Arrow |
+| `crates/semantic-catalog`  | Relation schemas, definitions, lineage, and concept metadata                                          |
+| `crates/semantic-ossie`    | Pinned schema validation, source bindings, field projections, and semantic metadata import            |
+| `crates/semantic-plan`     | Serializable semantic intent and grounding result contracts                                           |
+| `crates/semantic-engine`   | Catalog loading, relation backends, DataFusion sessions, views, and SQL execution                     |
+| `crates/semantic-compiler` | Provider adapter, catalog prompt, grounding outcomes, validation, bounded repair                      |
+| `apps/semantic-cli`        | Interactive and batch SQL/natural-language frontend; binary name `semantic-db`                        |
 
 The compiler uses semantic-plan's grounding outcome contracts. Its unresolved
 `SemanticPlan` remains a scaffold for richer typed intent lowering. The geospatial
