@@ -1,12 +1,60 @@
 # Semantic DB
 
-An exploration of a domain-agnostic semantic query engine over heterogeneous data
-sources, using Rust, Apache DataFusion, and Arrow.
+A Rust library for teams to query their own catalog through their own data
+backends, using Apache DataFusion and Arrow. The CLI is a runnable example of
+embedding the engine.
 
 The intended pipeline is **intent → catalog retrieval → grounding → relational
 planning → federated execution**. The current slice runs SQL and catalog-aware
-natural-language queries over CSV data and composable views. Remote federation
-and deterministic domain grounding remain future work.
+natural-language queries over application-provided DataFusion tables, CSV data,
+and composable views. Built-in remote connectors and deterministic domain
+grounding remain future work.
+
+## Embed in your application
+
+Use the `semantic-db` facade as one dependency. Packages are not published yet;
+for a local checkout:
+
+```toml
+[dependencies]
+semantic-db = { path = "../semantic-db/crates/semantic-db" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+Define `Relation::base` and `Relation::view` entries with Arrow schemas and
+descriptions, then implement one async `RelationBackend::resolve` method returning
+`Arc<dyn TableProvider>`. The backend owns source routing and connection setup;
+the engine plans SQL, composes views, and validates schema contracts.
+
+```rust,ignore
+let catalog = Catalog::from_relations([
+    Relation::base("orders", schema.clone(), "warehouse:orders")
+        .with_description("Customer orders")
+        .with_grain("One row per order"),
+    Relation::view("completed_orders", schema,
+        "SELECT * FROM orders WHERE status = 'completed'"),
+])?;
+let engine = Engine::from_catalog(catalog, &backend).await?;
+let batches = engine.query("SELECT * FROM completed_orders LIMIT 10").await?;
+```
+
+`from_catalog` also accepts an iterator of relations projected from your existing
+catalog. Providers use DataFusion's standard interface; you can reuse connectors
+or register a provider directly with `Engine::register_table`. DataFusion and
+Arrow are re-exported by the facade so their types use matching versions.
+
+Run the complete example, which defines a team catalog and custom backend and
+returns order IDs 1 and 3:
+
+```sh
+cargo run -p semantic-db --example team_catalog
+```
+
+See the [embedding guide](docs/embedding.md) for the backend contract, model
+configuration, and streaming. For SQL-only applications, use
+`default-features = false` to omit the compiler and its HTTP provider dependency.
+The [catalog comparison](docs/catalog-prior-art.md) recommends DataFusion for
+execution and evaluates Apache Ossie/OSI for semantic interchange.
 
 ## Get started
 
@@ -101,9 +149,10 @@ work. Use a view with an explicit definition or put definitions in the request.
 
 | Package | Responsibility |
 | --- | --- |
+| `crates/semantic-db` | Single dependency for embedding; re-exports catalog, engine, optional compiler, DataFusion, and Arrow |
 | `crates/semantic-catalog` | Relation schemas, definitions, lineage, and concept metadata |
 | `crates/semantic-plan` | Serializable semantic intent and grounding result contracts |
-| `crates/semantic-engine` | DataFusion sessions, CSV registration, views, and SQL execution |
+| `crates/semantic-engine` | Catalog loading, relation backends, DataFusion sessions, views, and SQL execution |
 | `crates/semantic-compiler` | Provider adapter, catalog prompt, grounding outcomes, validation, bounded repair |
 | `apps/semantic-cli` | Interactive and batch SQL/natural-language frontend; binary name `semantic-db` |
 

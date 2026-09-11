@@ -2595,6 +2595,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "semantic-db"
+version = "0.1.0"
+dependencies = [
+ "datafusion",
+ "semantic-catalog",
+ "semantic-compiler",
+ "semantic-engine",
+ "semantic-plan",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "semantic-engine"
 version = "0.1.0"
 dependencies = [

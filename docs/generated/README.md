@@ -3,6 +3,9 @@
 These documents turn the initial design discussion into a domain-neutral starting
 point. They are maintained Markdown, not output from a code generation command.
 
+Start with the [embedding guide](../embedding.md) for library integration and
+the [catalog comparison](../catalog-prior-art.md) for standards and prior art.
+
 1. [System architecture](architecture.md): boundaries, crate ownership, and query flow.
 2. [Catalog and derived relations](catalog-and-derived-relations.md): metadata, views, row types, and lineage.
 3. [Grounding and federation](grounding-and-federation.md): semantic compilation, validation, and backend execution.

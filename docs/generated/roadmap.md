@@ -27,11 +27,22 @@ This starts the intent-compiler increment with combined interpretation and SQL
 proposal. Rich typed IR lowering, curated semantic enforcement, and large-catalog
 retrieval are still outstanding.
 
+## Embedding slice delivered
+
+- Single `semantic-db` facade with optional natural-language compiler.
+- Authored relation metadata and iterator-based ingestion from a team's catalog.
+- Async relation backend using DataFusion's standard `TableProvider` contract.
+- Direct provider registration with schema checks; dependency-ordered catalog
+  loading with missing-reference, cycle, and schema-drift diagnostics.
+- Runnable custom backend example and offline consumer integration tests.
+- [Prior-art comparison](../catalog-prior-art.md), identifying Apache Ossie/OSI as
+  a semantic interchange candidate to evaluate before choosing a durable format.
+
 ## Next increments
 
 | Increment | Deliverable | Acceptance criteria |
 | --- | --- | --- |
-| Catalog authoring and persistence | Qualified IDs, metadata editing, versioned definitions and relationships | Restart preserves views; schema drift and dependency cycles fail with useful diagnostics |
+| Catalog interoperability and persistence | Evaluate an Ossie adapter; qualified IDs, metadata editing, versioned definitions and relationships | A real team model imports with explicit unsupported-feature diagnostics; restart preserves definitions and revisions |
 | Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |
 | Intent compiler, next stage | Richer typed IR and deterministic lowering beyond the delivered LLM adapter | Expand live evaluations and validate semantic coverage, units, grain, and concept definitions |

@@ -27,8 +27,11 @@ definition alongside a real concept.
 
 `Relation` contains a name, Arrow schema, base/view kind, optional description,
 owner, and grain. Base relations record a source string. Views record defining
-SQL and direct dependency names. The engine currently leaves optional metadata
-empty; a later catalog authoring API should populate it.
+SQL and direct dependency names. `Relation::base` and `Relation::view` plus
+`with_description`, `with_owner`, and `with_grain` support authored metadata.
+`Engine::from_catalog` loads these definitions through a team's `RelationBackend`.
+CSV registration and interactive view creation still infer schemas and leave
+optional metadata empty. See the [embedding guide](../embedding.md).
 
 `Concept` sketches a curated name, description, definition, and evidence
 reference. Concepts are not yet stored or searched by the in-memory catalog.
@@ -36,7 +39,8 @@ reference. Concepts are not yet stored or searched by the in-memory catalog.
 
 The descriptive catalog complements DataFusion's execution catalog. DataFusion
 knows how to scan a provider; the semantic catalog should know what its rows mean.
-Today the engine coordinates the two during registration. A durable version will
+Today the engine coordinates the two during registration and checks declared
+schemas against providers and planned views. A durable version will
 need a transactional registration protocol rather than independent writes.
 
 ## Planned catalog model
@@ -70,12 +74,15 @@ expansion, including subqueries and excluding local CTE names. A view over
 another view records that view as its immediate
 dependency. Recursive lineage can later expand through catalog definitions.
 Names cannot be replaced today, preventing a common source of stale lineage.
+Catalog loading computes dependency order, rejects missing references and cycles,
+and recomputes imported lineage from SQL before exposing a usable engine.
 
 For durable storage, prefer versioned canonical SQL or a project-owned IR plus
 catalog/dependency versions. DataFusion `LogicalPlan` is an in-process compilation
 artifact, not an assumed stable disk format. Replan and validate after reload or
-engine upgrades. Definition changes should check cycles, dependent schemas, and
-cache invalidation before publication.
+engine upgrades. Definition changes should check dependent revisions and cache
+invalidation before publication; initial loading already validates cycles and
+output schemas.
 
 ## Two catalog ingestion paths
 

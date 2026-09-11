@@ -53,9 +53,10 @@ flowchart LR
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
+| Facade (`semantic-db`) | One dependency for embedding and consistent public re-exports | Separate planning or execution logic |
 | Catalog | Descriptive relation metadata, Arrow schemas, view definitions, vocabulary | Execution or LLM inference |
 | Semantic plan | Serializable unresolved intent, grounding evidence, ambiguity outcomes | DataFusion internals or backend credentials |
-| Engine | Session state, provider registration, SQL planning, result execution | Terminal interaction or prompt templates |
+| Engine | Catalog loading, backend resolution, provider registration, SQL planning, execution | Terminal interaction or prompt templates |
 | Compiler | Catalog projection, provider calls, grounding outcomes, validation, bounded repair | Query execution or deterministic domain definitions |
 | CLI | Arguments, line editing, display, user-facing errors | Relational optimization |
 
@@ -90,12 +91,18 @@ This is a combined proposal flow, not the full target pipeline. `SemanticPlan`
 is not yet lowered deterministically. Evidence existence and SQL validity cannot
 prove meaning, coverage, units, or grain; those need curated catalog constraints
 and future semantic validation. The whole catalog is sent without retrieval or
-access filtering, appropriate only to the current local single-user scope.
+access filtering. Embedding applications must supply a catalog already scoped to
+the caller's permissions.
 
 ## Runnable slice
 
 An `Engine` owns a private `SessionContext` and a descriptive `Catalog`. CSV
 registration builds a lazy DataFusion provider and records its inferred schema.
+`Engine::from_catalog` accepts a team's authored definitions and resolves base
+relations through `RelationBackend`, which returns standard DataFusion providers.
+It validates declared schemas and plans views in dependency order. Missing
+dependencies and cycles fail before backend resolution. The library facade and
+backend example are described in the [embedding guide](../embedding.md).
 View registration plans its defining SQL, records direct dependencies, and
 registers the plan as a view without collecting its rows. Queries return batches;
 `plan_sql` also permits DataFusion's streaming API.
@@ -107,7 +114,9 @@ catalog consistency controls, not a complete sandbox for untrusted workloads.
 
 Metadata and providers are process-local. CSV data remains at its source and can
 change between queries; no snapshot isolation is promised. Source schemas are
-inferred at registration, and source schema changes require a new session today.
+inferred or validated at registration, and schema changes require a new session
+today. External catalog formats are evaluated in the
+[prior-art comparison](../catalog-prior-art.md).
 
 ## Scope of DataFusion
 

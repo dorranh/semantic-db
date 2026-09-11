@@ -63,7 +63,9 @@ impl<P: ModelProvider> Compiler<P> {
         if engine.catalog().relations().next().is_none() {
             return Ok(Compilation {
                 outcome: GroundingOutcome::Unsupported {
-                    reason: "No relations are registered. Register a CSV or view first.".into(),
+                    reason:
+                        "No relations are registered. Load a catalog or register a relation first."
+                            .into(),
                 },
                 attempts: 0,
             });

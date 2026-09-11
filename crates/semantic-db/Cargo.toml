@@ -1,0 +1,25 @@
+[package]
+name = "semantic-db"
+description = "Embed catalog-aware SQL and natural-language queries with application-owned backends"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["compiler"]
+compiler = ["dep:semantic-compiler"]
+
+[dependencies]
+semantic-catalog.workspace = true
+semantic-engine.workspace = true
+semantic-plan.workspace = true
+semantic-compiler = { workspace = true, optional = true }
+datafusion.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
