@@ -50,6 +50,17 @@ retrieval are still outstanding.
 
 See the [integration guide](../ossie-integration.md) for the supported profile.
 
+## GitHub remote experiment delivered
+
+- Optional `semantic-github` providers for repository-scoped issues and labels.
+- Live page streams, independent nested cursors, and explicit per-scan budgets.
+- Ossie model, SQL/natural-language example, and local CSV ownership joins.
+- Remote/local result equivalence tests and HTTP/error/cancellation probes.
+
+See the [experiment and findings](../../examples/github/README.md). Filters and
+joins remain local; typed source capabilities, efficient pushdown, shared query
+budgets, and snapshot semantics are still open.
+
 ## Next increments
 
 | Increment | Deliverable | Acceptance criteria |
@@ -59,7 +70,7 @@ See the [integration guide](../ossie-integration.md) for the supported profile.
 | Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |
 | Intent compiler, next stage | Richer typed IR and deterministic lowering beyond the delivered LLM adapter | Expand live evaluations and validate semantic coverage, units, grain, and concept definitions |
-| First remote provider | One backend with Arrow scans and explicit capability reporting | Results match a local reference across NULLs, pagination, errors, and supported pushdown |
+| Remote provider optimization | Typed scope/capabilities and exact GitHub repository/state pushdown | Optimized results match the baseline across NULLs, pagination, residual filters, and limits; request counts improve |
 | Semantic operators | One precisely defined search/table-function integration | Candidate limits and approximation are visible; model/index versions are recorded |
 | Durable derived relations | Definition revisioning, dependency invalidation, optional materialization | Views compose after reload; stale materializations cannot silently satisfy a query |
 | Service execution | Streaming, cancellation, resource budgets, auth, and observability | Resource limits and cancellation propagate to connectors; query provenance is inspectable |
@@ -85,7 +96,7 @@ but avoid using unstable plan formatting as the sole correctness assertion.
 - Namespace, ownership, authorization, and catalog revision model.
 - Exact types for parameters, units, relationships, temporal and spatial intent.
 - Retrieval provider, broader semantic evaluation data, and token/cost budgets.
-- First external connector and whether an existing federation extension fits it.
+- Scope/capability contracts and whether an existing federation extension fits API joins.
 - Materialization freshness rules and source snapshot guarantees.
 - Project license and any future public API stability policy.
 

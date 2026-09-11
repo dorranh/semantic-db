@@ -2958,10 +2958,13 @@ dependencies = [
 name = "semantic-db"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "datafusion",
+ "dotenvy",
  "semantic-catalog",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-github",
  "semantic-ossie",
  "semantic-plan",
  "serde_json",
@@ -2975,6 +2978,22 @@ dependencies = [
  "datafusion",
  "semantic-catalog",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "semantic-github"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "datafusion",
+ "futures",
+ "reqwest",
+ "semantic-compiler",
+ "semantic-engine",
+ "semantic-ossie",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

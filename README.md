@@ -10,8 +10,8 @@ embedding the engine.
 The intended pipeline is **intent → catalog retrieval → grounding → relational
 planning → federated execution**. The current slice runs SQL and catalog-aware
 natural-language queries over application-provided DataFusion tables, CSV data,
-and composable views. Built-in remote connectors and deterministic domain
-grounding remain future work.
+and composable views. An experimental GitHub GraphQL connector exercises remote
+scans; deterministic domain grounding and remote optimization remain future work.
 
 ## Embed in your application
 
@@ -135,6 +135,21 @@ cargo run -p semantic-db --features ossie --example ossie_wells
 
 See the [embedding guide](docs/embedding.md#ossie-models) for provider bindings.
 
+## Query GitHub through Ossie
+
+The [GitHub experiment](examples/github/README.md) adds live, repository-scoped
+issues and issue-label tables, an Ossie model, and a local team CSV for federation.
+Set `GITHUB_TOKEN` in the environment or `.env`, then run:
+
+```sh
+cargo run -p semantic-db --features ossie,github --example github
+```
+
+The example supports `--repo`, `--query`, `--file`, `--ask`, and `--dry-run`.
+It demonstrates lazy pagination, request budgets, and failure on partial GraphQL
+responses. Filters and joins currently execute locally; the guide records the
+architecture gaps. Offline connector tests need no API token.
+
 ## Natural-language queries
 
 Copy `.env.example` to `.env` in the repository root and fill in `OPENAI_API_KEY`.
@@ -188,6 +203,7 @@ work. Use a view with an explicit definition or put definitions in the request.
 | `crates/semantic-db`       | Single dependency for embedding; re-exports catalog, engine, optional compiler, DataFusion, and Arrow |
 | `crates/semantic-catalog`  | Relation schemas, definitions, lineage, and concept metadata                                          |
 | `crates/semantic-ossie`    | Pinned schema validation, source bindings, field projections, and semantic metadata import            |
+| `crates/semantic-github` | Experimental GraphQL issue and label providers with lazy pagination and request budgets |
 | `crates/semantic-plan`     | Serializable semantic intent and grounding result contracts                                           |
 | `crates/semantic-engine`   | Catalog loading, relation backends, DataFusion sessions, views, and SQL execution                     |
 | `crates/semantic-compiler` | Provider adapter, catalog prompt, grounding outcomes, validation, bounded repair                      |
