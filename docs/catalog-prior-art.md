@@ -3,6 +3,9 @@
 Assessment: September 11, 2026. These are design recommendations, not implemented
 external-catalog integrations.
 
+The [Ossie integration exploration](ossie-integration.md) follows up with a pinned
+source assessment, validation probes, a local fixture, and an importer proposal.
+
 ## Recommendation
 
 Use DataFusion's `TableProvider` as the executable relation contract now. Keep
@@ -23,7 +26,7 @@ boundary rather than make one external catalog service mandatory for embedding.
 | Prior art | What it supplies | Fit for this project |
 | --- | --- | --- |
 | [DataFusion catalogs and providers](https://datafusion.apache.org/library-user-guide/catalogs.html) | Catalog/schema/table hierarchy and pluggable table providers | Best execution interface. Already used. An existing `SchemaProvider` can supply providers behind `RelationBackend`; business definitions still need a semantic projection. |
-| [Apache Ossie core specification](https://github.com/apache/ossie/blob/main/core-spec/spec.md) | Datasets, fields, keys, relationships, metrics, dialect-specific expressions, AI context, and extensions | Strongest candidate for portable semantic definitions. The inspected main-branch spec is explicitly a `0.2.0.dev0` draft; pin a released schema/version when prototyping an importer. |
+| [Apache Ossie core specification](https://github.com/apache/ossie/blob/main/core-spec/spec.md) | Datasets, fields, keys, relationships, metrics, dialect-specific expressions, AI context, and extensions | Strongest candidate for portable semantic definitions. The inspected main-branch spec is explicitly a `0.2.0.dev0` draft; no stable GitHub release was found. Pin the schema commit and document version for the experiment. |
 | [dbt semantic models / MetricFlow](https://docs.getdbt.com/docs/build/semantic-models) | Semantic graphs over dbt models, entities/join keys, dimensions, and metric definitions | Good upstream source for teams already using dbt, and useful modeling precedent. Adopting its whole model would orient this general relation engine toward metric analytics. Current dbt docs also describe Ossie documents as an alternative authoring format. |
 | [Iceberg REST catalog](https://iceberg.apache.org/rest-catalog-spec/) | Standard HTTP API for Iceberg catalog operations | Good physical discovery boundary for an Iceberg backend. It does not supply this engine's business-meaning and grounding layer; use it behind an adapter when Iceberg data is the actual need. |
 | [Apache Gravitino relational metadata](https://gravitino.apache.org/docs/next/manage-relational-metadata-using-gravitino/) | Catalog/schema/table metadata management through APIs and clients | Useful upstream metadata service for teams already operating it. Requiring that service would add infrastructure to the minimal library path. |

@@ -55,6 +55,8 @@ configuration, and streaming. For SQL-only applications, use
 `default-features = false` to omit the compiler and its HTTP provider dependency.
 The [catalog comparison](docs/catalog-prior-art.md) recommends DataFusion for
 execution and evaluates Apache Ossie/OSI for semantic interchange.
+The [Ossie integration exploration](docs/ossie-integration.md) checks a pinned
+upstream schema and examples and defines the first importer slice.
 
 ## Get started
 

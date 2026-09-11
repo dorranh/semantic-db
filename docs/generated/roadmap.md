@@ -40,9 +40,14 @@ retrieval are still outstanding.
 
 ## Next increments
 
+The [Ossie exploration](../ossie-integration.md) now defines a first importer
+profile and a schema-validated orders fixture. Importer execution remains future
+work; validation of an interchange document is not an executed integration.
+
 | Increment | Deliverable | Acceptance criteria |
 | --- | --- | --- |
-| Catalog interoperability and persistence | Evaluate an Ossie adapter; qualified IDs, metadata editing, versioned definitions and relationships | A real team model imports with explicit unsupported-feature diagnostics; restart preserves definitions and revisions |
+| Catalog interoperability | Optional Ossie importer with a pinned schema, provider bindings, and explicit capability diagnostics | Orders fixture matches the hand-authored catalog; TPC-DS inspection reports unsupported semantics; expand coverage using a real team model |
+| Catalog persistence and identity | Qualified IDs, metadata editing, versioned definitions and relationships | Restart preserves definitions and revisions; source identity survives interchange and execution projections |
 | Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |
 | Intent compiler, next stage | Richer typed IR and deterministic lowering beyond the delivered LLM adapter | Expand live evaluations and validate semantic coverage, units, grain, and concept definitions |

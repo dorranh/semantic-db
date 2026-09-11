@@ -1,0 +1,25 @@
+# Exploration fixture, not yet loadable by semantic-db.
+# Validated against apache/ossie commit
+# 28365cd638f3833765c5b940ada5b8cbc65f1c42, core-spec/ossie-schema.json.
+# Mirrors the orders base relation in crates/semantic-db/examples/team_catalog.rs.
+# Arrow types/nullability and the completed_orders view remain application-owned.
+version: "0.2.0.dev0"
+semantic_model:
+  - name: team_orders
+    datasets:
+      - name: orders
+        source: warehouse:orders
+        description: Customer orders; status is pending or completed
+        fields:
+          - name: order_id
+            datatype: Integer
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: order_id
+          - name: status
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: status
