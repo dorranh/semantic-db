@@ -134,6 +134,7 @@ pub fn catalog_context(catalog: &Catalog) -> serde_json::Value {
             "description": relation.description,
             "grain": relation.grain,
             "view_sql": definition,
+            "semantics": relation.semantics,
             "columns": relation.schema.fields().iter().map(|field| serde_json::json!({
                 "name": field.name(), "type": field.data_type().to_string(), "nullable": field.is_nullable()
             })).collect::<Vec<_>>()

@@ -71,6 +71,52 @@ When you already have a provider, use
 interactive use. The latter derives an output schema when you do not need a
 declared view contract.
 
+## Ossie models
+
+Enable the facade's `ossie` feature to use `semantic_db::ossie`. This is independent
+of `compiler`: SQL-only applications can set `default-features = false` and
+`features = ["ossie"]`. Python and schema downloads are not required at runtime.
+
+```rust,ignore
+use semantic_db::ossie::{OssieDocument, SourceBindings};
+
+let document = OssieDocument::parse(&yaml)?;
+let mut bindings = SourceBindings::new();
+bindings.bind("fixtures.geospatial.wells", provider)?; // Arc<dyn TableProvider>
+let imported = document.load(Some("geospatial_wells"), &bindings)?;
+for warning in imported.warnings {
+    eprintln!("{warning}");
+}
+let engine = imported.engine;
+```
+
+`bind_csv(source, path).await?` is a convenience for local CSV fixtures. Custom
+connectors bind their own providers with `bind`. Bindings are reused during
+projection and registration; the adapter derives Arrow schemas from the bound
+providers rather than guessing widths or nullability from logical Ossie types.
+Each dataset exposes only its explicitly declared fields in document order.
+Source strings are opaque binding keys and are never automatically run as SQL or
+interpreted as URLs. Duplicate bindings fail.
+
+`load(None, ...)` selects the only model; otherwise provide an exact name.
+It returns a fresh engine or document-path diagnostics, never a partial engine.
+`OssieDocument::parse` checks the pinned JSON Schema, while `load` checks executable
+capabilities and source contracts. `original_text()` and `json()` retain the
+source document, including features that prevent executable import. See the
+[supported profile](ossie-integration.md#implemented-import-profile).
+
+Metadata lives in `Relation.semantics`: model/field descriptions, AI context,
+logical field types, time roles, labels, declared keys, and import provenance.
+Keys are explicitly unenforced declarations. The compiler receives these
+annotations as evidence, not as instructions that override its rules. Neither
+units in descriptions nor valid field types prove deterministic domain correctness.
+
+Run the complete [wells importer example](../crates/semantic-db/examples/ossie_wells.rs):
+
+```sh
+cargo run -p semantic-db --features ossie --example ossie_wells
+```
+
 ## Validation and failure behavior
 
 Names must be lowercase, unqualified SQL identifiers. Duplicate names, missing
@@ -123,7 +169,8 @@ environment. Supply a custom `ModelProvider` to use another model adapter. For
 SQL-only use, disable the facade's default features.
 
 The compiler receives descriptions, grain, column names/types/nullability, and
-view definitions for the full loaded catalog. It omits owners, base source
+view definitions for the full loaded catalog. Imported `Relation.semantics` also
+provides authored model/field annotations, declared keys, and provenance. It omits owners, base source
 identifiers, arbitrary Arrow metadata, and row samples. Filter the catalog to
 the caller's permitted scope before loading it. SQL validation and evidence
 existence checks are implemented; deterministic enforcement of business

@@ -38,15 +38,23 @@ retrieval are still outstanding.
 - [Prior-art comparison](../catalog-prior-art.md), identifying Apache Ossie/OSI as
   a semantic interchange candidate to evaluate before choosing a durable format.
 
-## Next increments
+## Ossie importer delivered
 
-The [Ossie exploration](../ossie-integration.md) now defines a first importer
-profile and a schema-validated orders fixture. Importer execution remains future
-work; validation of an interchange document is not an executed integration.
+- Optional `semantic-ossie` library, exposed by the facade's `ossie` feature.
+- Offline pinned JSON Schema validation and explicit source-to-provider bindings.
+- Identity-field projections with logical/physical type checks and hidden raw columns.
+- Model/field annotations and declared keys preserved separately from Arrow schemas
+  and supplied to the compiler; keys are explicitly not enforced.
+- CLI `--ossie`, `--ossie-model`, and `--source-csv` support.
+- Wells query equivalence, compiler metadata, rejection, and CLI integration tests.
+
+See the [integration guide](../ossie-integration.md) for the supported profile.
+
+## Next increments
 
 | Increment | Deliverable | Acceptance criteria |
 | --- | --- | --- |
-| Catalog interoperability | Optional Ossie importer with a pinned schema, provider bindings, and explicit capability diagnostics | Orders fixture matches the hand-authored catalog; TPC-DS inspection reports unsupported semantics; expand coverage using a real team model |
+| Catalog interoperability expansion | Selected computed expressions, relationships, and metrics guided by a real team model | Correct projections and aggregation across joins; unsupported semantics retain explicit diagnostics |
 | Catalog persistence and identity | Qualified IDs, metadata editing, versioned definitions and relationships | Restart preserves definitions and revisions; source identity survives interchange and execution projections |
 | Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |

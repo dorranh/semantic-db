@@ -3,12 +3,12 @@
 [wells.ossie.yaml](wells.ossie.yaml) describes the seven columns in
 [wells.csv](wells.csv), using the Ossie `0.2.0.dev0` core schema pinned at
 [`28365cd638f3833765c5b940ada5b8cbc65f1c42`](https://github.com/apache/ossie/blob/28365cd638f3833765c5b940ada5b8cbc65f1c42/core-spec/ossie-schema.json).
-It is an authored semantic model for this synthetic fixture. The CLI still loads
-the CSV; it does not yet load Ossie files.
+It is an authored semantic model for this synthetic fixture. The library and CLI
+can load this model using an explicit source-to-provider binding.
 
 ## Source and row contract
 
-The proposed application binding is:
+The application binding is:
 
 | Property | Value |
 | --- | --- |
@@ -50,7 +50,9 @@ The model documents these interpretations without creating extra columns:
 The complete query remains in [query.sql](query.sql). From the repository root:
 
 ```sh
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv \
+cargo run -p semantic-cli -- \
+  --ossie examples/geospatial/wells.ossie.yaml \
+  --source-csv fixtures.geospatial.wells=examples/geospatial/wells.csv \
   --file examples/geospatial/query.sql
 ```
 
@@ -73,16 +75,30 @@ documented in prose; they are not machine-enforced unit types or enum constraint
 The model does not invent a CRS, depth datum, relationships, or metrics.
 
 Descriptions and `ai_context` are authored metadata, not executable predicates.
-The current compiler does not read this file. This model intentionally goes beyond
-the proposed minimal orders importer profile by including keys, field descriptions,
-and AI context. An importer must preserve them and report unsupported semantics;
-it must not claim complete support merely because all seven fields can be scanned.
+The importer retains them in `Relation.semantics`, separate from Arrow metadata,
+and the compiler includes them as catalog evidence. Model instructions and example
+questions cannot override the compiler rules or supply implicit query cutoffs.
+The declared key produces an `unenforced_keys` warning because the engine does
+not scan data to enforce uniqueness or non-nullness.
 
-The mapping was checked against the upstream validator, CSV headers and values,
-and a DataFusion projection built from its seven field expressions. Running the
-existing query over that projection returned the same result as the direct CSV
-query. That verifies this mapping's query equivalence, not an implemented importer
-or LLM consumption of the annotations.
+The importer validates the pinned schema offline, checks logical types against
+the CSV provider, and constructs a projection containing exactly these seven
+fields. Integration tests compare the imported query result and schema with the
+direct CSV path, compose a view over the import, and verify metadata reaches an
+offline compiler stub without source paths or row samples.
+
+To query in natural language, replace `--file examples/geospatial/query.sql` with:
+
+```sh
+--ask "List active wells in North Basin with total depth at least 2500 metres, ordered by well ID"
+```
+
+This uses the model-provider configuration described in the root README. The
+library example works without an API key:
+
+```sh
+cargo run -p semantic-db --features ossie --example ossie_wells
+```
 
 For structural validation, use a checkout at the pinned commit and the Python
 dependencies described in the [integration assessment](../../docs/ossie-integration.md):

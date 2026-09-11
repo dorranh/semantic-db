@@ -11,6 +11,7 @@ publish = false
 [workspace.dependencies]
 semantic-catalog = { path = "crates/semantic-catalog" }
 semantic-plan = { path = "crates/semantic-plan" }
+semantic-ossie = { path = "crates/semantic-ossie" }
 semantic-engine = { path = "crates/semantic-engine" }
 semantic-compiler = { path = "crates/semantic-compiler" }
 arrow-schema = "59.2.0"
@@ -19,6 +20,9 @@ clap = { version = "4.5", features = ["derive"] }
 rustyline = "17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde-saphyr = "1.2"
+jsonschema = { version = "0.56", default-features = false }
+sha2 = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 dotenvy = "0.15"
 thiserror = "2"

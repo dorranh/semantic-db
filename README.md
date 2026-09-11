@@ -55,8 +55,8 @@ configuration, and streaming. For SQL-only applications, use
 `default-features = false` to omit the compiler and its HTTP provider dependency.
 The [catalog comparison](docs/catalog-prior-art.md) recommends DataFusion for
 execution and evaluates Apache Ossie/OSI for semantic interchange.
-The [Ossie integration exploration](docs/ossie-integration.md) checks a pinned
-upstream schema and examples and defines the first importer slice.
+The [Ossie integration guide](docs/ossie-integration.md) describes the supported
+import profile and its pinned upstream schema.
 
 ## Get started
 
@@ -102,11 +102,37 @@ and views last only for the current process. Names currently use lowercase,
 unqualified SQL identifiers. CLI results are collected in memory, so use `LIMIT`
 for exploratory queries over large inputs. Library consumers can stream results.
 
-## Natural-language queries
+## Load an Ossie model
 
-The [wells Ossie mapping](examples/geospatial/README.md) describes the CSV's fields
-and query meaning in a portable semantic model. It is a validated example;
-Ossie loading remains future work.
+Load the [wells model](examples/geospatial/README.md) and explicitly bind its
+source reference to the CSV:
+
+```sh
+cargo run -p semantic-cli -- \
+  --ossie examples/geospatial/wells.ossie.yaml \
+  --source-csv fixtures.geospatial.wells=examples/geospatial/wells.csv \
+  --file examples/geospatial/query.sql
+```
+
+This imports the model and returns **W-001 and W-004**. Use `--ossie-model NAME`
+for documents containing multiple models. The same options work with `--query`,
+`--ask`, `--dry-run`, `--view`, and the REPL; `--csv` is the separate direct-load
+mode. For natural language, imported descriptions and AI context reach the compiler.
+
+The importer validates the bundled `0.2.0.dev0` schema offline, checks source
+bindings/types, and exposes only explicitly declared identity fields. Keys remain
+declarations and produce an unenforced-key warning. Metrics, relationships,
+computed fields, and custom extensions fail with document-path diagnostics.
+
+Library consumers enable the optional `ossie` feature:
+
+```sh
+cargo run -p semantic-db --features ossie --example ossie_wells
+```
+
+See the [embedding guide](docs/embedding.md#ossie-models) for provider bindings.
+
+## Natural-language queries
 
 Copy `.env.example` to `.env` in the repository root and fill in `OPENAI_API_KEY`.
 The default model is `gpt-4.1-mini`; set `OPENAI_MODEL` and `OPENAI_BASE_URL` for
@@ -130,7 +156,8 @@ resubmit the complete request with the missing definition. Provider configuratio
 is loaded from the current directory's `.env` on first use and reused in the REPL.
 
 The compiler sends relation names, column types/nullability, descriptions, grain,
-and view definitions to the provider. It does not sample rows or include base
+and view definitions to the provider. Imported model/field descriptions, AI
+context, declared keys, and provenance are also included. It does not sample rows or include base
 source paths. It returns SQL with evidence, a clarification question, or an
 unsupported reason. Clarification/unsupported outcomes do not execute a query;
 they are successful compilation outcomes and exit with status 0. Configuration,
@@ -157,6 +184,7 @@ work. Use a view with an explicit definition or put definitions in the request.
 | --- | --- |
 | `crates/semantic-db` | Single dependency for embedding; re-exports catalog, engine, optional compiler, DataFusion, and Arrow |
 | `crates/semantic-catalog` | Relation schemas, definitions, lineage, and concept metadata |
+| `crates/semantic-ossie` | Pinned schema validation, source bindings, field projections, and semantic metadata import |
 | `crates/semantic-plan` | Serializable semantic intent and grounding result contracts |
 | `crates/semantic-engine` | Catalog loading, relation backends, DataFusion sessions, views, and SQL execution |
 | `crates/semantic-compiler` | Provider adapter, catalog prompt, grounding outcomes, validation, bounded repair |
@@ -173,8 +201,8 @@ Architecture and next steps are in [docs/generated](docs/generated/README.md).
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-features --locked
 ```
 
 These checks use fake providers/local HTTP servers and need no API key. Once

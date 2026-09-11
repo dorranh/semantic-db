@@ -58,6 +58,7 @@ flowchart LR
 | Semantic plan | Serializable unresolved intent, grounding evidence, ambiguity outcomes | DataFusion internals or backend credentials |
 | Engine | Catalog loading, backend resolution, provider registration, SQL planning, execution | Terminal interaction or prompt templates |
 | Compiler | Catalog projection, provider calls, grounding outcomes, validation, bounded repair | Query execution or deterministic domain definitions |
+| Ossie adapter | Offline schema validation, explicit provider bindings, declared-field projections, semantic annotation import | Implicit connections, relationship/metric execution, or key enforcement |
 | CLI | Arguments, line editing, display, user-facing errors | Relational optimization |
 
 The initial engine intentionally exposes DataFusion `DataFrame` for advanced

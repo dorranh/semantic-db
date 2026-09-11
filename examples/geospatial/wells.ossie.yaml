@@ -1,4 +1,4 @@
-# Authored mapping of the synthetic wells.csv fixture, not yet an engine input.
+# Authored mapping of the synthetic wells.csv fixture; load with --ossie.
 # Schema: apache/ossie commit 28365cd638f3833765c5b940ada5b8cbc65f1c42
 #         core-spec/ossie-schema.json
 # The application binds fixtures.geospatial.wells to wells.csv; this source name

@@ -33,6 +33,12 @@ SQL and direct dependency names. `Relation::base` and `Relation::view` plus
 CSV registration and interactive view creation still infer schemas and leave
 optional metadata empty. See the [embedding guide](../embedding.md).
 
+The Ossie importer also populates `Relation.semantics`: model and field
+descriptions, AI context, logical types, labels/time roles, declared keys, and
+source-document provenance. The compiler includes these authored annotations as
+evidence. They remain separate from Arrow metadata; key declarations do not enforce
+uniqueness, and descriptions do not execute domain predicates.
+
 `Concept` sketches a curated name, description, definition, and evidence
 reference. Concepts are not yet stored or searched by the in-memory catalog.
 `Catalog` currently registers and looks up relations only.

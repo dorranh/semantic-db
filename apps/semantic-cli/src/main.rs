@@ -7,6 +7,7 @@ use clap::Parser;
 use rustyline::{DefaultEditor, error::ReadlineError};
 use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
+use semantic_ossie::{OssieDocument, SourceBindings};
 
 mod config;
 
@@ -22,6 +23,15 @@ struct Args {
     /// Register a CSV with a header row; repeat for multiple sources.
     #[arg(long, value_name = "NAME=PATH", value_parser = parse_assignment)]
     csv: Vec<(String, String)>,
+    /// Load a pinned Ossie YAML/JSON semantic model with explicit source bindings.
+    #[arg(long, value_name = "PATH", conflicts_with = "csv")]
+    ossie: Option<std::path::PathBuf>,
+    /// Select a model (required when the Ossie document contains multiple models).
+    #[arg(long, value_name = "NAME", requires = "ossie")]
+    ossie_model: Option<String>,
+    /// Bind an Ossie source identifier to a CSV; repeat for multiple sources.
+    #[arg(long, value_name = "SOURCE=PATH", requires = "ossie", value_parser = parse_assignment)]
+    source_csv: Vec<(String, String)>,
     /// Register a view before querying; repeat in dependency order.
     #[arg(long, value_name = "NAME=SQL", value_parser = parse_assignment)]
     view: Vec<(String, String)>,
@@ -50,7 +60,20 @@ fn parse_assignment(value: &str) -> std::result::Result<(String, String), String
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let mut engine = Engine::new();
+    let mut engine = if let Some(path) = args.ossie {
+        let document = OssieDocument::parse(&std::fs::read_to_string(path)?)?;
+        let mut bindings = SourceBindings::new();
+        for (source, path) in args.source_csv {
+            bindings.bind_csv(source, &path).await?;
+        }
+        let imported = document.load(args.ossie_model.as_deref(), &bindings)?;
+        for warning in imported.warnings {
+            eprintln!("Warning: {warning}");
+        }
+        imported.engine
+    } else {
+        Engine::new()
+    };
     for (name, path) in args.csv {
         engine.register_csv(&name, &path).await?;
     }

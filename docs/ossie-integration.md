@@ -1,14 +1,15 @@
-# Ossie integration exploration
+# Ossie integration
 
-Assessment: September 11, 2026. This is an integration design and validated input
-fixture; no Ossie importer or runtime dependency has been added.
+Assessment and first implementation: September 11, 2026. The optional Rust
+importer now loads the wells and orders core models with explicit source bindings.
+The research findings below refer to the pinned upstream checkout.
 
 ## Recommendation
 
-Build a small, optional Rust importer for Ossie's **core semantic models** as the
-next interoperability slice. Keep the original document alongside a validated
-execution projection. Continue using DataFusion providers for data access and
-Semantic DB relations for query execution.
+The `semantic-ossie` crate imports a supported subset of Ossie's **core semantic
+models**. It retains the original document alongside a validated execution
+projection and uses DataFusion providers for data access. The facade exposes it
+through an opt-in `ossie` feature; no Python runtime is needed.
 
 Ossie is a useful way to receive authored business definitions from other tools.
 Its repository contains a specification, Python model types, validation tools,
@@ -45,28 +46,30 @@ All upstream file links below use that commit.
   YAML into an embedded Rust library does not justify requiring Python at runtime.
 
 The version alone is insufficient to reproduce a moving development schema.
-Record upstream commit, schema digest, document digest, and adapter revision in
-an import report. These are proposed provenance fields, not current catalog APIs.
+`Relation.semantics.origin` records the upstream commit, schema digest, original
+document digest, document version, model/dataset identity, and adapter package
+version. The latter is not a Git revision; release management must version adapter
+changes if it needs to distinguish builds of this unpublished package.
 
 ## Mapping into the current skeleton
 
 The [core specification][spec] describes the source constructs. The right-hand
-column below is our proposed policy, based on the current catalog and engine.
+column below distinguishes the implemented profile from future capabilities.
 
-| Ossie construct | Proposed Semantic DB mapping and boundary |
+| Ossie construct | Semantic DB mapping and boundary |
 | --- | --- |
 | Model and dataset names | Select one model explicitly. Map dataset names to unique, lowercase, unqualified relation names; reject collisions and unsupported names rather than silently normalizing them. Preserve original identity separately. |
-| Dataset `source` | Pass through an application-owned source binding. A physical reference is not automatically a Semantic DB SQL name. Treat query-valued sources as unsupported in the first importer. |
-| Dataset description | Populate `Relation.description`. Model descriptions need a separate metadata home. |
+| Dataset `source` | Resolve only through an explicit application-owned source binding. The string is an opaque key; it is never automatically interpreted as a file, URL, or executable query. |
+| Dataset description | Populate `Relation.description`; retain model descriptions in `Relation.semantics`. |
 | Identity field expressions | Expose exactly the declared fields, in order. Check references against the bound provider. Never expose extra physical columns through an implicit `SELECT *`. |
 | Aliases and computed fields | Later, lower checked scalar expressions to a projection provider or a view over a private source. Do not register the raw provider under the semantic name and pretend the expressions ran. |
 | Logical `datatype` | Check compatibility with a resolved Arrow type. Obtain width, decimal precision/scale, timezone, and nullability from the provider or an explicit application schema contract. Do not guess `Integer = Int64`. |
-| Field descriptions, labels, time roles | Preserve in the imported document. Add typed field metadata before claiming these reach grounding. Arrow metadata alone is currently omitted from the compiler prompt. |
-| Primary/unique keys and relationships | Preserve declarations; diagnose unsupported execution semantics. Do not translate keys into a claim of enforced uniqueness or automatically plan joins yet. |
+| Field descriptions, labels, time roles | Retain in typed `Relation.semantics.fields` and expose to the compiler. These annotations remain separate from physical Arrow metadata. |
+| Primary/unique keys and relationships | Retain keys with an `unenforced_keys` warning. Reject relationship import until join semantics are implemented. |
 | Metrics | Preserve aggregate definitions; block executable import in the first profile. A metric requires grouping/filter context and join semantics, so a metric name cannot simply become a fixed SQL view. |
-| `ai_context` | Preserve as source metadata. Later expose selected synonyms/examples as catalog evidence, with a deliberate policy for free-form instructions. |
-| Custom extensions | Retain opaque payloads and identify them in diagnostics. Unknown extensions may carry filters or other behavior, so preservation alone does not establish executable equivalence. |
-| Ontology documents | Recognize and report an unsupported document kind in the core importer. Plan concept grounding separately. |
+| `ai_context` | Expose strings or known instructions/synonyms/examples as catalog evidence. Reject unknown context properties; instructions cannot override compiler rules, and examples cannot supply implicit defaults. |
+| Custom extensions | Retain in the original document and reject executable import. Unknown extensions may carry filters or other behavior. |
+| Ontology documents | Reject through core schema validation. Ontology execution remains a separate future capability. |
 
 Two implementation details deserve attention:
 
@@ -84,7 +87,8 @@ The relevant code is in [the catalog](../crates/semantic-catalog/src/lib.rs),
 [the engine](../crates/semantic-engine/src/lib.rs), and the compiler's
 [`catalog_context`](../crates/semantic-compiler/src/lib.rs). The compiler currently
 receives relation descriptions/grain, view SQL, and column names/types/nullability;
-it does not consume relationships, metrics, field descriptions, or ontology rules.
+it now also consumes imported `Relation.semantics`, including field descriptions
+and AI context. Relationships, metrics, and ontology rules remain unsupported.
 
 ## Validation findings
 
@@ -112,50 +116,47 @@ for every unsupported construct. Produce no runnable import when blocking
 diagnostics remain. An inspection mode may preserve and report the whole document
 without presenting it as an executable catalog.
 
-## First implementation slice
+## Implemented import profile
 
-Proposed location: a `semantic-ossie` crate, exposed through an opt-in `ossie`
-feature on the `semantic-db` facade. Its first executable profile should support
-one selected core model, explicit nonempty field lists containing identity
-`ANSI_SQL` column expressions, dataset descriptions, and provider-derived schemas.
-Missing/empty fields, computed expressions, query sources, non-ANSI-only
-expressions, and unsupported semantic annotations should produce explicit
-diagnostics. Empty optional collections are harmless. Keep unsupported definitions
-available to inspection, but require a clean executable profile to load a catalog.
+`semantic-ossie` is exposed through the facade's opt-in `ossie` feature. The CLI
+uses the same library with `--ossie PATH`, optional `--ossie-model NAME`, and
+repeatable `--source-csv SOURCE=PATH` bindings. See the
+[wells instructions](../examples/geospatial/README.md) and
+[embedding guide](embedding.md#ossie-models) for runnable commands.
 
-Start with [team_catalog.yaml](../examples/ossie/team_catalog.yaml), authored from
-our existing [Rust orders example](../crates/semantic-db/examples/team_catalog.rs).
-It is a synthetic compatibility fixture, not evidence that a real team's model
-has been imported. It deliberately covers only the base `orders` relation; the
-application continues to supply Arrow nullability, owner/grain, and the
-`completed_orders` view.
+Supported: one selected core model, explicit nonempty field lists with identity
+`ANSI_SQL` expressions, provider-derived schemas, compatible logical types,
+dataset/model/field descriptions, field labels/time roles, known AI context
+properties, and declared primary/unique keys. Key columns must reference distinct
+declared fields. Row uniqueness and non-nullness are not enforced; import returns
+a warning for datasets with keys. Other supplied dialect variants are retained in
+the original document with a warning that ANSI_SQL was selected.
 
-The [wells mapping](../examples/geospatial/README.md) also expresses the existing
-geospatial fixture in Ossie, including its key, field descriptions, units in
-prose, and AI context. It is a richer metadata-preservation example beyond the
-minimal orders profile; the existing query still returns W-001 and W-004.
+The adapter rejects missing/empty fields, aliases/computed expressions, missing
+ANSI_SQL expressions, duplicate dialects/names, unknown sources/columns,
+incompatible logical types (including `Opaque`), relationships, metrics, and
+custom extensions. Unknown structured AI context properties also fail instead of
+being discarded. Full schema validation precedes capability checks. Diagnostics
+carry stable codes and document paths. Schema validation checks every model;
+executable capability checks apply to the selected model. Model names must be
+unique across the document. Original text and parsed JSON remain available on
+`OssieDocument` even when executable import fails.
 
-Acceptance criteria for that implementation:
+The [wells model](../examples/geospatial/wells.ossie.yaml) runs through the importer
+and returns **W-001 and W-004**. Tests compare schema and query results with the
+direct CSV path, compose a view, check declared-column visibility and type
+compatibility, and verify that authored metadata reaches an offline compiler stub.
+This verifies the compiler input contract, not a live LLM's interpretation.
 
-1. Import the fixture using the existing in-memory orders provider. Compose the
-   same application-owned `completed_orders` view and return order IDs **1 and 3**.
-   Compare schema and results with the hand-authored catalog.
-2. Produce the same compiler catalog projection after applying the same
-   application metadata. Use an offline provider stub to test evidence references;
-   do not depend on a live LLM for deterministic importer tests.
-3. Reject version drift, duplicate YAML keys/names, name collisions, unknown
-   sources/columns, incompatible logical types, unsupported dialects, and semantic
-   constructs outside the supported profile. Check that no partially loaded engine
-   is returned and that extra source columns are never exposed.
-4. Inspect the complete TPC-DS model and report every unsupported construct with
-   source paths, while preserving the original document. Do not count this as
-   executable TPC-DS support.
+The simpler [orders model](../examples/ossie/team_catalog.yaml) is also supported;
+bind its `warehouse:orders` source to the application's provider. Neither fixture
+establishes interoperability with a real team's production model.
 
-After this slice, add field metadata and selected computed expressions, then
-relationships/metrics with tests for join fanout and aggregation. Use a real team
-model to choose which capabilities come next. Catalog persistence and ontology
-execution remain separate increments; Ossie files do not themselves provide
-catalog revisions, transactions, or materialization freshness.
+Next, add selected computed expressions, then relationships/metrics with tests
+for join fanout and aggregation, guided by a real team model. The full upstream
+TPC-DS model is still outside the supported execution profile. Catalog persistence
+and ontology execution remain separate increments; Ossie files do not themselves
+provide revisions, transactions, or materialization freshness.
 
 To reproduce structural validation of the local fixture with an upstream checkout
 and a Python environment containing the versions listed above:

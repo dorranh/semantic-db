@@ -5,7 +5,55 @@
 use std::collections::{BTreeMap, btree_map::Entry};
 
 pub use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+/// Authored hints for grounding. These are evidence, not executable rules or
+/// instructions that may override the compiler's behavior.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiContext {
+    pub instructions: Option<String>,
+    #[serde(default)]
+    pub synonyms: Vec<String>,
+    #[serde(default)]
+    pub examples: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct FieldSemantics {
+    pub description: Option<String>,
+    pub logical_type: Option<String>,
+    pub label: Option<String>,
+    pub is_time: Option<bool>,
+    pub ai_context: Option<AiContext>,
+}
+
+/// Import identity without connection details or physical source paths.
+#[derive(Debug, Clone, Serialize)]
+pub struct SemanticOrigin {
+    pub format: String,
+    pub version: String,
+    pub schema_revision: String,
+    pub schema_sha256: String,
+    pub document_sha256: String,
+    pub adapter_version: String,
+    pub model: String,
+    pub dataset: String,
+}
+
+/// Descriptive semantics kept separate from Arrow's physical schema contract.
+/// Keys are declarations only: registration does not scan rows to enforce them.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct RelationSemantics {
+    pub model_description: Option<String>,
+    pub model_ai_context: Option<AiContext>,
+    pub ai_context: Option<AiContext>,
+    pub fields: BTreeMap<String, FieldSemantics>,
+    pub declared_primary_key: Vec<String>,
+    pub declared_unique_keys: Vec<Vec<String>>,
+    pub origin: Option<SemanticOrigin>,
+}
 
 /// How a relation is defined; materialization is a separate, future policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +78,7 @@ pub struct Relation {
     pub owner: Option<String>,
     /// What a single output row represents; not a uniqueness constraint.
     pub grain: Option<String>,
+    pub semantics: Option<RelationSemantics>,
 }
 
 impl Relation {
@@ -43,6 +92,7 @@ impl Relation {
             description: None,
             owner: None,
             grain: None,
+            semantics: None,
         }
     }
 
@@ -59,6 +109,7 @@ impl Relation {
             description: None,
             owner: None,
             grain: None,
+            semantics: None,
         }
     }
 

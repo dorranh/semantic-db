@@ -1,10 +1,10 @@
 # Catalog prior art and integration direction
 
-Assessment: September 11, 2026. These are design recommendations, not implemented
-external-catalog integrations.
+Assessment: September 11, 2026. The comparison records design recommendations;
+the first Ossie core importer is now implemented as described in the linked guide.
 
 The [Ossie integration exploration](ossie-integration.md) follows up with a pinned
-source assessment, validation probes, a local fixture, and an importer proposal.
+source assessment, validation probes, fixtures, and the implemented importer profile.
 
 ## Recommendation
 

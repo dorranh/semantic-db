@@ -4,6 +4,8 @@
 //! The `compiler` feature (enabled by default) adds natural-language compilation;
 //! SQL-only consumers can disable default features. No environment variables are
 //! read by the library: applications configure backends and model providers.
+//! The opt-in `ossie` feature imports pinned Ossie models with explicit source
+//! bindings; see the `ossie_wells` example.
 //!
 //! DataFusion and Arrow are re-exported to keep connector types on the same
 //! dependency version as the engine. They remain part of the public API.
@@ -14,6 +16,8 @@ pub use semantic_catalog as catalog;
 #[cfg(feature = "compiler")]
 pub use semantic_compiler as compiler;
 pub use semantic_engine as engine;
+#[cfg(feature = "ossie")]
+pub use semantic_ossie as ossie;
 pub use semantic_plan as plan;
 
 pub use semantic_catalog::{Catalog, Relation, RelationKind};
