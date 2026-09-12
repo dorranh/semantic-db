@@ -1,4 +1,10 @@
-# Ossie integration
+# Ossie integration assessment
+
+This document records the original upstream assessment and implementation. For
+current executable support, including column aliases and offline inspection, use
+the [Ossie reference](ossie-reference.md). For onboarding, use
+[Add a dataset](adding-datasets.md). Identity-only limitations below describe the
+initial September 11 baseline.
 
 Assessment and first implementation: September 11, 2026. The optional Rust
 importer now loads the wells and orders core models with explicit source bindings.

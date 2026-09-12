@@ -6,6 +6,13 @@ use semantic_compiler::provider::{OpenAiConfig, OpenAiProvider};
 /// Existing process variables take precedence. Do not mutate global environment
 /// state (unsafe once Tokio threads exist in Rust 2024).
 pub fn provider() -> super::Result<OpenAiProvider> {
+    let env = environment()?;
+    let config = parse_config(env)?;
+    Ok(OpenAiProvider::new(config)?)
+}
+
+/// The CLI resolves secrets; the shared loader never reads process state.
+pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + Sync> {
     let file = match dotenvy::from_path_iter(".env") {
         Ok(values) => values
             .collect::<std::result::Result<HashMap<_, _>, _>>()
@@ -15,8 +22,7 @@ pub fn provider() -> super::Result<OpenAiProvider> {
         }
         Err(_) => return Err("could not read .env in the current directory".into()),
     };
-    let config = parse_config(|name| std::env::var(name).ok().or_else(|| file.get(name).cloned()))?;
-    Ok(OpenAiProvider::new(config)?)
+    Ok(move |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned()))
 }
 
 fn parse_config(get: impl Fn(&str) -> Option<String>) -> super::Result<OpenAiConfig> {

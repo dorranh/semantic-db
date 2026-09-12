@@ -51,8 +51,7 @@ The complete query remains in [query.sql](query.sql). From the repository root:
 
 ```sh
 cargo run -p semantic-cli -- \
-  --ossie examples/geospatial/wells.ossie.yaml \
-  --source-csv fixtures.geospatial.wells=examples/geospatial/wells.csv \
+  --config examples/geospatial/semantic-db.yaml \
   --file examples/geospatial/query.sql
 ```
 
@@ -100,9 +99,13 @@ library example works without an API key:
 cargo run -p semantic-db --features ossie --example ossie_wells
 ```
 
-For structural validation, use a checkout at the pinned commit and the Python
-dependencies described in the [integration assessment](../../docs/ossie-integration.md):
+Validate and inspect without Python or an upstream checkout:
 
 ```sh
-python /tmp/ossie/validation/validate.py examples/geospatial/wells.ossie.yaml
+cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate
+cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --inspect
+cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate --connect
 ```
+
+Use [Add a dataset](../../docs/adding-datasets.md) to adapt this project. See the
+[Ossie reference](../../docs/ossie-reference.md) for supported mappings and aliases.

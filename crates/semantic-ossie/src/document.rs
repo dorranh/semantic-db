@@ -128,6 +128,33 @@ impl OssieDocument {
         &self.value
     }
 
+    /// Inspect executable semantics and source requirements without providers or I/O.
+    pub fn inspect(&self, model_name: Option<&str>) -> Result<ModelInspection, ImportError> {
+        let prepared = self.prepare(model_name)?;
+        Ok(ModelInspection {
+            name: prepared.name,
+            datasets: prepared
+                .definitions
+                .iter()
+                .map(|(dataset, path, _)| DatasetRequirement {
+                    name: dataset.name.clone(),
+                    source: dataset.source.clone(),
+                    path: path.clone(),
+                    fields: dataset
+                        .fields
+                        .iter()
+                        .map(|field| FieldRequirement {
+                            name: field.name.clone(),
+                            source_column: source_column(field).expect("validated expression"),
+                            datatype: field.datatype.clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+            warnings: prepared.warnings,
+        })
+    }
+
     /// Load one model into a fresh engine. With no name, exactly one model must
     /// exist. Failure never returns a partially populated engine. Keys are
     /// descriptive declarations, reported in warnings, not enforced constraints.
@@ -136,6 +163,25 @@ impl OssieDocument {
         model_name: Option<&str>,
         bindings: &SourceBindings,
     ) -> Result<ImportedCatalog, ImportError> {
+        let prepared = self.prepare(model_name)?;
+        let mut errors = Vec::new();
+        for (dataset, path, _) in &prepared.definitions {
+            if !bindings.providers.contains_key(&dataset.source) {
+                issue(
+                    &mut errors,
+                    "missing_binding",
+                    format!("{path}/source"),
+                    format!("no provider bound for {:?}", dataset.source),
+                );
+            }
+        }
+        if !errors.is_empty() {
+            return Err(ImportError::Diagnostics(errors));
+        }
+        self.load_prepared(prepared, bindings)
+    }
+
+    fn prepare(&self, model_name: Option<&str>) -> Result<PreparedModel, ImportError> {
         let models = self.value["semantic_model"]
             .as_array()
             .expect("validated array");
@@ -247,6 +293,14 @@ impl OssieDocument {
                         "expected a unique lowercase SQL identifier",
                     );
                 }
+                if field.datatype.as_deref() == Some("Opaque") {
+                    issue(
+                        &mut errors,
+                        "unsupported_datatype",
+                        format!("{fp}/datatype"),
+                        "Opaque has no executable physical-type mapping",
+                    );
+                }
                 unsupported(
                     &field.custom_extensions,
                     "custom_extensions",
@@ -270,18 +324,18 @@ impl OssieDocument {
                     .iter()
                     .find(|d| d.dialect == "ANSI_SQL")
                 {
-                    Some(d) if d.expression.trim() == field.name => {}
+                    Some(_) if source_column(field).is_some() => {}
                     Some(_) => issue(
                         &mut errors,
                         "unsupported_expression",
                         format!("{fp}/expression"),
-                        "only identity column expressions are supported",
+                        "expected a single column reference (optionally double-quoted); computed expressions are unsupported",
                     ),
                     None => issue(
                         &mut errors,
                         "unsupported_dialect",
                         format!("{fp}/expression"),
-                        "an ANSI_SQL identity expression is required",
+                        "an ANSI_SQL column expression is required",
                     ),
                 }
                 if field.expression.dialects.len() > 1 {
@@ -331,19 +385,29 @@ impl OssieDocument {
                     "keys are retained as declarations; uniqueness and non-nullness are not enforced",
                 );
             }
-            if !bindings.providers.contains_key(&dataset.source) {
-                issue(
-                    &mut errors,
-                    "missing_binding",
-                    format!("{p}/source"),
-                    format!("no provider bound for {:?}", dataset.source),
-                );
-            }
-            definitions.push((dataset, p, semantics));
+            definitions.push((dataset.clone(), p, semantics));
         }
         if !errors.is_empty() {
             return Err(ImportError::Diagnostics(errors));
         }
+        Ok(PreparedModel {
+            name: model.name,
+            definitions,
+            warnings,
+        })
+    }
+
+    fn load_prepared(
+        &self,
+        prepared: PreparedModel,
+        bindings: &SourceBindings,
+    ) -> Result<ImportedCatalog, ImportError> {
+        let PreparedModel {
+            definitions,
+            warnings,
+            ..
+        } = prepared;
+        let mut errors = Vec::new();
         let mut engine = Engine::new();
         for (dataset, path, semantics) in definitions {
             let provider = bindings.providers[&dataset.source].clone();
@@ -362,12 +426,16 @@ impl OssieDocument {
             }
             for (j, field) in dataset.fields.iter().enumerate() {
                 let p = format!("{path}/fields/{j}");
-                match schema.field_with_name(&field.name) {
+                let column = source_column(field).expect("validated expression");
+                match schema.field_with_name(&column) {
                     Err(_) => issue(
                         &mut errors,
                         "missing_column",
                         &p,
-                        format!("provider has no column {:?}", field.name),
+                        format!(
+                            "provider has no column {column:?} for field {:?}",
+                            field.name
+                        ),
                     ),
                     Ok(physical) => {
                         if let Some(logical) = &field.datatype
@@ -394,7 +462,15 @@ impl OssieDocument {
             let projection: Vec<_> = dataset
                 .fields
                 .iter()
-                .map(|f| Expr::Column(Column::new_unqualified(&f.name)))
+                .map(|f| {
+                    let column = source_column(f).expect("validated expression");
+                    let expr = Expr::Column(Column::new_unqualified(&column));
+                    if column == f.name {
+                        expr
+                    } else {
+                        expr.alias(&f.name)
+                    }
+                })
                 .collect();
             let frame = SessionContext::new()
                 .read_table(provider)?
@@ -406,6 +482,65 @@ impl OssieDocument {
             engine.register_table(relation, projected)?;
         }
         Ok(ImportedCatalog { engine, warnings })
+    }
+}
+
+/// Requirements for one executable model. Physical types are checked only on load.
+#[derive(Debug)]
+pub struct ModelInspection {
+    pub name: String,
+    pub datasets: Vec<DatasetRequirement>,
+    pub warnings: Vec<Diagnostic>,
+}
+
+#[derive(Debug)]
+pub struct DatasetRequirement {
+    pub name: String,
+    pub source: String,
+    pub path: String,
+    pub fields: Vec<FieldRequirement>,
+}
+
+#[derive(Debug)]
+pub struct FieldRequirement {
+    pub name: String,
+    pub source_column: String,
+    pub datatype: Option<String>,
+}
+
+struct PreparedModel {
+    name: String,
+    definitions: Vec<(Dataset, String, RelationSemantics)>,
+    warnings: Vec<Diagnostic>,
+}
+
+fn source_column(field: &Field) -> Option<String> {
+    let text = field
+        .expression
+        .dialects
+        .iter()
+        .find(|d| d.dialect == "ANSI_SQL")?
+        .expression
+        .trim();
+    if let Some(inner) = text.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        if inner.is_empty() {
+            return None;
+        }
+        let mut chars = inner.chars();
+        let mut name = String::new();
+        while let Some(ch) = chars.next() {
+            if ch == '"' && chars.next() != Some('"') {
+                return None;
+            }
+            name.push(ch);
+        }
+        Some(name)
+    } else {
+        let mut chars = text.chars();
+        let first = chars.next()?;
+        ((first.is_ascii_alphabetic() || first == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        .then(|| text.to_owned())
     }
 }
 
@@ -479,7 +614,7 @@ fn compatible(logical: &str, physical: &DataType) -> bool {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Model {
     name: String,
     description: Option<String>,
@@ -492,7 +627,7 @@ struct Model {
     #[serde(default)]
     custom_extensions: Vec<Value>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Dataset {
     name: String,
     source: String,
@@ -507,7 +642,7 @@ struct Dataset {
     #[serde(default)]
     custom_extensions: Vec<Value>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Field {
     name: String,
     expression: Expression,
@@ -519,16 +654,16 @@ struct Field {
     #[serde(default)]
     custom_extensions: Vec<Value>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Expression {
     dialects: Vec<DialectExpression>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct DialectExpression {
     dialect: String,
     expression: String,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Dimension {
     is_time: Option<bool>,
 }

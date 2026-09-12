@@ -1,12 +1,41 @@
 # Embedding Semantic DB
 
-A team owns its catalog definitions, source connections, and model configuration.
-Semantic DB turns a snapshot of those definitions into a queryable session. Start
-with the [complete example](../crates/semantic-db/examples/team_catalog.rs):
+Use the `semantic-db` facade as one dependency. Packages are unpublished; for a
+local checkout:
 
-```sh
-cargo run -p semantic-db --example team_catalog
+```toml
+[dependencies]
+semantic-db = { path = "../semantic-db/crates/semantic-db", features = ["sources", "github"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
+
+## Load the same project as the CLI
+
+```rust,ignore
+use semantic_db::sources::{Project, Registry};
+
+let project = Project::from_path("examples/geospatial/semantic-db.yaml")?;
+let registry = Registry::standard();
+let inspection = project.inspect(&registry)?; // Offline; no credentials/providers.
+let imported = project.load(&registry, &|name| std::env::var(name).ok()).await?;
+let batches = imported.engine.query("SELECT * FROM wells LIMIT 10").await?;
+```
+
+The application chooses its secret resolver; the library does not read process
+variables or `.env` itself. Use `Project::new` with a parsed `ProjectConfig`,
+`OssieDocument`, and explicit base directory for in-memory configuration. Register
+custom factories with `Registry::register` or construct an empty `Registry::new`
+to allow only selected connectors. See [configuration](connectors.md) and
+[connector development](building-connectors.md).
+
+`features = ["sources"]` includes Ossie and CSV loading; adding `github` registers
+GitHub in the standard registry. For SQL-only use set `default-features = false`.
+The optional `compiler` feature remains independent of configured loading.
+
+If you already have providers, use the direct Ossie bindings below. If you own
+another catalog representation with Arrow schemas, use `Engine::from_catalog`
+and `RelationBackend`. The [team catalog example](../crates/semantic-db/examples/team_catalog.rs)
+demonstrates that lower-level path.
 
 ## Catalog definitions
 
@@ -94,7 +123,9 @@ let engine = imported.engine;
 connectors bind their own providers with `bind`. Bindings are reused during
 projection and registration; the adapter derives Arrow schemas from the bound
 providers rather than guessing widths or nullability from logical Ossie types.
-Each dataset exposes only its explicitly declared fields in document order.
+Each dataset exposes only its explicitly declared fields in document order, including
+checked single-column aliases. `document.inspect(model)` returns source and field
+requirements without bindings or I/O.
 Source strings are opaque binding keys and are never automatically run as SQL or
 interpreted as URLs. Duplicate bindings fail.
 
@@ -103,7 +134,7 @@ It returns a fresh engine or document-path diagnostics, never a partial engine.
 `OssieDocument::parse` checks the pinned JSON Schema, while `load` checks executable
 capabilities and source contracts. `original_text()` and `json()` retain the
 source document, including features that prevent executable import. See the
-[supported profile](ossie-integration.md#implemented-import-profile).
+[supported profile](ossie-reference.md).
 
 Metadata lives in `Relation.semantics`: model/field descriptions, AI context,
 logical field types, time roles, labels, declared keys, and import provenance.

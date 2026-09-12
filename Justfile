@@ -1,0 +1,21 @@
+# Format the Rust workspace.
+format:
+    cargo fmt --all
+
+# Lint every target and feature, treating warnings as errors.
+lint:
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+# Type-check every target and feature without building executables.
+check:
+    cargo check --workspace --all-targets --all-features --locked
+
+# Run offline workspace tests and the connector template tests.
+test:
+    cargo test --workspace --all-features --locked
+    cargo test -p semantic-cli --example custom_connector --locked
+
+# Build and run the CLI, forwarding arguments unchanged.
+[positional-arguments]
+cli *args:
+    cargo run -p semantic-cli --locked -- "$@"

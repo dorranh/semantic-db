@@ -1,0 +1,28 @@
+[package]
+name = "semantic-sources"
+description = "Shared configured source loading and connector registry for Semantic DB"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+github = ["dep:semantic-github"]
+
+[dependencies]
+semantic-engine.workspace = true
+semantic-ossie.workspace = true
+semantic-github = { workspace = true, optional = true }
+datafusion.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

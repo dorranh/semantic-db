@@ -48,7 +48,7 @@ retrieval are still outstanding.
 - CLI `--ossie`, `--ossie-model`, and `--source-csv` support.
 - Wells query equivalence, compiler metadata, rejection, and CLI integration tests.
 
-See the [integration guide](../ossie-integration.md) for the supported profile.
+See the [Ossie reference](../ossie-reference.md) for the supported profile.
 
 ## GitHub remote experiment delivered
 
@@ -57,9 +57,19 @@ See the [integration guide](../ossie-integration.md) for the supported profile.
 - Ossie model, SQL/natural-language example, and local CSV ownership joins.
 - Remote/local result equivalence tests and HTTP/error/cancellation probes.
 
-See the [experiment and findings](../../examples/github/README.md). Filters and
+See the [experiment and findings](../../examples/github/README.md). Other filters and
 joins remain local; typed source capabilities, efficient pushdown, shared query
 budgets, and snapshot semantics are still open.
+
+## Dataset and connector onboarding delivered
+
+- Shared `semantic-sources` project loader and extensible factory/connection registry.
+- CSV and GitHub use the same configured CLI and embedded loading path.
+- Offline model/config validation and inspection; optional connected schema checks.
+- Single-column Ossie aliases, including exact quoted physical names.
+- Reusable CLI host, runnable paginated connector template, and result-conformance helper.
+- Exact GitHub issue-state equality pushdown, compared with local/reference scans.
+- Task-oriented [dataset](../adding-datasets.md) and [connector](../building-connectors.md) guides.
 
 ## Next increments
 
@@ -70,7 +80,7 @@ budgets, and snapshot semantics are still open.
 | Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |
 | Intent compiler, next stage | Richer typed IR and deterministic lowering beyond the delivered LLM adapter | Expand live evaluations and validate semantic coverage, units, grain, and concept definitions |
-| Remote provider optimization | Typed scope/capabilities and exact GitHub repository/state pushdown | Optimized results match the baseline across NULLs, pagination, residual filters, and limits; request counts improve |
+| Remote provider optimization | Typed scope/capabilities, repository pruning and remote field selection beyond state equality | Optimized results match the baseline across NULLs, pagination, residual filters, and limits; request counts improve |
 | Semantic operators | One precisely defined search/table-function integration | Candidate limits and approximation are visible; model/index versions are recorded |
 | Durable derived relations | Definition revisioning, dependency invalidation, optional materialization | Views compose after reload; stale materializations cannot silently satisfy a query |
 | Service execution | Streaming, cancellation, resource budgets, auth, and observability | Resource limits and cancellation propagate to connectors; query provenance is inspectable |

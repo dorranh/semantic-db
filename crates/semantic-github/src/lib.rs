@@ -1,7 +1,7 @@
 //! Experimental, read-only GitHub GraphQL tables over an explicit repository set.
 //!
-//! Rows are fetched only when polled. Filters, joins, aggregates, and column
-//! selection run in DataFusion; the wire queries deliberately have fixed fields.
+//! Rows are fetched only when polled. Issue state equality can be pushed to
+//! GitHub. Other filters, joins, aggregates, and column selection stay local.
 //! Each scan has its own request budget and cursor state. There is no snapshot
 //! isolation, automatic retry, or query-wide budget across multiple scans.
 
@@ -15,17 +15,21 @@ use std::{
     time::Duration,
 };
 
+use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{ArrayRef, Int64Array, StringArray, TimestampMillisecondArray},
         datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
         record_batch::RecordBatch,
     },
-    catalog::{TableProvider, streaming::StreamingTable},
+    catalog::{Session, TableProvider, empty::EmptyTable, streaming::StreamingTable},
+    common::ScalarValue,
     error::{DataFusionError, Result},
     execution::TaskContext,
+    logical_expr::{Expr, Operator, TableProviderFilterPushDown, TableType},
     physical_plan::{
-        SendableRecordBatchStream, stream::RecordBatchStreamAdapter, streaming::PartitionStream,
+        ExecutionPlan, SendableRecordBatchStream, stream::RecordBatchStreamAdapter,
+        streaming::PartitionStream,
     },
 };
 use reqwest::{
@@ -36,10 +40,10 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 const ISSUES_QUERY: &str = r#"
-query SemanticDbIssues($owner: String!, $name: String!, $first: Int!, $after: String) {
+query SemanticDbIssues($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!]) {
   repository(owner: $owner, name: $name) {
     nameWithOwner
-    issues(first: $first, after: $after, orderBy: {field: CREATED_AT, direction: ASC}) {
+    issues(first: $first, after: $after, states: $states, orderBy: {field: CREATED_AT, direction: ASC}) {
       nodes { id number title state author { login } createdAt updatedAt closedAt url }
       pageInfo { hasNextPage endCursor }
     }
@@ -71,6 +75,8 @@ pub struct GitHubConfig {
     pub max_requests_per_scan: usize,
     pub request_timeout: Duration,
     pub max_response_bytes: usize,
+    /// Disable to compare optimized scans with local residual execution.
+    pub filter_pushdown: bool,
 }
 
 impl GitHubConfig {
@@ -83,7 +89,57 @@ impl GitHubConfig {
             max_requests_per_scan: 100,
             request_timeout: Duration::from_secs(30),
             max_response_bytes: 4 * 1024 * 1024,
+            filter_pushdown: true,
         }
+    }
+    /// Validate scope, endpoint and budgets without credentials or network I/O.
+    pub fn validate(&self) -> Result<()> {
+        if self.repositories.is_empty()
+            || !(1..=100).contains(&self.page_size)
+            || self.max_requests_per_scan == 0
+            || self.request_timeout.is_zero()
+            || self.max_response_bytes == 0
+        {
+            return Err(error(
+                "invalid configuration: repository scope and budgets must be nonempty/positive; page size must be 1–100",
+            ));
+        }
+        let mut seen = BTreeSet::new();
+        for repository in &self.repositories {
+            let parts: Vec<_> = repository.split('/').collect();
+            if parts.len() != 2
+                || parts.iter().any(|s| {
+                    s.is_empty()
+                        || !s
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+                })
+            {
+                return Err(error(
+                    "repository scope must contain owner/name identifiers",
+                ));
+            }
+            if !seen.insert(repository.to_ascii_lowercase()) {
+                return Err(error("duplicate repository in scope"));
+            }
+        }
+        let endpoint = Url::parse(&self.endpoint).map_err(|_| error("invalid endpoint"))?;
+        let loopback = matches!(
+            endpoint.host_str(),
+            Some("localhost" | "127.0.0.1" | "[::1]")
+        );
+        if (endpoint.scheme() != "https" && !(endpoint.scheme() == "http" && loopback))
+            || endpoint.host_str().is_none()
+            || !endpoint.username().is_empty()
+            || endpoint.password().is_some()
+            || endpoint.query().is_some()
+            || endpoint.fragment().is_some()
+        {
+            return Err(error(
+                "endpoint must be HTTPS (or loopback HTTP), without credentials, query or fragment",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -123,52 +179,11 @@ impl fmt::Debug for GitHub {
 
 impl GitHub {
     pub fn new(mut config: GitHubConfig) -> Result<Self> {
-        if config.token.trim().is_empty()
-            || config.repositories.is_empty()
-            || !(1..=100).contains(&config.page_size)
-            || config.max_requests_per_scan == 0
-            || config.request_timeout.is_zero()
-            || config.max_response_bytes == 0
-        {
-            return Err(error(
-                "invalid configuration: token, repository scope and budgets must be nonempty/positive; page size must be 1–100",
-            ));
-        }
-        let mut seen = BTreeSet::new();
-        for repository in &config.repositories {
-            let parts: Vec<_> = repository.split('/').collect();
-            if parts.len() != 2
-                || parts.iter().any(|s| {
-                    s.is_empty()
-                        || !s
-                            .bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-                })
-            {
-                return Err(error(
-                    "repository scope must contain owner/name identifiers",
-                ));
-            }
-            if !seen.insert(repository.to_ascii_lowercase()) {
-                return Err(error("duplicate repository in scope"));
-            }
+        config.validate()?;
+        if config.token.trim().is_empty() {
+            return Err(error("token must be nonempty"));
         }
         let endpoint = Url::parse(&config.endpoint).map_err(|_| error("invalid endpoint"))?;
-        let loopback = matches!(
-            endpoint.host_str(),
-            Some("localhost" | "127.0.0.1" | "[::1]")
-        );
-        if (endpoint.scheme() != "https" && !(endpoint.scheme() == "http" && loopback))
-            || endpoint.host_str().is_none()
-            || !endpoint.username().is_empty()
-            || endpoint.password().is_some()
-            || endpoint.query().is_some()
-            || endpoint.fragment().is_some()
-        {
-            return Err(error(
-                "endpoint must be HTTPS (or loopback HTTP), without credentials, query or fragment",
-            ));
-        }
         let mut authorization = HeaderValue::from_str(&format!("Bearer {}", config.token))
             .map_err(|_| error("invalid authorization header"))?;
         authorization.set_sensitive(true);
@@ -192,7 +207,9 @@ impl GitHub {
     }
 
     pub fn issues(&self) -> Result<Arc<dyn TableProvider>> {
-        self.table(Kind::Issues)
+        Ok(Arc::new(IssueTable {
+            github: self.clone(),
+        }))
     }
 
     pub fn issue_labels(&self) -> Result<Arc<dyn TableProvider>> {
@@ -208,9 +225,92 @@ impl GitHub {
         let partition = Arc::new(GitHubPartition {
             github: self.clone(),
             kind,
+            state_filter: None,
             schema: schema.clone(),
         });
         Ok(Arc::new(StreamingTable::try_new(schema, vec![partition])?))
+    }
+}
+
+/// Minimal custom provider: translate one exact predicate, then reuse DataFusion's
+/// streaming plan for projection and safe limits. All row I/O remains in Scan.
+#[derive(Debug)]
+struct IssueTable {
+    github: GitHub,
+}
+
+// Deliberately narrow: SQL case-sensitive equality to a known enum value.
+// Functions, OR, NULL, casts and other expressions fall back to DataFusion.
+fn state_equality(expr: &Expr) -> Option<&str> {
+    let Expr::BinaryExpr(binary) = expr else {
+        return None;
+    };
+    if binary.op != Operator::Eq {
+        return None;
+    }
+    let pair = match (binary.left.as_ref(), binary.right.as_ref()) {
+        (Expr::Column(column), Expr::Literal(ScalarValue::Utf8(Some(value)), _)) => (column, value),
+        (Expr::Literal(ScalarValue::Utf8(Some(value)), _), Expr::Column(column)) => (column, value),
+        _ => return None,
+    };
+    (pair.0.name == "state" && matches!(pair.1.as_str(), "OPEN" | "CLOSED"))
+        .then_some(pair.1.as_str())
+}
+
+#[async_trait]
+impl TableProvider for IssueTable {
+    fn schema(&self) -> SchemaRef {
+        Kind::Issues.schema()
+    }
+    fn table_type(&self) -> TableType {
+        TableType::Base
+    }
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> Result<Vec<TableProviderFilterPushDown>> {
+        Ok(filters
+            .iter()
+            .map(|expr| {
+                if self.github.connection.config.filter_pushdown && state_equality(expr).is_some() {
+                    TableProviderFilterPushDown::Exact
+                } else {
+                    TableProviderFilterPushDown::Unsupported
+                }
+            })
+            .collect())
+    }
+    async fn scan(
+        &self,
+        session: &dyn Session,
+        projection: Option<&Vec<usize>>,
+        filters: &[Expr],
+        limit: Option<usize>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let mut state_filter: Option<String> = None;
+        for filter in filters {
+            let state = state_equality(filter)
+                .ok_or_else(|| error("unsupported filter passed to issue scan"))?;
+            if state_filter
+                .as_deref()
+                .is_some_and(|previous| previous != state)
+            {
+                return EmptyTable::new(self.schema())
+                    .scan(session, projection, &[], limit)
+                    .await;
+            }
+            state_filter = Some(state.to_owned());
+        }
+        let schema = self.schema();
+        let partition = Arc::new(GitHubPartition {
+            github: self.github.clone(),
+            kind: Kind::Issues,
+            schema: schema.clone(),
+            state_filter,
+        });
+        StreamingTable::try_new(schema, vec![partition])?
+            .scan(session, projection, &[], limit)
+            .await
     }
 }
 
@@ -256,6 +356,7 @@ impl Kind {
 #[derive(Debug)]
 struct GitHubPartition {
     github: GitHub,
+    state_filter: Option<String>,
     kind: Kind,
     schema: SchemaRef,
 }
@@ -270,6 +371,7 @@ impl PartitionStream for GitHubPartition {
         let state = Scan {
             github: self.github.clone(),
             kind: self.kind,
+            state_filter: self.state_filter.clone(),
             schema: self.schema.clone(),
             repository_index: 0,
             canonical_repositories: BTreeSet::new(),
@@ -319,6 +421,7 @@ struct PendingLabels {
 
 struct Scan {
     github: GitHub,
+    state_filter: Option<String>,
     kind: Kind,
     schema: SchemaRef,
     repository_index: usize,
@@ -420,6 +523,7 @@ impl Scan {
             let first_page = self.issue_cursor.after.is_none();
             let response: IssueData = self.request(ISSUES_QUERY, json!({
                 "owner": owner, "name": name, "first": first, "after": self.issue_cursor.after,
+                "states": self.state_filter.as_ref().map(|state| vec![state]),
             })).await?;
             let repository = response
                 .repository
@@ -437,6 +541,15 @@ impl Scan {
             }
             match self.kind {
                 Kind::Issues => {
+                    if let Some(expected) = &self.state_filter
+                        && repository
+                            .issues
+                            .nodes
+                            .iter()
+                            .any(|issue| &issue.state != expected)
+                    {
+                        return Err(error("response violates pushed issue state filter"));
+                    }
                     let batch = issue_batch(
                         &self.schema,
                         &repository.name_with_owner,

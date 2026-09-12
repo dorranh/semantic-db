@@ -9,6 +9,8 @@ rust-version = "1.94"
 publish = false
 
 [workspace.dependencies]
+semantic-sources = { path = "crates/semantic-sources" }
+async-trait = "0.1"
 semantic-catalog = { path = "crates/semantic-catalog" }
 semantic-plan = { path = "crates/semantic-plan" }
 semantic-ossie = { path = "crates/semantic-ossie" }

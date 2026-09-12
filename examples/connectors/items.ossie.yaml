@@ -1,0 +1,14 @@
+version: 0.2.0.dev0
+semantic_model:
+  - name: demo
+    datasets:
+      - name: items
+        source: demo.items
+        description: Five simulated API items, one row per item.
+        fields:
+          - name: id
+            datatype: Integer
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: id

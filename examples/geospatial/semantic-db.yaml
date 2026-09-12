@@ -1,0 +1,8 @@
+ossie: wells.ossie.yaml
+connections:
+  local:
+    connector: csv
+sources:
+  fixtures.geospatial.wells:
+    connection: local
+    path: wells.csv

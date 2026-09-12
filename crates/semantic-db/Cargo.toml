@@ -10,9 +10,11 @@ publish.workspace = true
 default = ["compiler"]
 compiler = ["dep:semantic-compiler"]
 ossie = ["dep:semantic-ossie"]
-github = ["dep:semantic-github"]
+sources = ["ossie", "dep:semantic-sources"]
+github = ["dep:semantic-github", "semantic-sources?/github"]
 
 [dependencies]
+semantic-sources = { workspace = true, optional = true }
 semantic-catalog.workspace = true
 semantic-engine.workspace = true
 semantic-plan.workspace = true
@@ -24,9 +26,6 @@ datafusion.workspace = true
 [dev-dependencies]
 tokio.workspace = true
 serde_json.workspace = true
-clap.workspace = true
-dotenvy.workspace = true
-rustyline.workspace = true
 
 [[example]]
 name = "ossie_wells"
@@ -34,7 +33,7 @@ required-features = ["ossie"]
 
 [[example]]
 name = "github"
-required-features = ["ossie", "github", "compiler"]
+required-features = ["sources", "github"]
 
 [lints]
 workspace = true

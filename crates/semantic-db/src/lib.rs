@@ -1,6 +1,7 @@
 //! Embed Semantic DB with an application-owned catalog and relation backend.
 //!
-//! Start with [`Engine::from_catalog`], [`Relation`], and [`RelationBackend`].
+//! With `sources`, load the same configured Ossie project as the CLI. For an
+//! application-owned catalog, use [`Engine::from_catalog`] and [`RelationBackend`].
 //! The `compiler` feature (enabled by default) adds natural-language compilation;
 //! SQL-only consumers can disable default features. No environment variables are
 //! read by the library: applications configure backends and model providers.
@@ -21,6 +22,8 @@ pub use semantic_github as github;
 #[cfg(feature = "ossie")]
 pub use semantic_ossie as ossie;
 pub use semantic_plan as plan;
+#[cfg(feature = "sources")]
+pub use semantic_sources as sources;
 
 pub use semantic_catalog::{Catalog, Relation, RelationKind};
 #[cfg(feature = "compiler")]

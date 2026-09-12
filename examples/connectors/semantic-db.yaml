@@ -1,0 +1,9 @@
+ossie: items.ossie.yaml
+connections:
+  pages:
+    connector: demo
+    page_size: 2
+sources:
+  demo.items:
+    connection: pages
+    rows: 5

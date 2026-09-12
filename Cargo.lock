@@ -2931,11 +2931,15 @@ name = "semantic-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "datafusion",
  "dotenvy",
+ "futures",
  "rustyline",
  "semantic-compiler",
  "semantic-engine",
  "semantic-ossie",
+ "semantic-sources",
+ "serde",
  "serde_json",
  "tokio",
 ]
@@ -2958,16 +2962,14 @@ dependencies = [
 name = "semantic-db"
 version = "0.1.0"
 dependencies = [
- "clap",
  "datafusion",
- "dotenvy",
- "rustyline",
  "semantic-catalog",
  "semantic-compiler",
  "semantic-engine",
  "semantic-github",
  "semantic-ossie",
  "semantic-plan",
+ "semantic-sources",
  "serde_json",
  "tokio",
 ]
@@ -2986,6 +2988,7 @@ dependencies = [
 name = "semantic-github"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "datafusion",
  "futures",
@@ -3020,6 +3023,22 @@ name = "semantic-plan"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "semantic-sources"
+version = "0.1.0"
+dependencies = [
+ "datafusion",
+ "futures",
+ "semantic-engine",
+ "semantic-github",
+ "semantic-ossie",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

@@ -113,6 +113,7 @@ impl Server {
         let mut config = GitHubConfig::new("fixture-token".into(), vec!["acme/widget".into()]);
         config.endpoint = self.url.clone();
         config.page_size = 2;
+        config.filter_pushdown = false;
         config
     }
 }
@@ -620,4 +621,129 @@ async fn compiler_receives_semantics_and_clarification_does_not_execute_github()
         result(&reference().await, &query.sql).await
     );
     assert_eq!(github.request_count(), 2);
+}
+
+#[tokio::test]
+async fn exact_state_pushdown_matches_local_results_and_reduces_pages_through_ossie() {
+    let server = Server::new(|request, _| {
+        let vars = &request["variables"];
+        assert!(
+            request["query"]
+                .as_str()
+                .unwrap()
+                .contains("states: $states")
+        );
+        let mut nodes = vec![
+            issue(1, "CLOSED", Some("alice")),
+            issue(2, "OPEN", None),
+            issue(3, "OPEN", Some("alice")),
+        ];
+        if let Some(states) = vars["states"].as_array() {
+            assert_eq!(states.len(), 1);
+            nodes.retain(|node| states.contains(&node["state"]));
+        }
+        let offset = vars["after"]
+            .as_str()
+            .map(|v| v.parse::<usize>().unwrap())
+            .unwrap_or(0);
+        let end = (offset + vars["first"].as_u64().unwrap() as usize).min(nodes.len());
+        let next = (end < nodes.len()).then(|| end.to_string());
+        (200, json!({"data":{"repository":{"nameWithOwner":"acme/widget", "issues":page(nodes[offset..end].to_vec(), next.as_deref())}}}).to_string(), Duration::ZERO)
+    });
+    let mut config = server.config();
+    config.page_size = 1;
+    config.filter_pushdown = true;
+    let github = GitHub::new(config.clone()).unwrap();
+    let optimized = remote(&github).await;
+    config.filter_pushdown = false;
+    let baseline_client = GitHub::new(config).unwrap();
+    let baseline = remote(&baseline_client).await;
+    let reference = reference().await;
+    let queries = [
+        "SELECT number FROM issues WHERE state = 'OPEN' ORDER BY number",
+        "SELECT number FROM issues WHERE 'CLOSED' = state ORDER BY number",
+        "SELECT number FROM issues WHERE state = 'OPEN' AND author_login IS NULL ORDER BY number",
+        "SELECT number FROM issues WHERE state = 'OPEN' AND title LIKE '%3' LIMIT 1",
+        "SELECT number FROM issues WHERE state = 'OPEN' ORDER BY number DESC LIMIT 1",
+        "SELECT COUNT(*) FROM issues WHERE state = 'OPEN'",
+        "SELECT number FROM issues WHERE state = 'open' ORDER BY number",
+        "SELECT number FROM issues WHERE lower(state) = 'open' ORDER BY number",
+        "SELECT number FROM issues WHERE state = 'OPEN' OR number = 1 ORDER BY number",
+        "SELECT number FROM issues WHERE state = 'OPEN' AND state = 'CLOSED'",
+        "SELECT number FROM issues WHERE state IS NULL",
+        "SELECT number FROM issues WHERE state = CAST(NULL AS VARCHAR)",
+        "SELECT number FROM issues WHERE state = 'OPEN' LIMIT 0",
+        include_str!("../../../examples/github/open_issues_by_team.sql"),
+    ];
+    optimized.plan_sql(queries[0]).await.unwrap();
+    assert_eq!(github.request_count(), 0);
+    for sql in queries {
+        let expected = result(&reference, sql).await;
+        assert_eq!(result(&optimized, sql).await, expected, "optimized: {sql}");
+        assert_eq!(result(&baseline, sql).await, expected, "baseline: {sql}");
+    }
+    let before = github.request_count();
+    result(&optimized, queries[0]).await;
+    assert_eq!(github.request_count() - before, 2);
+    let before = baseline_client.request_count();
+    result(&baseline, queries[0]).await;
+    assert_eq!(baseline_client.request_count() - before, 3);
+
+    // Alias projection must preserve pushdown all the way to the remote source.
+    let mut model: Value = github_model();
+    let fields = model["semantic_model"][0]["datasets"][0]["fields"]
+        .as_array_mut()
+        .unwrap();
+    fields
+        .iter_mut()
+        .find(|field| field["name"] == "state")
+        .unwrap()["name"] = json!("issue_state");
+    let mut sources = SourceBindings::new();
+    sources
+        .bind("github.scoped.issues", github.issues().unwrap())
+        .unwrap();
+    sources
+        .bind("github.scoped.issue_labels", github.issue_labels().unwrap())
+        .unwrap();
+    sources
+        .bind(
+            "local.repository_teams",
+            view("SELECT 'acme/widget' AS repository, 'Platform' AS team").await,
+        )
+        .unwrap();
+    let aliased = OssieDocument::parse(&model.to_string())
+        .unwrap()
+        .load(None, &sources)
+        .unwrap();
+    let before = github.request_count();
+    assert_eq!(
+        result(
+            &aliased.engine,
+            "SELECT number FROM issues WHERE issue_state = 'OPEN' ORDER BY number"
+        )
+        .await,
+        result(&reference, queries[0]).await
+    );
+    assert_eq!(github.request_count() - before, 2);
+}
+
+fn github_model() -> Value {
+    OssieDocument::parse(include_str!("../../../examples/github/github.ossie.yaml"))
+        .unwrap()
+        .json()
+        .clone()
+}
+
+#[tokio::test]
+async fn rejects_remote_rows_that_violate_an_exact_pushed_filter() {
+    let server = Server::fixture();
+    let mut config = server.config();
+    config.filter_pushdown = true;
+    let engine = remote(&GitHub::new(config).unwrap()).await;
+    let error = engine
+        .query("SELECT number FROM issues WHERE state = 'OPEN'")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("violates pushed issue state filter"));
 }

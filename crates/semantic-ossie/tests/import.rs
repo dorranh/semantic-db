@@ -277,11 +277,6 @@ fn rejects_unsupported_semantics_and_binding_errors_with_paths() {
             "missing_binding",
         ),
         (
-            "/semantic_model/0/datasets/0/fields/0/name",
-            json!("missing"),
-            "unsupported_expression",
-        ),
-        (
             "/semantic_model/0/datasets/0/fields/0/datatype",
             json!("String"),
             "type_mismatch",
@@ -387,4 +382,108 @@ fn selects_models_and_rejects_duplicates() {
     );
     let mut sources = bindings();
     assert!(sources.bind("private:items", table()).is_err());
+}
+
+#[tokio::test]
+async fn aliases_preserve_physical_types_nulls_and_only_expose_semantic_names() {
+    let mut input = simple();
+    input["semantic_model"][0]["datasets"][0]["fields"][0]["name"] = json!("item_id");
+    let document = OssieDocument::parse(&input.to_string()).unwrap();
+    let inspection = document.inspect(None).unwrap();
+    assert_eq!(inspection.datasets[0].source, "private:items");
+    assert_eq!(inspection.datasets[0].fields[0].source_column, "id");
+    let imported = document.load(None, &bindings()).unwrap();
+    let batches = imported
+        .engine
+        .query("SELECT item_id FROM items ORDER BY item_id NULLS LAST")
+        .await
+        .unwrap();
+    assert_eq!(batches[0].schema().field(0).data_type(), &DataType::Int32);
+    assert_eq!(batches[0].column(0).null_count(), 1);
+    assert!(imported.engine.query("SELECT id FROM items").await.is_err());
+    assert!(
+        imported
+            .engine
+            .query("SELECT secret FROM items")
+            .await
+            .is_err()
+    );
+
+    for physical in ["ORDER_ID", "Order ID", "Order\"ID", "warehouse.id"] {
+        let mut input = simple();
+        input["semantic_model"][0]["datasets"][0]["fields"][0]["expression"]["dialects"][0]["expression"] =
+            json!(format!("\"{}\"", physical.replace('"', "\"\"")));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            physical,
+            DataType::Int32,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![7]))])
+            .unwrap();
+        let mut sources = SourceBindings::new();
+        sources
+            .bind(
+                "private:items",
+                Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+            )
+            .unwrap();
+        let document = OssieDocument::parse(&input.to_string()).unwrap();
+        assert_eq!(
+            document.inspect(None).unwrap().datasets[0].fields[0].source_column,
+            physical
+        );
+        assert_eq!(
+            document
+                .load(None, &sources)
+                .unwrap()
+                .engine
+                .query("SELECT id FROM items")
+                .await
+                .unwrap()[0]
+                .num_rows(),
+            1
+        );
+    }
+}
+
+#[test]
+fn offline_inspection_rejects_computation_and_ambiguous_column_syntax() {
+    for expression in [
+        "id + 1",
+        "items.id",
+        "id AS renamed",
+        "*",
+        "\"\"",
+        "\"id\"\"",
+        "id; SELECT 1",
+        "coalesce(id, 0)",
+    ] {
+        let mut input = simple();
+        input["semantic_model"][0]["datasets"][0]["fields"][0]["expression"]["dialects"][0]["expression"] =
+            json!(expression);
+        let error = OssieDocument::parse(&input.to_string())
+            .unwrap()
+            .inspect(None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("unsupported_expression"),
+            "{expression}: {error}"
+        );
+        assert!(error.contains("/semantic_model/0/datasets/0/fields/0/expression"));
+    }
+}
+
+#[test]
+fn offline_inspection_rejects_opaque_without_a_provider() {
+    let mut input = simple();
+    input["semantic_model"][0]["datasets"][0]["fields"][0]["datatype"] = json!("Opaque");
+    assert!(
+        OssieDocument::parse(&input.to_string())
+            .unwrap()
+            .inspect(None)
+            .unwrap_err()
+            .to_string()
+            .contains("unsupported_datatype")
+    );
 }

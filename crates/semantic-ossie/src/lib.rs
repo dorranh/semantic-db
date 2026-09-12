@@ -5,7 +5,10 @@
 
 mod document;
 
-pub use document::{Diagnostic, ImportError, OssieDocument, SCHEMA_COMMIT, SPEC_VERSION};
+pub use document::{
+    DatasetRequirement, Diagnostic, FieldRequirement, ImportError, ModelInspection, OssieDocument,
+    SCHEMA_COMMIT, SPEC_VERSION,
+};
 
 use datafusion::prelude::{CsvReadOptions, SessionContext};
 use semantic_engine::{Engine, TableProvider};

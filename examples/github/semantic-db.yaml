@@ -1,0 +1,20 @@
+ossie: github.ossie.yaml
+connections:
+  github:
+    connector: github
+    token_env: GITHUB_TOKEN
+    repositories: [apache/ossie]
+    page_size: 100
+    max_requests_per_scan: 100
+  local:
+    connector: csv
+sources:
+  github.scoped.issues:
+    connection: github
+    collection: issues
+  github.scoped.issue_labels:
+    connection: github
+    collection: issue_labels
+  local.repository_teams:
+    connection: local
+    path: repository_teams.csv
