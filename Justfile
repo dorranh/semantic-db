@@ -19,3 +19,8 @@ test:
 [positional-arguments]
 cli *args:
     cargo run -p semantic-cli --locked -- "$@"
+
+# Open an example REPL: geospatial (default), or github (requires GITHUB_TOKEN).
+[positional-arguments]
+repl example="geospatial":
+    cargo run -p semantic-cli --locked -- --config "examples/$1/semantic-db.yaml"
