@@ -126,7 +126,7 @@ but avoid using unstable plan formatting as the sole correctness assertion.
 - Retrieval provider, broader semantic evaluation data, and token/cost budgets.
 - Scope/capability contracts and whether an existing federation extension fits API joins.
 - Materialization freshness rules and source snapshot guarantees.
-- Project license and any future public API stability policy.
+- Any future public API stability policy.
 
 None of these decisions prevents developing and testing the current local SQL
 and relation-registration foundation.

@@ -166,8 +166,8 @@ replaces an existing provider.
 
 The library exposes DataFusion `DataFrame`, `TableProvider`, and Arrow types.
 Use its re-exports or a compatible DataFusion version in your connector; upgrades
-to these dependencies can affect the public API. Packages remain unpublished
-and no project license has been selected yet.
+to these dependencies can affect the public API. Packages remain unpublished.
+Semantic DB is licensed under the [Apache License 2.0](../LICENSE).
 
 ## Queries and natural language
 

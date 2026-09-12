@@ -4,6 +4,7 @@ description = "Catalog-aware natural-language compilation with pluggable model p
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 publish.workspace = true
 
 [dependencies]

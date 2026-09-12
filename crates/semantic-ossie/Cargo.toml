@@ -4,6 +4,7 @@ description = "Pinned Ossie semantic model imports with application-owned source
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 publish.workspace = true
 
 [dependencies]

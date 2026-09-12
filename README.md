@@ -94,7 +94,7 @@ cargo test -p semantic-cli --example custom_connector --locked
 
 Tests use fixtures and local HTTP servers; no API key is needed. Optional live
 checks are ignored by default. Commit `Cargo.lock` for reproducible builds.
-A project license has not yet been selected.
+Licensed under the [Apache License 2.0](LICENSE). Third-party components retain their own licenses and notices.
 
 The facade is `crates/semantic-db`. Source configuration lives in
 `crates/semantic-sources`; catalog, Ossie import, execution, compiler, and GitHub
