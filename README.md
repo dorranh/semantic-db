@@ -1,6 +1,6 @@
 # Semantic DB
 
-A semantic query engine for all your data. Give your datasets business meaning, then query across them—wherever they live.
+A semantic query engine for all your data. Give your datasets business meaning then query across them - wherever they live.
 
 > Experimental software, developed with the help of Codex (read: vibed). APIs and configuration
 > may change; packages are not published yet.
@@ -75,13 +75,13 @@ let batches = imported.engine.query("SELECT * FROM wells LIMIT 10").await?;
 
 See the guides below to use your own data or embed Semantic DB in your application.
 
-| Task                                            | Guide                                                      |
-| ----------------------------------------------- | ---------------------------------------------------------- |
-| Bring a dataset on an available connector        | [Add a dataset](docs/adding-datasets.md)                     |
-| Implement an API or another data backend         | [Build a connector](docs/building-connectors.md)             |
+| Task                                             | Guide                                                       |
+| ------------------------------------------------ | ----------------------------------------------------------- |
+| Bring a dataset on an available connector        | [Add a dataset](docs/adding-datasets.md)                    |
+| Implement an API or another data backend         | [Build a connector](docs/building-connectors.md)            |
 | Configure CSV, GitHub, scope and credentials     | [Connector and configuration reference](docs/connectors.md) |
-| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                    |
-| Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                       |
+| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                  |
+| Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                      |
 
 ## Development and architecture
 
