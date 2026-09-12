@@ -53,17 +53,35 @@ This example DB and related config is defined in [./examples/geospatial/](./exam
 
 There are two main ways to use semantic DB - either directly via its CLI or embedded in your own Rust application.
 
-TODO: Document basic usage examples, folding in the choose your next step table
+Use the CLI to query a configured dataset:
 
-## Choose your next step
+```bash
+just cli --config examples/geospatial/semantic-db.yaml --query "SELECT * FROM wells LIMIT 10"
+```
 
-| Task                                             | Guide                                                       |
-| ------------------------------------------------ | ----------------------------------------------------------- |
-| Bring a dataset on an available connector        | [Add a dataset](docs/adding-datasets.md)                    |
-| Implement an API or another data backend         | [Build a connector](docs/building-connectors.md)            |
+Leave out `--query` to open the repl.
+
+In Rust, enable the `sources` feature to load the same config and query it through the engine:
+
+```rust
+use semantic_db::sources::{Project, Registry};
+
+let project = Project::from_path("examples/geospatial/semantic-db.yaml")?;
+let imported = project
+    .load(&Registry::standard(), &|name| std::env::var(name).ok())
+    .await?;
+let batches = imported.engine.query("SELECT * FROM wells LIMIT 10").await?;
+```
+
+See the guides below to use your own data or embed Semantic DB in your application.
+
+| Task                                            | Guide                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------- |
+| Bring a dataset on an available connector        | [Add a dataset](docs/adding-datasets.md)                     |
+| Implement an API or another data backend         | [Build a connector](docs/building-connectors.md)             |
 | Configure CSV, GitHub, scope and credentials     | [Connector and configuration reference](docs/connectors.md) |
-| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                  |
-| Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                      |
+| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                    |
+| Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                       |
 
 ## Development and architecture
 
