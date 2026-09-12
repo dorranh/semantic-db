@@ -20,9 +20,10 @@ dotenvy.workspace = true
 clap.workspace = true
 rustyline.workspace = true
 tokio.workspace = true
+datafusion.workspace = true
+directories = "6"
 
 [dev-dependencies]
-datafusion.workspace = true
 futures.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -4,7 +4,6 @@ use std::{
 };
 
 use clap::{ArgGroup, Parser, Subcommand};
-use rustyline::{DefaultEditor, error::ReadlineError};
 use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
 use semantic_ossie::{ModelInspection, OssieDocument, SourceBindings};
@@ -12,6 +11,7 @@ use semantic_sources::{Project, Registry};
 
 mod config;
 mod init;
+mod repl;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -27,6 +27,15 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 struct Args {
     #[command(subcommand)]
     command: Option<Command>,
+    /// Disable colors in the interactive REPL.
+    #[arg(long)]
+    no_color: bool,
+    /// Keep interactive command history in memory only.
+    #[arg(long, conflicts_with = "history_file")]
+    no_history: bool,
+    /// Override the interactive history file (shared across projects by default).
+    #[arg(long, value_name = "PATH")]
+    history_file: Option<std::path::PathBuf>,
     /// Load an Ossie model and source connections from a YAML/JSON project file.
     #[arg(long, value_name = "PATH", conflicts_with_all = ["csv", "ossie", "ossie_model", "source_csv"])]
     config: Option<std::path::PathBuf>,
@@ -183,7 +192,13 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
         io::stdin().read_to_string(&mut query)?;
         return run_query(&engine, &query).await;
     }
-    repl(&mut engine).await
+    repl::run(
+        &mut engine,
+        args.no_color,
+        args.no_history,
+        args.history_file,
+    )
+    .await
 }
 
 fn show_inspection(
@@ -277,126 +292,6 @@ async fn run_ask(
             println!("Needs clarification: {question}")
         }
         GroundingOutcome::Unsupported { reason } => println!("Unsupported: {reason}"),
-    }
-    Ok(())
-}
-
-async fn repl(engine: &mut Engine) -> Result<()> {
-    println!("Semantic DB — end SQL with ; or use .help");
-    let mut editor = DefaultEditor::new()?;
-    let mut pending = String::new();
-    let mut compiler = None;
-    loop {
-        let prompt = if pending.is_empty() {
-            "semantic> "
-        } else {
-            "      ... "
-        };
-        match editor.readline(prompt) {
-            Ok(line) => {
-                let trimmed = line.trim();
-                if pending.is_empty() && trimmed.starts_with('.') {
-                    if matches!(trimmed, ".quit" | ".exit") {
-                        break;
-                    }
-                    if let Err(error) = command(engine, &mut compiler, trimmed).await {
-                        eprintln!("Error: {error}");
-                    }
-                    continue;
-                }
-                if pending.is_empty() && trimmed.is_empty() {
-                    continue;
-                }
-                pending.push_str(&line);
-                pending.push('\n');
-                // Deliberately simple REPL framing: one statement per submission.
-                // DataFusion performs SQL parsing; this is not a script parser.
-                if trimmed.ends_with(';') {
-                    editor.add_history_entry(pending.trim())?;
-                    if let Err(error) = run_query(engine, &pending).await {
-                        eprintln!("Error: {error}");
-                    }
-                    pending.clear();
-                }
-            }
-            Err(ReadlineError::Interrupted) => pending.clear(),
-            Err(ReadlineError::Eof) => {
-                if !pending.trim().is_empty() {
-                    eprintln!("Discarded unfinished SQL; terminate statements with ;");
-                }
-                break;
-            }
-            Err(error) => return Err(error.into()),
-        }
-    }
-    Ok(())
-}
-
-async fn command(
-    engine: &mut Engine,
-    compiler: &mut Option<Compiler<OpenAiProvider>>,
-    line: &str,
-) -> Result<()> {
-    let (command, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
-    let rest = rest.trim();
-    match command {
-        ".help" => println!(
-            ".tables                 List registered relations\n\
-             .schema NAME            Show schema and definition\n\
-             .view NAME=SELECT ...   Register an in-memory view (one line)\n\
-             .ask REQUEST           Compile and execute natural language\n\
-             .plan REQUEST          Compile and show SQL without execution\n\
-             .ask-views REQUEST     Select a view and execute a bounded query\n\
-             .plan-views REQUEST    Select a view and show SQL without execution\n\
-             .quit                   Exit\n\
-             SQL spans lines until a line ends with ;. Ctrl-C clears pending SQL."
-        ),
-        ".tables" => {
-            for relation in engine.catalog().relations() {
-                println!("{}", relation.name);
-            }
-        }
-        ".schema" => {
-            let relation = engine
-                .catalog()
-                .relation(rest)
-                .ok_or_else(|| format!("unknown relation: {rest}"))?;
-            println!("{}\n{:?}", relation.name, relation.kind);
-            for field in relation.schema.fields() {
-                println!(
-                    "  {}: {}{}",
-                    field.name(),
-                    field.data_type(),
-                    if field.is_nullable() {
-                        " (nullable)"
-                    } else {
-                        ""
-                    }
-                );
-            }
-        }
-        ".view" => {
-            let (name, sql) = parse_assignment(rest)?;
-            engine.create_view(&name, &sql).await?;
-            println!("Registered view {name}");
-        }
-        ".ask" | ".plan" | ".ask-views" | ".plan-views" => {
-            if rest.is_empty() {
-                return Err("provide a natural-language request".into());
-            }
-            if compiler.is_none() {
-                *compiler = Some(Compiler::new(config::provider()?));
-            }
-            run_ask(
-                engine,
-                compiler.as_ref().expect("compiler initialized"),
-                rest,
-                matches!(command, ".plan" | ".plan-views"),
-                matches!(command, ".ask-views" | ".plan-views"),
-            )
-            .await?;
-        }
-        _ => return Err(format!("unknown command: {command}; use .help").into()),
     }
     Ok(())
 }
