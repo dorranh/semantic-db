@@ -9,11 +9,13 @@ publish.workspace = true
 [features]
 default = []
 github = ["dep:semantic-github"]
+clickhouse = ["dep:semantic-clickhouse"]
 
 [dependencies]
 semantic-engine.workspace = true
 semantic-ossie.workspace = true
 semantic-github = { workspace = true, optional = true }
+semantic-clickhouse = { workspace = true, optional = true }
 datafusion.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -22,7 +24,10 @@ futures.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+semantic-catalog.workspace = true
 tokio.workspace = true
+testcontainers.workspace = true
+clickhouse.workspace = true
 
 [lints]
 workspace = true

@@ -14,6 +14,8 @@
 pub use datafusion;
 pub use datafusion::arrow;
 pub use semantic_catalog as catalog;
+#[cfg(feature = "clickhouse")]
+pub use semantic_clickhouse as clickhouse;
 #[cfg(feature = "compiler")]
 pub use semantic_compiler as compiler;
 pub use semantic_engine as engine;

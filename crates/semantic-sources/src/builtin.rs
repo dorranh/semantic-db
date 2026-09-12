@@ -2,6 +2,12 @@ use super::*;
 use datafusion::prelude::{CsvReadOptions, SessionContext};
 use serde::de::DeserializeOwned;
 
+#[cfg(feature = "clickhouse")]
+#[path = "clickhouse.rs"]
+mod clickhouse;
+#[cfg(feature = "clickhouse")]
+pub use clickhouse::ClickHouseConnector;
+
 fn options<T: DeserializeOwned>(value: &Options) -> Result<T> {
     serde_json::from_value(Value::Object(value.clone()))
         .map_err(|e| SourceError::configuration("options", "/", e.to_string()))

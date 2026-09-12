@@ -20,6 +20,8 @@ use std::{
 };
 use thiserror::Error;
 
+#[cfg(feature = "clickhouse")]
+pub use builtin::ClickHouseConnector;
 pub use builtin::CsvConnector;
 #[cfg(feature = "github")]
 pub use builtin::GitHubConnector;
@@ -93,7 +95,7 @@ impl Registry {
         Self::default()
     }
 
-    /// CSV plus GitHub when built with the `github` feature.
+    /// CSV plus connectors enabled by the `github` and `clickhouse` features.
     pub fn standard() -> Self {
         let mut registry = Self::new();
         registry
@@ -102,6 +104,10 @@ impl Registry {
         #[cfg(feature = "github")]
         registry
             .register("github", GitHubConnector)
+            .expect("unique builtin");
+        #[cfg(feature = "clickhouse")]
+        registry
+            .register("clickhouse", ClickHouseConnector)
             .expect("unique builtin");
         registry
     }

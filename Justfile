@@ -15,6 +15,10 @@ test:
     cargo test --workspace --all-features --locked
     cargo test -p semantic-cli --example custom_connector --locked
 
+# Run connector integration tests
+test-connectors:
+    cargo test --workspace --all-features --locked connector_integration -- --ignored
+
 # Build and run the CLI, forwarding arguments unchanged.
 [positional-arguments]
 cli *args:

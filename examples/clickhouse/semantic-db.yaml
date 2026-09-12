@@ -1,0 +1,24 @@
+ossie: drilling.ossie.yaml
+connections:
+  drilling:
+    connector: clickhouse
+    endpoint: http://localhost:8123
+    database: drilling
+    user: fixture
+    password_env: CLICKHOUSE_PASSWORD
+    query_timeout_seconds: 30
+    max_response_bytes: 268435456
+    federation: true
+sources:
+  drilling.samples:
+    connection: drilling
+    table: drilling_samples
+  drilling.wells:
+    connection: drilling
+    table: wells
+  drilling.totals:
+    connection: drilling
+    table: drilling_totals
+  drilling.summary:
+    connection: drilling
+    table: drilling_summary

@@ -47,6 +47,7 @@ This example DB and related config is defined in [./examples/geospatial/](./exam
 1. Any standard [DataFusion Data Source](https://datafusion.apache.org/user-guide/features.html#data-sources) (csv, parquet, avro, etc.)
 1. (Experimental) ClickHouse
 1. Any other external database or API that exposes relations by building a custom connector.
+   1. See the [GitHub GraphQL API example](./examples/github/) for one simple example of a non-SQL backend.
 
 ## Usage
 

@@ -1,0 +1,59 @@
+version: "0.2.0.dev0"
+semantic_model:
+  - name: drilling
+    description: Synthetic drilling measurements and ClickHouse materialized aggregates.
+    ai_context:
+      instructions: >-
+        depth_m is incremental drilled distance, not absolute well depth.
+        Samples have one row per well_id and sample_id. Duration is in minutes;
+        load is in kN. A missing load is unknown, not zero. Totals may contain
+        several partial rows per well until parts merge: always GROUP BY well_id
+        and SUM additive measures. Summary is finalized with sumMerge/avgMerge
+        in ClickHouse and has one row per well. Do not average mean_load_kn across
+        wells without the corresponding non-null load counts. These are fictional data.
+    datasets:
+      - name: samples
+        source: drilling.samples
+        fields:
+          - name: well_id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
+          - name: sample_id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: sample_id}]}
+          - name: depth_m
+            description: Incremental distance drilled during this sample, in metres.
+            expression: {dialects: [{dialect: ANSI_SQL, expression: drilled_m}]}
+          - name: duration_min
+            expression: {dialects: [{dialect: ANSI_SQL, expression: duration_min}]}
+          - name: load_kn
+            expression: {dialects: [{dialect: ANSI_SQL, expression: load_kn}]}
+      - name: wells
+        source: drilling.wells
+        fields:
+          - name: well_id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
+          - name: basin
+            expression: {dialects: [{dialect: ANSI_SQL, expression: basin}]}
+      - name: totals
+        source: drilling.totals
+        description: Partial SummingMergeTree totals; SUM by well_id before use.
+        fields:
+          - name: well_id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
+          - name: depth_m
+            expression: {dialects: [{dialect: ANSI_SQL, expression: drilled_m}]}
+          - name: duration_min
+            expression: {dialects: [{dialect: ANSI_SQL, expression: duration_min}]}
+      - name: summary
+        source: drilling.summary
+        description: Finalized AggregatingMergeTree states, one row per well with measurements.
+        fields:
+          - name: well_id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
+          - name: depth_m
+            expression: {dialects: [{dialect: ANSI_SQL, expression: drilled_m}]}
+          - name: duration_min
+            expression: {dialects: [{dialect: ANSI_SQL, expression: duration_min}]}
+          - name: mean_load_kn
+            expression: {dialects: [{dialect: ANSI_SQL, expression: mean_load_kn}]}
+          - name: samples
+            expression: {dialects: [{dialect: ANSI_SQL, expression: samples}]}

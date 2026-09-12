@@ -1,0 +1,21 @@
+[package]
+name = "semantic-clickhouse"
+description = "Read-only ClickHouse sources using core DataFusion federation and Arrow streams"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+datafusion.workspace = true
+datafusion-federation.workspace = true
+clickhouse.workspace = true
+arrow-ipc.workspace = true
+async-trait.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+tokio = { workspace = true, features = ["time"] }
+reqwest.workspace = true
+
+[lints]
+workspace = true

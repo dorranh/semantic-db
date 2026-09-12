@@ -1,5 +1,7 @@
 //! Deterministic SQL execution with a descriptive relation catalog.
 
+mod federation;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     future::Future,
@@ -86,8 +88,14 @@ impl Default for Engine {
 impl Engine {
     pub fn new() -> Self {
         let config = SessionConfig::new().with_information_schema(true);
+        let state = datafusion::execution::session_state::SessionStateBuilder::new()
+            .with_config(config)
+            .with_default_features()
+            .with_optimizer_rules(federation::optimizer_rules())
+            .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
+            .build();
         Self {
-            context: SessionContext::new_with_config(config),
+            context: SessionContext::new_with_state(state),
             catalog: Catalog::default(),
         }
     }
