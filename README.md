@@ -7,60 +7,52 @@ A semantic query engine for all your data. Give your datasets business meaning, 
 
 ## Overview
 
-TODO
+The primary goal of semantic DB is simple - provide a single, semantically-rich interface for consuming data in your applications allowing
+you to assign meaning once and work with your (relational) data through a common interface.
 
-Query your datasets with SQL or natural language using an **Ossie semantic model
-and configured data sources**. Start with the CLI, or embed the same source loader
-and DataFusion/Arrow engine in a Rust application.
+It accomplishes this with the help of [Ossie](https://ossie.apache.org/) (a format for specifying semantic models) and [DataFusion/Arrow](https://datafusion.apache.org/index.html) for queries.
 
-Adding a dataset on an available connector takes model and configuration edits.
-Adding a new connector means supplying a DataFusion provider and registering its
-factory; the CLI, importer, and query workflow stay the same.
+It natively supports federation via DataFusion's federation module along with its own set of external connectors.
+
+If you are only ever working with a single database you likely should explore a native Ossie integration if one exists.
+However, if like most of us you have to work across many disparate data sources you should give Semantic DB a go!
 
 ## Quickstart
 
-Install [rustup](https://rustup.rs/). The repository pins Rust 1.94.0 for
-DataFusion 55. The first build downloads and compiles a substantial dependency graph.
-From the repository root:
+To play around with Semantic DB locally, ensure that you have [rustup](https://rustup.rs/) and
+[just](https://just.systems/man/en/installation.html) installed then build and launch the repl against
+the demo dataset with:
 
-```sh
-# Inspect the model and source bindings without credentials or source I/O.
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --inspect
-
-# Run the fixture query: returns W-001 and W-004.
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml \
-  --file examples/geospatial/query.sql
-
-# Interactive SQL, .tables, .schema, .view, .ask and .plan.
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml
+```bash
+just repl
 ```
 
-The project file selects an Ossie document and binds its source to a CSV:
+Note that if you want to use natural language queries you will need to provide an API key / config for an OpenAI-compatible API.
+See the [example .env](./.env.example) for a full list of config.
 
-```yaml
-ossie: wells.ossie.yaml
-connections:
-  local:
-    connector: csv
-sources:
-  fixtures.geospatial.wells:
-    connection: local
-    path: wells.csv
+Once in the repl you can use SQL or natural language to explore the example semantic DB:
+
+```
+> SHOW TABLES:
+
+> .ask one deep oil well;
+
+> .help
 ```
 
-Paths inside the project file are relative to that file. Credentials stay in the
-application's secret resolver; the CLI uses process environment variables and the
-working directory's `.env`, with process values taking precedence.
+This example DB and related config is defined in [./examples/geospatial/](./examples/geospatial/).
 
-For natural language, copy `.env.example` to `.env`, set `OPENAI_API_KEY`, and run:
+## Supported Data Sources
 
-```sh
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml \
-  --ask "Count wells by basin"
-```
+1. Any standard [DataFusion Data Source](https://datafusion.apache.org/user-guide/features.html#data-sources) (csv, parquet, avro, etc.)
+1. (Experimental) ClickHouse
+1. Any other external database or API that exposes relations by building a custom connector.
 
-SQL needs no model key. See the [CLI reference](docs/cli.md) for model settings,
-dry runs, direct CSV flags, streaming limits, and compilation behavior.
+## Usage
+
+There are two main ways to use semantic DB - either directly via its CLI or embedded in your own Rust application.
+
+TODO: Document basic usage examples, folding in the choose your next step table
 
 ## Choose your next step
 
@@ -71,27 +63,6 @@ dry runs, direct CSV flags, streaming limits, and compilation behavior.
 | Configure CSV, GitHub, scope and credentials     | [Connector and configuration reference](docs/connectors.md) |
 | Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                  |
 | Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                      |
-
-## Query GitHub with the same CLI
-
-The [GitHub example](examples/github/README.md) binds live repository-scoped
-issues and labels plus a local team CSV. Set `GITHUB_TOKEN` in the environment or
-`.env`, edit repository scope in the project file, then run:
-
-```sh
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml \
-  --file examples/github/open_issues_by_team.sql
-```
-
-Available connectors are CSV and experimental GitHub GraphQL. ClickHouse and
-Snowflake are not implemented. GitHub streams pages lazily and pushes exact
-issue-state equality to the API; other filters and all joins/aggregates stay
-local. A working connector does not guarantee efficient remote federation.
-
-The importer supports single-column mappings and aliases, descriptions, AI
-context, and declared keys. Computed fields, relationships, metrics, and ontology
-execution remain unsupported. Keys are not enforced; natural-language grounding
-is model-driven and does not prove business correctness.
 
 ## Development and architecture
 
