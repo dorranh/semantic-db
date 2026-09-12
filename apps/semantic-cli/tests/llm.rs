@@ -68,6 +68,10 @@ fn rejects_conflicting_modes() {
     for args in [
         vec!["--ask", "wells", "--query", "SELECT 1"],
         vec!["--ask", "wells", "--file", "x.sql"],
+        vec!["--ask-views", "wells", "--ask", "wells"],
+        vec!["--ask-views", "wells", "--query", "SELECT 1"],
+        vec!["--ask-views", "wells", "--file", "x.sql"],
+        vec!["--ask-views", "wells", "--inspect", "--config", "x.yaml"],
         vec!["--dry-run"],
     ] {
         assert!(!cli().args(args).output().unwrap().status.success());
@@ -81,7 +85,7 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
     listener.set_nonblocking(true).unwrap();
     std::fs::write(dir.0.join(".env"), format!("OPENAI_API_KEY=local-test-key\nOPENAI_MODEL=dotenv-model\nOPENAI_BASE_URL=http://{}/v1\n", listener.local_addr().unwrap())).unwrap();
     let server = thread::spawn(move || {
-        for _ in 0..2 {
+        for index in 0..4 {
             let deadline = Instant::now() + Duration::from_secs(15);
             let mut socket = loop {
                 match listener.accept() {
@@ -122,15 +126,23 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
                     break;
                 }
             }
-            let proposal = json!({"status":"grounded","query":{
-                "sql":"SELECT well_id FROM wells WHERE basin = 'North Basin' AND total_depth_m >= 2500 ORDER BY well_id",
-                "evidence":[{"phrase":"wells","catalog_reference":"wells","interpretation":"Registered wells"}]
-            }});
+            let proposal = if index < 2 {
+                json!({"status":"grounded","query":{
+                    "sql":"SELECT well_id FROM wells WHERE basin = 'North Basin' AND total_depth_m >= 2500 ORDER BY well_id",
+                    "evidence":[{"phrase":"wells","catalog_reference":"wells","interpretation":"Registered wells"}]
+                }})
+            } else {
+                json!({"status":"selected","selection":{
+                    "view":"active_deep_wells","phrase":"active deep wells","columns":["well_id"],
+                    "filters":[{"kind":"compare","column":"basin","op":"eq","value":{"kind":"text","text":"North Basin"}}],
+                    "order_by":[{"column":"well_id","direction":"asc"}]
+                }})
+            };
             let body = json!({"choices":[{"message":{"content":proposal.to_string()},"finish_reason":"stop"}]}).to_string();
             write!(socket, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
         }
     });
-    for dry_run in [false, true] {
+    for (views_only, dry_run) in [(false, false), (false, true), (true, false), (true, true)] {
         let mut command = cli();
         command
             .current_dir(&dir.0)
@@ -138,13 +150,21 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
             .env_remove("OPENAI_BASE_URL")
             .env_remove("OPENAI_TIMEOUT_SECONDS")
             .env_remove("OPENAI_JSON_MODE")
-            .env("OPENAI_MODEL", "environment-model")
-            .args([
+            .env("OPENAI_MODEL", "environment-model");
+        if views_only {
+            command.args([
+                "--config", &format!("{}/../../examples/geospatial/semantic-db.yaml", env!("CARGO_MANIFEST_DIR")),
+                "--view", "active_deep_wells=SELECT * FROM wells WHERE status = 'active' AND total_depth_m >= 2500",
+                "--ask-views", "List well IDs for active deep wells in North Basin, ordered by well_id",
+            ]);
+        } else {
+            command.args([
                 "--csv",
                 &fixture(),
                 "--ask",
                 "List well IDs in North Basin with total_depth_m >= 2500",
             ]);
+        }
         if dry_run {
             command.arg("--dry-run");
         }
@@ -153,6 +173,10 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
         assert_eq!(text.contains("W-001"), !dry_run);
         assert_eq!(text.contains("W-004"), !dry_run);
         assert_eq!(text.contains("2 row(s)"), !dry_run);
+        assert_eq!(
+            text.contains("Applied authored view definition unchanged:"),
+            views_only
+        );
     }
     server.join().unwrap();
 }

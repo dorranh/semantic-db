@@ -225,3 +225,161 @@ async fn provider_errors_do_not_trigger_repairs() {
         CompilerError::Provider(ProviderError::Http(401))
     ));
 }
+
+async fn view_fixture() -> Engine {
+    let mut engine = fixture().await;
+    engine
+        .create_view(
+            "deep_wells",
+            "SELECT * FROM wells WHERE total_depth_m >= 2500",
+        )
+        .await
+        .unwrap();
+    engine
+        .create_view(
+            "active_deep_wells",
+            "SELECT * FROM deep_wells WHERE status = 'active'",
+        )
+        .await
+        .unwrap();
+    engine
+}
+
+fn selected() -> serde_json::Value {
+    json!({"status":"selected","selection":{
+        "view":"active_deep_wells", "phrase":"active deep wells",
+        "columns":["well_id"],
+        "filters":[{"kind":"compare","column":"basin","op":"eq","value":{"kind":"text","text":"North Basin"}}],
+        "order_by":[{"column":"well_id","direction":"asc"}]
+    }})
+}
+
+const VIEW_REQUEST: &str = "List IDs for active deep wells in North Basin, ordered by well_id";
+
+#[tokio::test]
+async fn view_selection_lowers_nested_definitions_and_preserves_results() {
+    let engine = view_fixture().await;
+    let (compiler, calls) = compiler(vec![selected().to_string()]);
+    let result = compiler.compile_views(&engine, VIEW_REQUEST).await.unwrap();
+    assert_eq!(result.attempts, 1);
+    assert_eq!(result.view_selection.unwrap().view, "active_deep_wells");
+    let GroundingOutcome::Grounded { query } = result.outcome else {
+        panic!("expected grounded")
+    };
+    let actual = engine.query(&query.sql).await.unwrap();
+    let expected = engine.query("SELECT well_id FROM wells WHERE total_depth_m >= 2500 AND status = 'active' AND basin = 'North Basin' ORDER BY well_id").await.unwrap();
+    assert_eq!(
+        pretty_format_batches(&actual).unwrap().to_string(),
+        pretty_format_batches(&expected).unwrap().to_string()
+    );
+    assert_eq!(actual[0].num_rows(), 2);
+    assert_eq!(query.evidence[0].catalog_reference, "active_deep_wells");
+    assert!(
+        query.evidence[0]
+            .interpretation
+            .contains("SELECT * FROM deep_wells WHERE status = 'active'")
+    );
+    let calls = calls.lock().unwrap();
+    let context: serde_json::Value = serde_json::from_str(&calls[0][1].content).unwrap();
+    let catalog = context["catalog"].as_array().unwrap();
+    assert_eq!(catalog.len(), 2);
+    assert!(
+        catalog
+            .iter()
+            .all(|relation| relation["view_sql"].is_string())
+    );
+    assert!(!calls[0][1].content.contains("wells.csv"));
+}
+
+#[tokio::test]
+async fn view_mode_rejects_sql_bypasses_and_invalid_bindings() {
+    let engine = view_fixture().await;
+    let mut invalid = vec![grounded("SELECT well_id FROM wells")];
+    for (field, value) in [
+        ("view", json!("wells")),
+        ("view", json!("missing_view")),
+        ("phrase", json!("invented phrase")),
+        ("phrase", json!(" ")),
+        ("columns", json!([])),
+        ("columns", json!(["well_id", "well_id"])),
+        (
+            "columns",
+            json!(["well_id FROM wells UNION SELECT well_id"]),
+        ),
+        ("columns", json!(["*"])),
+        ("sql", json!("SELECT * FROM wells")),
+        ("limit", json!(1)),
+        ("order_by", json!([{"column":"missing", "direction":"asc"}])),
+        (
+            "filters",
+            json!([{"kind":"compare", "column":"total_depth_m", "op":"gte", "value":{"kind":"number","text":"1000"}}]),
+        ),
+    ] {
+        let mut proposal = selected();
+        proposal["selection"][field] = value;
+        invalid.push(proposal.to_string());
+    }
+    for proposal in invalid {
+        let (compiler, calls) = compiler(vec![proposal.clone()]);
+        assert!(
+            matches!(
+                compiler
+                    .with_max_repairs(0)
+                    .compile_views(&engine, VIEW_REQUEST)
+                    .await,
+                Err(CompilerError::Validation { attempts: 1, .. })
+            ),
+            "accepted {proposal}"
+        );
+        assert_eq!(calls.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn view_mode_repairs_without_sql_fallback_and_keeps_unresolved_outcomes() {
+    let engine = view_fixture().await;
+    let (compiler, calls) = compiler(vec![
+        grounded("SELECT * FROM wells"),
+        selected().to_string(),
+    ]);
+    let result = compiler.compile_views(&engine, VIEW_REQUEST).await.unwrap();
+    assert_eq!(result.attempts, 2);
+    {
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls[0][1].content, calls[1][1].content);
+        assert!(calls[1][3].content.contains("validation_error"));
+    }
+    for output in [
+        json!({"status":"needs_clarification","phrases":["deep"],"question":"Which departmental definition of deep applies?"}),
+        json!({"status":"unsupported","reason":"No location-quality field is available."}),
+    ] {
+        let (compiler, calls) = self::compiler(vec![output.to_string()]);
+        let result = compiler
+            .compile_views(&engine, "Find deep wells excluding uncertain locations")
+            .await
+            .unwrap();
+        assert_eq!(serde_json::to_value(result.outcome).unwrap(), output);
+        assert!(result.view_selection.is_none());
+        assert_eq!(calls.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn view_mode_skips_provider_when_no_definitions_exist() {
+    let (compiler, calls) = compiler(vec![]);
+    let result = compiler
+        .compile_views(&fixture().await, "Find deep wells")
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.outcome,
+        GroundingOutcome::Unsupported { .. }
+    ));
+    assert_eq!(result.attempts, 0);
+    assert!(result.view_selection.is_none());
+    assert!(matches!(
+        compiler.compile_views(&Engine::new(), "  ").await,
+        Err(CompilerError::EmptyRequest)
+    ));
+    assert!(calls.lock().unwrap().is_empty());
+}

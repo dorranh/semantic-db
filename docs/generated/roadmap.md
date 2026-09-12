@@ -71,13 +71,28 @@ budgets, and snapshot semantics are still open.
 - Exact GitHub issue-state equality pushdown, compared with local/reference scans.
 - Task-oriented [dataset](../adding-datasets.md) and [connector](../building-connectors.md) guides.
 
+## Authored-view grounding slice delivered
+
+- `Compiler::compile_views` and CLI/REPL view-query modes select existing authored
+  views without introducing a separate concept registry.
+- Typed selections lower to SQL with a fixed view source, checked columns,
+  request-literal comparisons, null tests and ordering.
+- Binding evidence comes from the applied view definition; selected intent remains
+  available in `Compilation.view_selection`.
+- Offline nested-view equivalence, invalid binding/literal, lowering and CLI tests,
+  plus a runnable Ossie-backed Rust example.
+
+This preserves the selected definition deterministically. Definition selection,
+natural-language coverage and units remain interpretation/validation gaps; see
+[the contract](authored-view-grounding.md).
+
 ## Next increments
 
 | Increment | Deliverable | Acceptance criteria |
 | --- | --- | --- |
 | Catalog interoperability expansion | Selected computed expressions, relationships, and metrics guided by a real team model | Correct projections and aggregation across joins; unsupported semantics retain explicit diagnostics |
 | Catalog persistence and identity | Qualified IDs, metadata editing, versioned definitions and relationships | Restart preserves definitions and revisions; source identity survives interchange and execution projections |
-| Deterministic grounding | Structured lookup and a small curated concept registry | A concept maps to a checked predicate with evidence; ambiguity and missing units require clarification |
+| Deterministic grounding | Extend checked authored definitions using real team requests; evaluate whether any separate concept representation is needed | Validate definition applicability and requested-constraint coverage; ambiguity and missing units require clarification |
 | Retrieval | Hybrid lexical/semantic search over catalog projections | Results retain stable IDs and revisions; access scope is applied before results reach the compiler |
 | Intent compiler, next stage | Richer typed IR and deterministic lowering beyond the delivered LLM adapter | Expand live evaluations and validate semantic coverage, units, grain, and concept definitions |
 | Remote provider optimization | Typed scope/capabilities, repository pruning and remote field selection beyond state equality | Optimized results match the baseline across NULLs, pagination, residual filters, and limits; request counts improve |

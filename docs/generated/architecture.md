@@ -95,6 +95,14 @@ and future semantic validation. The whole catalog is sent without retrieval or
 access filtering. Embedding applications must supply a catalog already scoped to
 the caller's permissions.
 
+The opt-in `Compiler::compile_views` slice accepts a typed `ViewSelection` instead
+of model-written SQL. It selects one authored view and deterministically lowers
+projection, conjunctions of supported filters, and ordering. The view definition
+cannot be replaced or bypassed by the selection; filter literals must occur in
+the request. This does not validate the model's choice of view, clause coverage,
+or unit applicability. See [grounding with authored views](authored-view-grounding.md)
+for the library, CLI, and offline example.
+
 ## Runnable slice
 
 An `Engine` owns a private `SessionContext` and a descriptive `Catalog`. CSV

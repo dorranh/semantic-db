@@ -11,6 +11,7 @@ The [embedding guide](../embedding.md) covers library integration; the
 2. [Catalog and derived relations](catalog-and-derived-relations.md): metadata, views, row types, and lineage.
 3. [Grounding and federation](grounding-and-federation.md): semantic compilation, validation, and backend execution.
 4. [Implementation roadmap](roadmap.md): what runs today, what remains, and acceptance criteria.
+5. [Grounding with authored views](authored-view-grounding.md): checked view binding, typed query lowering, and the remaining interpretation boundary.
 
 The examples use synthetic wells, subsurface intervals, and survey documents.
 These are example datasets, not assumptions embedded in the core abstractions.

@@ -24,6 +24,12 @@ IR. The model is prompted to preserve all constraints and return clarification o
 unsupported where appropriate; deterministic validation currently checks output
 shape, evidence-reference existence, and SQL planning, not semantic completeness.
 
+An opt-in authored-view mode now lowers a separate, bounded `ViewSelection` IR.
+It generates SQL over one registered view and records that actual binding, with
+checked output columns and request-literal filters. It does not lower the broader
+`SemanticPlan`, prove that the selected definition applies, or detect omitted
+natural-language constraints. See [the slice and its limits](authored-view-grounding.md).
+
 For the supplied fixture, “active,” `North Basin`, and an explicitly selected
 depth cutoff can be expressed as:
 

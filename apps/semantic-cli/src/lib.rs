@@ -20,20 +20,20 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
     version,
     about = "Query registered data with SQL or natural language",
     group(ArgGroup::new("model_input").args(["config", "ossie"])),
-    group(ArgGroup::new("batch").args(["query", "file", "ask"]))
+    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views"]))
 )]
 struct Args {
     /// Load an Ossie model and source connections from a YAML/JSON project file.
     #[arg(long, value_name = "PATH", conflicts_with_all = ["csv", "ossie", "ossie_model", "source_csv"])]
     config: Option<std::path::PathBuf>,
     /// Check the model, bindings and connector options offline, without credentials.
-    #[arg(long, requires = "model_input", conflicts_with_all = ["inspect", "query", "file", "ask", "view", "dry_run"])]
+    #[arg(long, requires = "model_input", conflicts_with_all = ["inspect", "query", "file", "ask", "ask_views", "view", "dry_run"])]
     validate: bool,
     /// Also construct providers and validate physical schemas; requires --validate.
     #[arg(long, requires = "validate")]
     connect: bool,
     /// Show model fields, source requirements and configured connector names offline.
-    #[arg(long, requires = "model_input", conflicts_with_all = ["validate", "query", "file", "ask", "view", "dry_run"])]
+    #[arg(long, requires = "model_input", conflicts_with_all = ["validate", "query", "file", "ask", "ask_views", "view", "dry_run"])]
     inspect: bool,
     /// Register a CSV with a header row; repeat for multiple sources.
     #[arg(long, value_name = "NAME=PATH", value_parser = parse_assignment)]
@@ -59,6 +59,9 @@ struct Args {
     /// Compile a natural-language request, show SQL/evidence, and execute it.
     #[arg(long, value_name = "REQUEST")]
     ask: Option<String>,
+    /// Select an authored view and compile a bounded query without model-written SQL.
+    #[arg(long, value_name = "REQUEST")]
+    ask_views: Option<String>,
     /// Plan SQL or compile natural language without executing query rows.
     #[arg(long, requires = "batch")]
     dry_run: bool,
@@ -135,7 +138,11 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
     }
     if let Some(request) = args.ask {
         let compiler = Compiler::new(config::provider()?);
-        return run_ask(&engine, &compiler, &request, args.dry_run).await;
+        return run_ask(&engine, &compiler, &request, args.dry_run, false).await;
+    }
+    if let Some(request) = args.ask_views {
+        let compiler = Compiler::new(config::provider()?);
+        return run_ask(&engine, &compiler, &request, args.dry_run, true).await;
     }
     if let Some(query) = args.query {
         return run_sql(&engine, &query, args.dry_run).await;
@@ -208,8 +215,13 @@ async fn run_ask(
     compiler: &Compiler<OpenAiProvider>,
     request: &str,
     dry_run: bool,
+    views_only: bool,
 ) -> Result<()> {
-    let compilation = compiler.compile(engine, request).await?;
+    let compilation = if views_only {
+        compiler.compile_views(engine, request).await?
+    } else {
+        compiler.compile(engine, request).await?
+    };
     match compilation.outcome {
         GroundingOutcome::Grounded { query } => {
             println!(
@@ -306,6 +318,8 @@ async fn command(
              .view NAME=SELECT ...   Register an in-memory view (one line)\n\
              .ask REQUEST           Compile and execute natural language\n\
              .plan REQUEST          Compile and show SQL without execution\n\
+             .ask-views REQUEST     Select a view and execute a bounded query\n\
+             .plan-views REQUEST    Select a view and show SQL without execution\n\
              .quit                   Exit\n\
              SQL spans lines until a line ends with ;. Ctrl-C clears pending SQL."
         ),
@@ -338,7 +352,7 @@ async fn command(
             engine.create_view(&name, &sql).await?;
             println!("Registered view {name}");
         }
-        ".ask" | ".plan" => {
+        ".ask" | ".plan" | ".ask-views" | ".plan-views" => {
             if rest.is_empty() {
                 return Err("provide a natural-language request".into());
             }
@@ -349,7 +363,8 @@ async fn command(
                 engine,
                 compiler.as_ref().expect("compiler initialized"),
                 rest,
-                command == ".plan",
+                matches!(command, ".plan" | ".plan-views"),
+                matches!(command, ".ask-views" | ".plan-views"),
             )
             .await?;
         }

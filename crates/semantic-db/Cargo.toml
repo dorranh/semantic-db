@@ -32,6 +32,10 @@ name = "ossie_wells"
 required-features = ["ossie"]
 
 [[example]]
+name = "authored_views"
+required-features = ["ossie", "compiler"]
+
+[[example]]
 name = "github"
 required-features = ["sources", "github"]
 
