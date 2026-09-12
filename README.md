@@ -37,6 +37,18 @@ Once in the repl you can use SQL or natural language to explore the example sema
 
 > .ask one deep oil well;
 
+semantic> .ask one deep oil well;
+
+    SQL (validated in 1 attempt(s)):
+    SELECT well_id, well_name, basin, latitude_deg, longitude_deg, total_depth_m, status FROM wells WHERE total_depth_m >= 2500 LIMIT 1
+      "deep oil well" → wells.total_depth_m: deep is interpreted as total_depth_m >= 2500 metres according to model instructions
+      "one" → wells: requesting a single deep well row from the wells relation
+    +---------+-----------+-------------+--------------+---------------+---------------+--------+
+    | well_id | well_name | basin       | latitude_deg | longitude_deg | total_depth_m | status |
+    +---------+-----------+-------------+--------------+---------------+---------------+--------+
+    | W-001   | Juniper-1 | North Basin | 56.12        | 2.45          | 3200.0        | active |
+    +---------+-----------+-------------+--------------+---------------+---------------+--------+
+
 > .help
 ```
 
