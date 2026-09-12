@@ -73,6 +73,12 @@ just cli --config examples/geospatial/semantic-db.yaml --query "SELECT * FROM we
 
 Leave out `--query` to open the repl.
 
+To bootstrap a new project directory use:
+
+```bash
+just cli init /path/to/new/project
+```
+
 In Rust, enable the `sources` feature to load the same config and query it through the engine:
 
 ```rust

@@ -3,7 +3,7 @@ use std::{
     io::{self, IsTerminal, Read},
 };
 
-use clap::{ArgGroup, Parser};
+use clap::{ArgGroup, Parser, Subcommand};
 use rustyline::{DefaultEditor, error::ReadlineError};
 use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
@@ -11,6 +11,7 @@ use semantic_ossie::{ModelInspection, OssieDocument, SourceBindings};
 use semantic_sources::{Project, Registry};
 
 mod config;
+mod init;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -19,10 +20,13 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
     name = "semantic-db",
     version,
     about = "Query registered data with SQL or natural language",
+    args_conflicts_with_subcommands = true,
     group(ArgGroup::new("model_input").args(["config", "ossie"])),
     group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views"]))
 )]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
     /// Load an Ossie model and source connections from a YAML/JSON project file.
     #[arg(long, value_name = "PATH", conflicts_with_all = ["csv", "ossie", "ossie_model", "source_csv"])]
     config: Option<std::path::PathBuf>,
@@ -67,6 +71,16 @@ struct Args {
     dry_run: bool,
 }
 
+#[derive(Subcommand)]
+enum Command {
+    /// Create a runnable project with a CSV source, semantic model, and SQL view.
+    Init {
+        /// Project directory; defaults to the current directory.
+        #[arg(default_value = ".")]
+        path: std::path::PathBuf,
+    },
+}
+
 fn parse_assignment(value: &str) -> std::result::Result<(String, String), String> {
     let (name, value) = value.split_once('=').ok_or("expected NAME=VALUE")?;
     if name.is_empty() || value.is_empty() {
@@ -79,6 +93,9 @@ fn parse_assignment(value: &str) -> std::result::Result<(String, String), String
 /// Custom binaries can register connectors and reuse all commands and the REPL.
 pub async fn run_with_registry(registry: Registry) -> Result<()> {
     let args = Args::parse();
+    if let Some(Command::Init { path }) = args.command {
+        return init::run(&path);
+    }
     let mut engine = if let Some(path) = args.config {
         let project = Project::from_path(path)?;
         if args.inspect || args.validate {

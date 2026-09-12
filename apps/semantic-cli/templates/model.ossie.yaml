@@ -1,0 +1,31 @@
+version: "0.2.0.dev0"
+semantic_model:
+  - name: starter
+    description: A starter project with synthetic items. Replace with your domain model.
+    datasets:
+      - name: items
+        source: local.items
+        description: One row per item. Active items have status equal to active.
+        primary_key: [id]
+        fields:
+          - name: id
+            description: Unique item identifier.
+            datatype: Integer
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: id
+          - name: name
+            description: Display name of the item.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: name
+          - name: status
+            description: Item status, either active or archived in this sample.
+            datatype: String
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: status

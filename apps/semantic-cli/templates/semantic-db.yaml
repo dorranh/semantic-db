@@ -1,0 +1,14 @@
+# Paths resolve relative to this file. Replace the sample with your own data.
+ossie: model.ossie.yaml
+connections:
+  local:
+    connector: csv
+sources:
+  local.items:
+    connection: local
+    path: data/items.csv
+# Register each SQL file here; placing a file in views/ alone does not load it.
+views:
+  active_items:
+    description: Items whose status is active, one row per item.
+    sql_file: views/active_items.sql
