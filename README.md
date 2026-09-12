@@ -1,7 +1,13 @@
 # Semantic DB
 
+A semantic query engine for all your data. Give your datasets business meaning, then query across them—wherever they live.
+
 > Experimental software, developed with the help of Codex (read: vibed). APIs and configuration
 > may change; packages are not published yet.
+
+## Overview
+
+TODO
 
 Query your datasets with SQL or natural language using an **Ossie semantic model
 and configured data sources**. Start with the CLI, or embed the same source loader
