@@ -99,6 +99,7 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
                     Err(error) => panic!("mock accept failed: {error}"),
                 }
             };
+            socket.set_nonblocking(false).unwrap();
             socket
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
@@ -123,6 +124,16 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
                     let body: serde_json::Value = serde_json::from_slice(&data[end + 4..]).unwrap();
                     // Process environment must override the model in .env.
                     assert_eq!(body["model"], "environment-model");
+                    if index >= 2 {
+                        let context: serde_json::Value =
+                            serde_json::from_str(body["messages"][1]["content"].as_str().unwrap())
+                                .unwrap();
+                        assert_eq!(context["catalog"][0]["name"], "active_deep_wells");
+                        assert_eq!(
+                            context["catalog"][0]["description"],
+                            "Active wells meeting this example project's depth convention."
+                        );
+                    }
                     break;
                 }
             }
@@ -153,9 +164,13 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
             .env("OPENAI_MODEL", "environment-model");
         if views_only {
             command.args([
-                "--config", &format!("{}/../../examples/geospatial/semantic-db.yaml", env!("CARGO_MANIFEST_DIR")),
-                "--view", "active_deep_wells=SELECT * FROM wells WHERE status = 'active' AND total_depth_m >= 2500",
-                "--ask-views", "List well IDs for active deep wells in North Basin, ordered by well_id",
+                "--config",
+                &format!(
+                    "{}/../../examples/geospatial/semantic-db.views.yaml",
+                    env!("CARGO_MANIFEST_DIR")
+                ),
+                "--ask-views",
+                "List well IDs for active deep wells in North Basin, ordered by well_id",
             ]);
         } else {
             command.args([

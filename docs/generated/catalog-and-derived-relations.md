@@ -33,6 +33,12 @@ SQL and direct dependency names. `Relation::base` and `Relation::view` plus
 CSV registration and interactive view creation still infer schemas and leave
 optional metadata empty. See the [embedding guide](../embedding.md).
 
+Configured projects can now author views with `views.<name>.sql_file` and an
+optional description. The shared project loader captures SQL files, validates
+dependencies offline, and infers schemas while registering views in dependency
+order. Definitions reload on a new project/session; this is file-based authoring,
+not catalog revisioning or transactional editing. See [project view authoring](authored-view-grounding.md#author-views-in-the-project).
+
 The Ossie importer also populates `Relation.semantics`: model and field
 descriptions, AI context, logical types, labels/time roles, declared keys, and
 source-document provenance. The compiler includes these authored annotations as

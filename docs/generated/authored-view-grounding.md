@@ -16,19 +16,18 @@ queries:
 
 ```sh
 cargo run -p semantic-cli --locked -- \
-  --config examples/geospatial/semantic-db.yaml \
-  --view "active_deep_wells=SELECT * FROM wells WHERE status = 'active' AND total_depth_m >= 2500" \
+  --config examples/geospatial/semantic-db.views.yaml \
   --ask-views "List well IDs for active deep wells in North Basin, ordered by well_id" \
   --dry-run
 ```
 
 Remove `--dry-run` to execute. A faithful selection produces W-001 and W-004.
-This command authors an example convention; the underlying Ossie model explicitly
+This project authors an example convention; the underlying Ossie model explicitly
 does not define a universal meaning of “deep.” Views over Ossie datasets use the
 importer's logical fields and projections as usual.
 
-The REPL offers `.ask-views REQUEST` and `.plan-views REQUEST` after registering
-definitions with `.view`. Existing `--ask`, `.ask`, and `.plan` retain the general
+The REPL offers `.ask-views REQUEST` and `.plan-views REQUEST` over loaded views or
+definitions registered with `.view`. Existing `--ask`, `.ask`, and `.plan` retain the general
 SQL-proposal mode. The view mode never falls back to that mode on failure.
 
 An offline Rust example loads the same Ossie model and directly lowers a supplied
@@ -37,6 +36,65 @@ typed selection, without an API key or model call:
 ```sh
 cargo run -p semantic-db --features ossie --example authored_views --locked
 ```
+
+## Author views in the project
+
+Add a `views` mapping to `semantic-db.yaml`, alongside `ossie`, `connections`, and
+`sources`. Each entry requires a `sql_file` and accepts an optional `description`:
+
+```yaml
+views:
+  deep_wells:
+    description: Wells meeting our team's depth convention of at least 2500 metres.
+    sql_file: views/deep_wells.sql
+  active_deep_wells:
+    description: Active wells meeting our team's depth convention.
+    sql_file: views/active_deep_wells.sql
+```
+
+`views/deep_wells.sql` contains the defining query, without `CREATE VIEW`:
+
+```sql
+SELECT * FROM wells WHERE total_depth_m >= 2500;
+```
+
+`views/active_deep_wells.sql` can compose that definition:
+
+```sql
+SELECT * FROM deep_wells WHERE status = 'active';
+```
+
+SQL paths are relative to the project YAML directory, including paths written as
+`views/...`; they are not relative to the process's working directory. Absolute
+paths also work. Files contain exactly one query; an optional trailing semicolon
+is accepted. Inline `sql` and unknown view options are rejected in this profile.
+
+Map order does not matter. The loader checks names and dependency graphs before
+connecting, then infers each view's schema and registers it in dependency order.
+Names must follow the engine's lowercase identifier rules and cannot collide with
+datasets in the selected Ossie model or other views. Descriptions become catalog
+metadata and are available to both compiler modes. Project views are scoped to
+the selected model's datasets; cross-model references are not supported.
+
+`--inspect` lists view files, descriptions, and direct dependencies in loading
+order. `--validate` checks files, query syntax, relation references and cycles
+without credentials or source access. `--validate --connect` additionally checks
+columns and types against provider schemas. It plans views without executing
+their rows. Errors identify `/views/<name>/sql_file` or the affected view name.
+
+The shared Rust loader handles the same definitions: `Project::from_path` reads
+and captures SQL files; `Project::load` registers them. `Project::new` also reads
+configured SQL files relative to its supplied base directory. `Project::inspect`
+keeps its original model-inspection return type and also validates project views.
+`Project::inspect_project` returns `ProjectInspection`, with the Ossie inspection
+under `.model` and ordered view definitions under `.views`.
+
+Keep the YAML and SQL files in version control. Each new Project or CLI startup
+reloads their definitions. An existing Project retains the SQL it read, so editing
+a file between inspection and load does not change that Project's definition.
+There is no file watching or write-back: `.view` and `--view` still add session-only
+definitions, and duplicate names are rejected instead of replacing loaded views.
+Persistent revision tracking, transactions, and materialization remain future work.
 
 ## Contract and execution
 
@@ -111,6 +169,8 @@ Compiler tests compare nested-view results with explicit reference SQL, reject
 base-table/SQL substitutions and invented literals, and exercise bounded repair
 and unresolved outcomes. Lowering tests cover all comparison operators, decimal
 spelling, quoted identifiers, SQL-looking text, nulls, sorting, type mismatches,
-and compilation without reading rows. CLI tests exercise both execution and dry
-run over the Ossie fixture using a local HTTP model stub. These deterministic
+and compilation without reading rows. Project tests cover file reloads, dependency
+ordering, offline rejection and schema diagnostics. CLI tests exercise inspection
+from another working directory and both execution and dry run over configured
+Ossie-backed views using a local HTTP model stub. These deterministic
 tests verify the contracts, not a live model's interpretation accuracy.

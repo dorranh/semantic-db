@@ -191,8 +191,17 @@ impl Engine {
 
     /// Register a composable view without collecting or materializing its rows.
     pub async fn create_view(&mut self, name: &str, sql: &str) -> Result<()> {
-        self.check_new_name(name)?;
-        let dependencies = self.view_dependencies(sql)?;
+        self.create_view_with_description(name, sql, None).await
+    }
+
+    /// Register an authored description alongside the inferred view schema.
+    pub async fn create_view_with_description(
+        &mut self,
+        name: &str,
+        sql: &str,
+        description: Option<&str>,
+    ) -> Result<()> {
+        let dependencies = self.validate_view_definition(name, sql)?;
         for dependency in &dependencies {
             if self.catalog.relation(dependency).is_none() {
                 return Err(EngineError::MissingDependency {
@@ -203,11 +212,20 @@ impl Engine {
         }
         let frame = self.plan_sql(sql).await?;
         let mut relation = Relation::view(name, Arc::new(frame.schema().as_arrow().clone()), sql);
+        relation.description = description.map(str::to_owned);
         relation.kind = RelationKind::View {
             sql: sql.into(),
             dependencies,
         };
         self.register_provider(relation, frame.into_view())
+    }
+
+    /// Check a new view's name and query syntax and return direct dependencies.
+    /// Does not resolve dependencies or columns, construct providers, or read rows.
+    /// Project loaders can use this before connecting to sources.
+    pub fn validate_view_definition(&self, name: &str, sql: &str) -> Result<Vec<String>> {
+        self.check_new_name(name)?;
+        self.view_dependencies(sql)
     }
 
     fn view_dependencies(&self, sql: &str) -> Result<Vec<String>> {

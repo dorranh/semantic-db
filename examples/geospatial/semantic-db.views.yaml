@@ -1,0 +1,17 @@
+ossie: wells.ossie.yaml
+connections:
+  local:
+    connector: csv
+sources:
+  fixtures.geospatial.wells:
+    connection: local
+    path: wells.csv
+views:
+  active_deep_wells:
+    description: Active wells meeting this example project's depth convention.
+    sql_file: views/active_deep_wells.sql
+  deep_wells:
+    description: >-
+      This project explicitly defines deep as total_depth_m >= 2500 metres.
+      This is an example convention, not a universal definition of deep.
+    sql_file: views/deep_wells.sql

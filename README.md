@@ -1,6 +1,6 @@
 # Semantic DB
 
-> Experimental software, developed with the help of Codex. APIs and configuration
+> Experimental software, developed with the help of Codex (read: vibed). APIs and configuration
 > may change; packages are not published yet.
 
 Query your datasets with SQL or natural language using an **Ossie semantic model
@@ -58,13 +58,13 @@ dry runs, direct CSV flags, streaming limits, and compilation behavior.
 
 ## Choose your next step
 
-| Task | Guide |
-| --- | --- |
-| Bring a dataset on an available connector | [Add a dataset](docs/adding-datasets.md) |
-| Implement an API or another data backend | [Build a connector](docs/building-connectors.md) |
-| Configure CSV, GitHub, scope and credentials | [Connector and configuration reference](docs/connectors.md) |
-| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md) |
-| Use providers or the configured loader in Rust | [Embed Semantic DB](docs/embedding.md) |
+| Task                                             | Guide                                                       |
+| ------------------------------------------------ | ----------------------------------------------------------- |
+| Bring a dataset on an available connector        | [Add a dataset](docs/adding-datasets.md)                    |
+| Implement an API or another data backend         | [Build a connector](docs/building-connectors.md)            |
+| Configure CSV, GitHub, scope and credentials     | [Connector and configuration reference](docs/connectors.md) |
+| Check supported Ossie constructs and diagnostics | [Ossie reference](docs/ossie-reference.md)                  |
+| Use providers or the configured loader in Rust   | [Embed Semantic DB](docs/embedding.md)                      |
 
 ## Query GitHub with the same CLI
 

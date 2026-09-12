@@ -150,6 +150,32 @@ pub struct ProjectConfig {
     pub connections: BTreeMap<String, ConnectionConfig>,
     #[serde(default)]
     pub sources: BTreeMap<String, SourceConfig>,
+    #[serde(default)]
+    pub views: BTreeMap<String, ViewConfig>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ViewConfig {
+    pub sql_file: PathBuf,
+    pub description: Option<String>,
+}
+
+/// Offline project inspection. View columns/types are checked only on load.
+#[derive(Debug)]
+pub struct ProjectInspection {
+    pub model: ModelInspection,
+    /// Definitions in dependency order, following the selected model's datasets.
+    pub views: Vec<ViewInspection>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ViewInspection {
+    pub name: String,
+    pub sql_file: PathBuf,
+    pub description: Option<String>,
+    pub sql: String,
+    pub dependencies: Vec<String>,
 }
 #[derive(Deserialize)]
 pub struct ConnectionConfig {
@@ -168,9 +194,10 @@ pub struct Project {
     config: ProjectConfig,
     document: OssieDocument,
     base_dir: PathBuf,
+    views: BTreeMap<String, ViewInspection>,
 }
 impl Project {
-    /// Model and local source paths are relative to this configuration file.
+    /// Model, view SQL and local source paths are relative to this configuration file.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path).map_err(|e| {
@@ -202,6 +229,7 @@ impl Project {
 
     /// In-memory equivalent of `from_path`; the caller supplies the document and
     /// base directory explicitly. The `ossie` path is not read by this method.
+    /// View SQL files are read once here; recreate the Project to pick up edits.
     pub fn new(config: ProjectConfig, document: OssieDocument, base_dir: PathBuf) -> Result<Self> {
         if config.ossie.as_os_str().is_empty() {
             return Err(SourceError::configuration(
@@ -210,16 +238,66 @@ impl Project {
                 "model path must be nonempty",
             ));
         }
+        // Path::parent("project.yaml") is the empty path, meaning the current
+        // directory. std::path::absolute requires that spelling to be explicit.
+        let base_dir = if base_dir.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            base_dir
+        };
+        let base_dir = std::path::absolute(&base_dir).map_err(|error| {
+            SourceError::configuration(
+                "project_path",
+                base_dir.display().to_string(),
+                error.to_string(),
+            )
+        })?;
+        let mut views = BTreeMap::new();
+        for (name, view) in &config.views {
+            let path = format!("/views/{}/sql_file", pointer(name));
+            if view.sql_file.as_os_str().is_empty() {
+                return Err(SourceError::configuration(
+                    "view_file",
+                    path,
+                    "SQL file path must be nonempty",
+                ));
+            }
+            let file = base_dir.join(&view.sql_file);
+            let sql = std::fs::read_to_string(&file).map_err(|error| {
+                SourceError::configuration(
+                    "view_read",
+                    path,
+                    format!("{}: {error}", file.display()),
+                )
+            })?;
+            views.insert(
+                name.clone(),
+                ViewInspection {
+                    name: name.clone(),
+                    sql_file: view.sql_file.clone(),
+                    description: view.description.clone(),
+                    sql,
+                    dependencies: Vec::new(),
+                },
+            );
+        }
         Ok(Self {
             config,
             document,
             base_dir,
+            views,
         })
     }
 
     /// No credential resolution, provider construction, or source I/O.
     /// Checks all configured options; only the selected model must be bound.
+    /// Also validates configured views; use `inspect_project` to inspect them.
     pub fn inspect(&self, registry: &Registry) -> Result<ModelInspection> {
+        Ok(self.inspect_project(registry)?.model)
+    }
+
+    /// Offline model inspection plus project views in dependency order.
+    pub fn inspect_project(&self, registry: &Registry) -> Result<ProjectInspection> {
         let inspection = self.document.inspect(self.config.model.as_deref())?;
         for (name, connection) in &self.config.connections {
             let path = format!("/connections/{}", pointer(name));
@@ -266,7 +344,70 @@ impl Project {
                 ));
             }
         }
-        Ok(inspection)
+        let views = self.inspect_views(&inspection)?;
+        Ok(ProjectInspection {
+            model: inspection,
+            views,
+        })
+    }
+
+    fn inspect_views(&self, model: &ModelInspection) -> Result<Vec<ViewInspection>> {
+        let engine = semantic_engine::Engine::new();
+        let mut ready: BTreeSet<_> = model
+            .datasets
+            .iter()
+            .map(|dataset| dataset.name.clone())
+            .collect();
+        let mut pending = self.views.clone();
+        for (name, view) in &mut pending {
+            let path = format!("/views/{}", pointer(name));
+            if ready.contains(name) {
+                return Err(SourceError::configuration(
+                    "duplicate_relation",
+                    path,
+                    "view name conflicts with a dataset in the selected model",
+                ));
+            }
+            view.dependencies =
+                engine
+                    .validate_view_definition(name, &view.sql)
+                    .map_err(|error| {
+                        SourceError::configuration(
+                            "view_definition",
+                            format!("{path}/sql_file"),
+                            format!("{}: {error}", view.sql_file.display()),
+                        )
+                    })?;
+            for dependency in &view.dependencies {
+                if !ready.contains(dependency) && !self.views.contains_key(dependency) {
+                    return Err(SourceError::configuration(
+                        "missing_view_dependency",
+                        path,
+                        format!("unknown relation {dependency:?}"),
+                    ));
+                }
+            }
+        }
+        let mut ordered = Vec::new();
+        while !pending.is_empty() {
+            let next = pending
+                .iter()
+                .find(|(_, view)| view.dependencies.iter().all(|name| ready.contains(name)))
+                .map(|(name, _)| name.clone());
+            let Some(name) = next else {
+                return Err(SourceError::configuration(
+                    "cyclic_views",
+                    "/views",
+                    format!(
+                        "cyclic dependencies; blocked views: {}",
+                        pending.keys().cloned().collect::<Vec<_>>().join(", ")
+                    ),
+                ));
+            };
+            ready.insert(name.clone());
+            ordered.push(pending.remove(&name).expect("selected pending view"));
+        }
+        Ok(ordered)
     }
 
     pub fn source_connector(&self, source: &str) -> Option<&str> {
@@ -282,8 +423,9 @@ impl Project {
         registry: &Registry,
         secrets: &SecretResolver<'_>,
     ) -> Result<ImportedCatalog> {
-        let inspection = self.inspect(registry)?;
+        let inspection = self.inspect_project(registry)?;
         let required: BTreeSet<_> = inspection
+            .model
             .datasets
             .iter()
             .map(|d| d.source.as_str())
@@ -308,9 +450,23 @@ impl Project {
                 .map_err(|e| e.context(format!("/sources/{}", pointer(source))))?;
             bindings.bind(source, provider)?;
         }
-        Ok(self
+        let mut imported = self
             .document
-            .load(self.config.model.as_deref(), &bindings)?)
+            .load(self.config.model.as_deref(), &bindings)?;
+        for view in inspection.views {
+            imported
+                .engine
+                .create_view_with_description(&view.name, &view.sql, view.description.as_deref())
+                .await
+                .map_err(|error| {
+                    SourceError::configuration(
+                        "view_plan",
+                        format!("/views/{}/sql_file", pointer(&view.name)),
+                        format!("{}: {error}", view.sql_file.display()),
+                    )
+                })?;
+        }
+        Ok(imported)
     }
 }
 

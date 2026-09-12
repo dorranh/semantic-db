@@ -82,13 +82,24 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
     let mut engine = if let Some(path) = args.config {
         let project = Project::from_path(path)?;
         if args.inspect || args.validate {
-            let inspection = project.inspect(&registry)?;
-            show_inspection(&inspection, args.inspect, |source| {
+            let inspection = project.inspect_project(&registry)?;
+            show_inspection(&inspection.model, args.inspect, |source| {
                 project.source_connector(source).map(str::to_owned)
             });
+            for view in &inspection.views {
+                println!(
+                    "  View {} ← {} (dependencies: {})",
+                    view.name,
+                    view.sql_file.display(),
+                    view.dependencies.join(", ")
+                );
+                if let Some(description) = &view.description {
+                    println!("    {description}");
+                }
+            }
             if !args.connect {
                 println!(
-                    "Offline validation passed; physical schemas and access have not been checked."
+                    "Offline validation passed; view syntax and dependencies checked. Physical schemas, view columns/types and access have not been checked."
                 );
                 return Ok(());
             }

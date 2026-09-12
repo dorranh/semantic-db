@@ -76,6 +76,47 @@ fn configured_csv_works_from_another_directory_with_validation_inspection_and_sq
 }
 
 #[test]
+fn project_views_inspect_and_reload_from_another_working_directory() {
+    let temp = Temp::new();
+    let config = format!("{ROOT}/examples/geospatial/semantic-db.views.yaml");
+    std::fs::write(temp.0.join(".env"), "not a valid env file\n").unwrap();
+    let inspected = success(temp.run(&["--config", &config, "--inspect"]));
+    assert!(inspected.contains("View deep_wells") && inspected.contains("views/deep_wells.sql"));
+    assert!(inspected.contains("dependencies: deep_wells"));
+    assert!(inspected.contains("example project's depth convention"));
+    assert!(
+        inspected.find("View deep_wells").unwrap()
+            < inspected.find("View active_deep_wells").unwrap()
+    );
+    assert!(success(temp.run(&["--config", &config, "--validate"])).contains("view columns/types"));
+    std::fs::remove_file(temp.0.join(".env")).unwrap();
+    assert!(
+        success(temp.run(&["--config", &config, "--validate", "--connect"]))
+            .contains("Connected schema validation passed")
+    );
+    // Separate processes reload the authored definitions on every startup.
+    for _ in 0..2 {
+        let rows = success(temp.run(&[
+            "--config",
+            &config,
+            "--query",
+            "SELECT well_id FROM active_deep_wells WHERE basin = 'North Basin' ORDER BY well_id",
+        ]));
+        assert!(rows.contains("W-001") && rows.contains("W-004") && rows.contains("2 row(s)"));
+    }
+    let duplicate = temp.run(&[
+        "--config",
+        &config,
+        "--view",
+        "deep_wells=SELECT * FROM wells",
+        "--query",
+        "SELECT 1",
+    ]);
+    assert!(!duplicate.status.success());
+    assert!(String::from_utf8_lossy(&duplicate.stderr).contains("DuplicateRelation"));
+}
+
+#[test]
 fn github_offline_commands_do_not_read_credentials_or_dotenv() {
     let temp = Temp::new();
     std::fs::write(temp.0.join(".env"), "not a valid env file\n").unwrap();
@@ -112,6 +153,16 @@ fn invalid_configurations_fail_before_execution_with_actionable_diagnostics() {
         (
             format!("ossie: {model}\nconnections: {{local: {{connector: csv, connector: csv}}}}"),
             "config_parse",
+        ),
+        (
+            format!(
+                "ossie: {model}\nviews:\n  duplicate: {{sql_file: x.sql}}\n  duplicate: {{sql_file: y.sql}}"
+            ),
+            "config_parse",
+        ),
+        (
+            format!("ossie: {model}\nviews: {{bad: {{sql_file: x.sql, typo: true}}}}"),
+            "unknown field",
         ),
     ] {
         std::fs::write(temp.0.join("project.yaml"), body).unwrap();

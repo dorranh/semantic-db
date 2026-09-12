@@ -81,6 +81,9 @@ budgets, and snapshot semantics are still open.
   available in `Compilation.view_selection`.
 - Offline nested-view equivalence, invalid binding/literal, lowering and CLI tests,
   plus a runnable Ossie-backed Rust example.
+- Project YAML `views` entries with descriptions and SQL files, resolved relative
+  to the project and loaded in dependency order. Offline inspection rejects name,
+  syntax and dependency errors; connected loading checks output schemas.
 
 This preserves the selected definition deterministically. Definition selection,
 natural-language coverage and units remain interpretation/validation gaps; see
