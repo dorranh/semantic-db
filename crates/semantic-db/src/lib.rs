@@ -31,3 +31,8 @@ pub use semantic_catalog::{Catalog, Relation, RelationKind};
 #[cfg(feature = "compiler")]
 pub use semantic_compiler::{Compiler, CompilerError, GroundingOutcome};
 pub use semantic_engine::{Engine, EngineError, RelationBackend, TableProvider};
+
+pub use semantic_engine::{
+    CacheOptions, MaterializationManager, MaterializationPolicy, PreparedQuery, QueryContext,
+    QueryExecution, QueryOptions, SourceDescriptor,
+};

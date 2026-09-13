@@ -48,6 +48,9 @@ impl ConnectorFactory for CsvConnector {
     }
 }
 impl SourceConnection for CsvConnection {
+    fn authorization_scope(&self) -> Option<String> {
+        Some("local-files".into())
+    }
     fn table<'a>(
         &'a self,
         value: &'a Options,
@@ -76,7 +79,7 @@ mod github {
     use std::time::Duration;
 
     pub struct GitHubConnector;
-    struct GitHubConnection(GitHub);
+    struct GitHubConnection(GitHub, String);
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct GitHubOptions {
@@ -160,14 +163,20 @@ mod github {
                             ),
                         )
                     })?;
-                Ok(
-                    Arc::new(GitHubConnection(GitHub::new(options.config(token))?))
-                        as Arc<dyn SourceConnection>,
-                )
+                Ok(Arc::new(GitHubConnection(
+                    GitHub::new(options.config(token.clone()))?,
+                    semantic_runtime::fingerprint(&[
+                        token.as_bytes(),
+                        serde_json::to_string(value).unwrap().as_bytes(),
+                    ]),
+                )) as Arc<dyn SourceConnection>)
             })
         }
     }
     impl SourceConnection for GitHubConnection {
+        fn authorization_scope(&self) -> Option<String> {
+            Some(self.1.clone())
+        }
         fn table<'a>(
             &'a self,
             value: &'a Options,

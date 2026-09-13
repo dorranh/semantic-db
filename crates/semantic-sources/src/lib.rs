@@ -78,6 +78,10 @@ pub trait ConnectorFactory: Send + Sync {
 
 /// A reusable connection/client serving one or more source bindings.
 pub trait SourceConnection: Send + Sync {
+    /// Opaque access identity; None keeps materializations session-local.
+    fn authorization_scope(&self) -> Option<String> {
+        None
+    }
     fn table<'a>(
         &'a self,
         options: &'a Options,
@@ -150,6 +154,7 @@ impl Registry {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
+    pub cache: Option<semantic_engine::CacheOptions>,
     pub ossie: PathBuf,
     pub model: Option<String>,
     #[serde(default)]
@@ -163,6 +168,7 @@ pub struct ProjectConfig {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ViewConfig {
+    pub materialization: Option<semantic_engine::MaterializationPolicy>,
     pub sql_file: PathBuf,
     pub description: Option<String>,
 }
@@ -191,6 +197,7 @@ pub struct ConnectionConfig {
 }
 #[derive(Deserialize)]
 pub struct SourceConfig {
+    pub materialization: Option<semantic_engine::MaterializationPolicy>,
     pub connection: String,
     #[serde(flatten)]
     pub options: Options,
@@ -305,6 +312,30 @@ impl Project {
     /// Offline model inspection plus project views in dependency order.
     pub fn inspect_project(&self, registry: &Registry) -> Result<ProjectInspection> {
         let inspection = self.document.inspect(self.config.model.as_deref())?;
+        if let Some(cache) = &self.config.cache {
+            cache.validate()?;
+        }
+        for policy in self
+            .config
+            .sources
+            .values()
+            .filter_map(|s| s.materialization.as_ref())
+            .chain(
+                self.config
+                    .views
+                    .values()
+                    .filter_map(|s| s.materialization.as_ref()),
+            )
+        {
+            policy.validate()?;
+            if self.config.cache.is_none() {
+                return Err(SourceError::configuration(
+                    "materialization",
+                    "/cache",
+                    "configure cache storage before materialization",
+                ));
+            }
+        }
         for (name, connection) in &self.config.connections {
             let path = format!("/connections/{}", pointer(name));
             if name.trim().is_empty() {
@@ -416,6 +447,13 @@ impl Project {
         Ok(ordered)
     }
 
+    /// Resolved local cache configuration, available without connecting to sources.
+    pub fn cache_options(&self) -> Option<semantic_engine::CacheOptions> {
+        self.config.cache.clone().map(|mut options| {
+            options.directory = self.base_dir.join(options.directory);
+            options
+        })
+    }
     pub fn source_connector(&self, source: &str) -> Option<&str> {
         let binding = self.config.sources.get(source)?;
         Some(&self.config.connections.get(&binding.connection)?.connector)
@@ -438,6 +476,7 @@ impl Project {
             .collect();
         let mut connections: BTreeMap<&str, Arc<dyn SourceConnection>> = BTreeMap::new();
         let mut bindings = SourceBindings::new();
+        let mut scopes = BTreeMap::new();
         for source in required {
             let binding = &self.config.sources[source];
             let config = &self.config.connections[&binding.connection];
@@ -454,11 +493,46 @@ impl Project {
                 .table(&binding.options, &self.base_dir)
                 .await
                 .map_err(|e| e.context(format!("/sources/{}", pointer(source))))?;
+            scopes.insert(
+                source.to_owned(),
+                connections[binding.connection.as_str()].authorization_scope(),
+            );
             bindings.bind(source, provider)?;
         }
         let mut imported = self
             .document
             .load(self.config.model.as_deref(), &bindings)?;
+        if let Some(options) = &self.config.cache {
+            let mut options = options.clone();
+            options.directory = self.base_dir.join(&options.directory);
+            imported.engine.configure_cache(options)?;
+        }
+        for dataset in &inspection.model.datasets {
+            let source = &self.config.sources[&dataset.source];
+            if let Some(Some(scope)) = scopes.get(&dataset.source) {
+                let relation = imported.engine.catalog().relation(&dataset.name).unwrap();
+                let descriptor = semantic_engine::SourceDescriptor {
+                    scope: semantic_runtime::fingerprint(&[
+                        self.base_dir.to_string_lossy().as_bytes(),
+                        dataset.source.as_bytes(),
+                        serde_json::to_string(&source.options).unwrap().as_bytes(),
+                    ]),
+                    authorization_scope: scope.clone(),
+                    schema_revision: semantic_runtime::fingerprint(&[format!(
+                        "{:?}",
+                        relation.schema
+                    )
+                    .as_bytes()]),
+                    revision: semantic_runtime::fingerprint(&[format!("{dataset:?}").as_bytes()]),
+                };
+                imported
+                    .engine
+                    .set_source_descriptor(&dataset.name, descriptor)?;
+            }
+            if let Some(policy) = &source.materialization {
+                imported.engine.materialize(&dataset.name, policy.clone())?;
+            }
+        }
         for view in inspection.views {
             imported
                 .engine
@@ -471,6 +545,11 @@ impl Project {
                         format!("{}: {error}", view.sql_file.display()),
                     )
                 })?;
+        }
+        for (name, view) in &self.config.views {
+            if let Some(policy) = &view.materialization {
+                imported.engine.materialize(name, policy.clone())?;
+            }
         }
         Ok(imported)
     }

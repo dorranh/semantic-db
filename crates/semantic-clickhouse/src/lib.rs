@@ -4,104 +4,39 @@
 //! client, schema discovery, bounded streams and a conservative capability policy.
 //! AggregateFunction state columns must be finalized in a ClickHouse view first.
 
+mod execution;
+mod http;
+mod metadata;
+mod options;
 mod policy;
+mod runtime_filter;
 mod transport;
+pub use metadata::{ColumnMetadata, ServerCapabilities, TableMetadata};
+pub use options::{ArrowCodec, ClickHouseConfig, ServerLimits, TableOptions};
 
 use async_trait::async_trait;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    catalog::{Session, TableProvider, streaming::StreamingTable},
+    catalog::{Session, TableProvider},
     common::TableReference,
     error::{DataFusionError, Result},
-    execution::TaskContext,
     logical_expr::TableType,
-    physical_plan::{ExecutionPlan, SendableRecordBatchStream, streaming::PartitionStream},
+    physical_plan::{ExecutionPlan, SendableRecordBatchStream},
 };
 use datafusion_federation::{
     FederatedTableProviderAdaptor,
     sql::{AstAnalyzer, LogicalOptimizer, SQLExecutor, SQLFederationProvider, SQLTableSource},
 };
-use reqwest::Url;
+
 use std::{
     fmt,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
 };
 
 static NEXT_CONNECTION: AtomicU64 = AtomicU64::new(1);
-
-/// Connection scope is explicit. Secrets are supplied by the embedding host.
-#[derive(Clone)]
-pub struct ClickHouseConfig {
-    pub endpoint: String,
-    pub database: String,
-    pub user: String,
-    pub password: String,
-    /// Deadline per metadata request or remote query, including result streaming.
-    pub query_timeout: Duration,
-    /// Maximum decoded HTTP payload bytes per remote query, not per whole query.
-    pub max_response_bytes: usize,
-    /// False uses the ordinary scan provider with local filters and aggregates.
-    pub federation: bool,
-}
-
-impl ClickHouseConfig {
-    pub fn new(
-        endpoint: impl Into<String>,
-        database: impl Into<String>,
-        user: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Self {
-        Self {
-            endpoint: endpoint.into(),
-            database: database.into(),
-            user: user.into(),
-            password: password.into(),
-            query_timeout: Duration::from_secs(30),
-            max_response_bytes: 256 * 1024 * 1024,
-            federation: true,
-        }
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        let url = Url::parse(&self.endpoint).map_err(|_| error("invalid endpoint"))?;
-        let loopback = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
-        if !(url.scheme() == "https" || url.scheme() == "http" && loopback)
-            || url.host_str().is_none()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-            || url.path() != "/"
-        {
-            return Err(error(
-                "endpoint must be HTTPS (or loopback HTTP), without credentials, path, query or fragment",
-            ));
-        }
-        validate_identifier(&self.database)?;
-        if self.user.trim().is_empty()
-            || self.query_timeout.is_zero()
-            || self.query_timeout > Duration::from_secs(86400)
-            || self.max_response_bytes == 0
-        {
-            return Err(error(
-                "user and response byte budget must be nonempty/positive; timeout must be within (0, 86400] seconds",
-            ));
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Debug for ClickHouseConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClickHouseConfig")
-            .field("federation", &self.federation)
-            .finish_non_exhaustive()
-    }
-}
 
 #[derive(Default)]
 struct Counters {
@@ -120,10 +55,13 @@ pub struct QueryMetrics {
 }
 
 struct Connection {
-    client: clickhouse::Client,
+    client: reqwest::Client,
+    permits: tokio::sync::Semaphore,
     config: ClickHouseConfig,
     context: String,
     counters: Counters,
+    metadata:
+        std::sync::Mutex<std::collections::BTreeMap<String, (std::time::Instant, TableMetadata)>>,
 }
 
 impl fmt::Debug for Connection {
@@ -153,27 +91,15 @@ impl ClickHouse {
             "semantic-db:clickhouse:{}",
             NEXT_CONNECTION.fetch_add(1, Ordering::Relaxed)
         );
-        let client = clickhouse::Client::default()
-            .with_url(&config.endpoint)
-            .with_database(&config.database)
-            .with_user(&config.user)
-            .with_password(&config.password)
-            .with_setting("readonly", "1")
-            .with_setting("cancel_http_readonly_queries_on_client_close", "1")
-            .with_setting("join_use_nulls", "1")
-            .with_setting("join_default_strictness", "ALL")
-            .with_setting("output_format_arrow_string_as_string", "1")
-            .with_setting("output_format_arrow_low_cardinality_as_dictionary", "0")
-            .with_setting(
-                "max_execution_time",
-                config.query_timeout.as_secs_f64().to_string(),
-            )
-            .with_setting("log_comment", &context);
+        let client = http::client(&config)?;
+        let permits = tokio::sync::Semaphore::new(config.max_concurrent_requests);
         Ok(Self(Arc::new(Connection {
             client,
+            permits,
             config,
             context,
             counters: Counters::default(),
+            metadata: std::sync::Mutex::new(std::collections::BTreeMap::new()),
         })))
     }
 
@@ -190,9 +116,61 @@ impl ClickHouse {
     /// Names are identifiers, never SQL expressions. Raw aggregation states are
     /// unsupported; bind a view with GROUP BY and the appropriate *Merge functions.
     pub async fn table(&self, table: &str) -> Result<Arc<dyn TableProvider>> {
+        self.table_with_options(table, TableOptions::default())
+            .await
+    }
+    pub async fn table_with_options(
+        &self,
+        table: &str,
+        options: TableOptions,
+    ) -> Result<Arc<dyn TableProvider>> {
         validate_identifier(table)?;
+        options.validate()?;
+        let metadata = self.metadata(table).await?;
+        if options.final_read
+            && ![
+                "ReplacingMergeTree",
+                "CollapsingMergeTree",
+                "SummingMergeTree",
+                "AggregatingMergeTree",
+            ]
+            .iter()
+            .any(|engine| metadata.engine.ends_with(engine))
+        {
+            return Err(error(
+                "FINAL requires a merge engine supporting finalization",
+            ));
+        }
+        for column in &metadata.columns {
+            if options
+                .columns
+                .as_ref()
+                .is_none_or(|names| names.contains(&column.name))
+                && (column.native_type.starts_with("AggregateFunction(")
+                    || column.native_type.contains("(AggregateFunction("))
+            {
+                return Err(error(
+                    "raw AggregateFunction states require a finalized view",
+                ));
+            }
+        }
         let reference = TableReference::partial(self.0.config.database.clone(), table.to_owned());
-        let sql = format!("SELECT * FROM {} LIMIT 0", remote_name(&reference));
+        let columns = options
+            .columns
+            .as_ref()
+            .map(|names| {
+                names
+                    .iter()
+                    .map(|name| quote_identifier(name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_else(|| "*".into());
+        let sql = format!(
+            "SELECT {columns} FROM {}{} WHERE false LIMIT 0",
+            remote_name(&reference),
+            if options.final_read { " FINAL" } else { "" }
+        );
         let schema = transport::schema(&self.0, &sql).await?;
         for field in schema.fields() {
             validate_identifier(field.name())?;
@@ -201,20 +179,47 @@ impl ClickHouse {
             connection: self.0.clone(),
             reference: reference.clone(),
             schema: schema.clone(),
+            options: options.clone(),
+            estimated_rows: if options.final_read {
+                None
+            } else {
+                metadata.total_rows.and_then(|n| usize::try_from(n).ok())
+            },
         });
         if !self.0.config.federation {
             return Ok(fallback);
         }
         let executor = Arc::new(Executor(self.0.clone()));
         let provider = Arc::new(SQLFederationProvider::new(executor));
-        let source = Arc::new(SQLTableSource::new_with_schema(
+        let source = Arc::new(SQLTableSource::new_with_table(
             provider,
-            reference.into(),
-            schema,
+            Arc::new(BoundTable {
+                reference,
+                schema,
+                options,
+            }),
         ));
         Ok(Arc::new(FederatedTableProviderAdaptor::new_with_provider(
             source, fallback,
         )))
+    }
+}
+
+#[derive(Debug)]
+struct BoundTable {
+    reference: TableReference,
+    schema: SchemaRef,
+    options: TableOptions,
+}
+impl datafusion_federation::sql::SQLTable for BoundTable {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn table_reference(&self) -> TableReference {
+        self.reference.clone()
+    }
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }
 
@@ -231,7 +236,10 @@ impl SQLExecutor for Executor {
         Arc::new(policy::ClickHouseDialect)
     }
     fn logical_optimizer(&self) -> Option<LogicalOptimizer> {
-        Some(Box::new(policy::restrict_federation))
+        let planner = Arc::new(execution::RemotePlanner(self.0.clone()));
+        Some(Box::new(move |plan| {
+            policy::restrict_federation(plan, planner.clone())
+        }))
     }
     fn ast_analyzer(&self) -> Option<AstAnalyzer> {
         Some(Box::new(policy::null_on_empty))
@@ -246,77 +254,110 @@ impl SQLExecutor for Executor {
         Ok(transport::execute(self.0.clone(), query.to_owned(), schema))
     }
     async fn table_names(&self) -> Result<Vec<String>> {
-        Err(error("bind explicit table names; discovery is not enabled"))
+        ClickHouse(self.0.clone()).table_names().await
     }
-    async fn get_table_schema(&self, _table_name: &str) -> Result<SchemaRef> {
-        Err(error("schemas are acquired through ClickHouse::table"))
+    async fn get_table_schema(&self, table_name: &str) -> Result<SchemaRef> {
+        Ok(ClickHouse(self.0.clone()).table(table_name).await?.schema())
     }
 }
 
 #[derive(Debug)]
 struct ScanTable {
+    estimated_rows: Option<usize>,
     connection: Arc<Connection>,
     reference: TableReference,
     schema: SchemaRef,
+    options: TableOptions,
 }
 
 #[async_trait]
 impl TableProvider for ScanTable {
+    fn statistics(&self) -> Option<datafusion::common::Statistics> {
+        let mut stats = datafusion::common::Statistics::new_unknown(&self.schema);
+        if let Some(rows) = self.estimated_rows {
+            stats.num_rows = datafusion::common::stats::Precision::Inexact(rows);
+        }
+        Some(stats)
+    }
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
     fn table_type(&self) -> TableType {
         TableType::Base
     }
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&datafusion::logical_expr::Expr],
+    ) -> Result<Vec<datafusion::logical_expr::TableProviderFilterPushDown>> {
+        use datafusion::logical_expr::TableProviderFilterPushDown::{Exact, Unsupported};
+        Ok(filters
+            .iter()
+            .map(|expr| {
+                if self.connection.config.filter_pushdown
+                    && policy::supports_filter(expr, &self.schema)
+                {
+                    Exact
+                } else {
+                    Unsupported
+                }
+            })
+            .collect())
+    }
     async fn scan(
         &self,
-        session: &dyn Session,
+        _session: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[datafusion::logical_expr::Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        let indices = projection
+            .cloned()
+            .unwrap_or_else(|| (0..self.schema.fields().len()).collect());
+        let schema = Arc::new(self.schema.project(&indices)?);
+        let zero = indices.is_empty();
+        let columns = if zero {
+            "1 AS __semantic_row".into()
+        } else {
+            indices
+                .iter()
+                .map(|i| quote_identifier(self.schema.field(*i).name()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let mut sql = format!(
+            "SELECT {columns} FROM {}{}",
+            remote_name(&self.reference),
+            if self.options.final_read {
+                " FINAL"
+            } else {
+                ""
+            }
+        );
         if !filters.is_empty() {
-            return Err(error("scan fallback does not accept pushed filters"));
+            if filters
+                .iter()
+                .any(|f| !policy::supports_filter(f, &self.schema))
+            {
+                return Err(error("unsupported pushed filter"));
+            }
+            sql.push_str(" WHERE ");
+            sql.push_str(
+                &filters
+                    .iter()
+                    .map(|f| policy::filter_sql(f).map(|s| format!("({s})")))
+                    .collect::<Result<Vec<_>>>()?
+                    .join(" AND "),
+            );
         }
-        // Keep the bound column order even if the remote table later adds or
-        // reorders columns. SELECT * could silently relabel same-typed values.
-        let columns = self
-            .schema
-            .fields()
-            .iter()
-            .map(|field| quote_identifier(field.name()))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let sql = format!("SELECT {columns} FROM {}", remote_name(&self.reference));
-        let partition = Arc::new(ScanPartition {
-            connection: self.connection.clone(),
-            sql,
-            schema: self.schema.clone(),
-        });
-        // Projection and limits are delegated locally so residual predicates can
-        // consume later batches. Correct fallback precedes scan SQL optimization.
-        StreamingTable::try_new(self.schema.clone(), vec![partition])?
-            .scan(session, projection, filters, limit)
-            .await
-    }
-}
-
-#[derive(Debug)]
-struct ScanPartition {
-    connection: Arc<Connection>,
-    sql: String,
-    schema: SchemaRef,
-}
-impl PartitionStream for ScanPartition {
-    fn schema(&self) -> &SchemaRef {
-        &self.schema
-    }
-    fn execute(&self, _context: Arc<TaskContext>) -> SendableRecordBatchStream {
-        transport::execute(
+        if let Some(limit) = limit {
+            sql.push_str(&format!(" LIMIT {limit}"));
+        }
+        Ok(Arc::new(execution::RemoteExec::new(
             self.connection.clone(),
-            self.sql.clone(),
-            self.schema.clone(),
-        )
+            sql,
+            schema,
+            zero,
+        )))
     }
 }
 
@@ -348,6 +389,7 @@ fn error(message: &str) -> DataFusionError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     #[test]
     fn configuration_scope_and_debug_are_safe() {
         let config = ClickHouseConfig::new(

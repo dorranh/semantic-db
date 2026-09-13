@@ -10,6 +10,8 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
+semantic-materialization = { path = "crates/semantic-materialization" }
+semantic-runtime = { path = "crates/semantic-runtime" }
 semantic-sources = { path = "crates/semantic-sources" }
 async-trait = "0.1"
 semantic-catalog = { path = "crates/semantic-catalog" }

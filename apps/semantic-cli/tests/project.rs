@@ -276,3 +276,50 @@ fn configured_github_and_csv_federate_through_the_standard_cli() {
     server.join().unwrap();
     assert!(text.contains("Platform") && text.contains("acme/widget") && text.contains("1 row(s)"));
 }
+
+#[test]
+fn cache_status_invalidation_refresh_and_bypass_work_across_processes() {
+    let temp = Temp::new();
+    std::fs::copy(
+        format!("{ROOT}/examples/geospatial/wells.csv"),
+        temp.0.join("wells.csv"),
+    )
+    .unwrap();
+    let config = serde_json::json!({
+        "ossie":format!("{ROOT}/examples/geospatial/wells.ossie.yaml"),
+        "connections":{"local":{"connector":"csv"}},
+        "sources":{"fixtures.geospatial.wells":{"connection":"local","path":"wells.csv","materialization":{"max_age_seconds":60,"max_fill_bytes":65536}}},
+        "cache":{"directory":"cache","max_memory_bytes":65536,"max_disk_bytes":1048576}
+    });
+    std::fs::write(temp.0.join("project.json"), config.to_string()).unwrap();
+    success(temp.run(&["--config", "project.json", "--cache-refresh", "wells"]));
+    let status = success(temp.run(&["--config", "project.json", "--cache-status"]));
+    let key = status.split_whitespace().next().unwrap().to_owned();
+    assert!(status.contains("generation="));
+    std::fs::rename(temp.0.join("wells.csv"), temp.0.join("offline.csv")).unwrap();
+    std::fs::write(temp.0.join(".env"), "not valid env text").unwrap();
+    assert_eq!(
+        success(temp.run(&["--config", "project.json", "--cache-status"])),
+        status
+    );
+    success(temp.run(&["--config", "project.json", "--cache-invalidate", &key]));
+    assert!(
+        success(temp.run(&["--config", "project.json", "--cache-status"]))
+            .trim()
+            .is_empty()
+    );
+    std::fs::rename(temp.0.join("offline.csv"), temp.0.join("wells.csv")).unwrap();
+    std::fs::remove_file(temp.0.join(".env")).unwrap();
+    success(temp.run(&[
+        "--config",
+        "project.json",
+        "--bypass-cache",
+        "--query",
+        "SELECT COUNT(*) FROM wells",
+    ]));
+    assert!(
+        success(temp.run(&["--config", "project.json", "--cache-status"]))
+            .trim()
+            .is_empty()
+    );
+}

@@ -1,6 +1,12 @@
 //! Deterministic SQL execution with a descriptive relation catalog.
 
 mod federation;
+mod materialization;
+mod query;
+pub use query::{PreparedQuery, QueryExecution};
+pub use semantic_materialization::{CacheOptions, MaterializationManager, MaterializationPolicy};
+pub use semantic_runtime::SourceDescriptor;
+pub use semantic_runtime::{QueryContext, QueryOptions};
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -77,6 +83,12 @@ pub type Result<T> = std::result::Result<T, EngineError>;
 pub struct Engine {
     context: SessionContext,
     catalog: Catalog,
+    providers: BTreeMap<String, Arc<dyn TableProvider>>,
+    descriptors: BTreeMap<String, SourceDescriptor>,
+    materialization_policies: BTreeMap<String, MaterializationPolicy>,
+    materializations: Option<Arc<MaterializationManager>>,
+    identity: String,
+    query_options: QueryOptions,
 }
 
 impl Default for Engine {
@@ -87,17 +99,33 @@ impl Default for Engine {
 
 impl Engine {
     pub fn new() -> Self {
+        Self::with_memory_limit(512 * 1024 * 1024).expect("default runtime")
+    }
+    pub fn with_memory_limit(bytes: usize) -> Result<Self> {
+        if bytes == 0 {
+            return Err(semantic_runtime::failure("memory limit must be positive").into());
+        }
+        let runtime = datafusion::execution::runtime_env::RuntimeEnvBuilder::new()
+            .with_memory_limit(bytes, 1.0)
+            .build_arc()?;
         let config = SessionConfig::new().with_information_schema(true);
         let state = datafusion::execution::session_state::SessionStateBuilder::new()
             .with_config(config)
+            .with_runtime_env(runtime)
             .with_default_features()
             .with_optimizer_rules(federation::optimizer_rules())
             .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
             .build();
-        Self {
+        Ok(Self {
             context: SessionContext::new_with_state(state),
             catalog: Catalog::default(),
-        }
+            providers: BTreeMap::new(),
+            descriptors: BTreeMap::new(),
+            materialization_policies: BTreeMap::new(),
+            materializations: None,
+            identity: semantic_runtime::unique_id(),
+            query_options: QueryOptions::default(),
+        })
     }
 
     pub fn catalog(&self) -> &Catalog {
@@ -119,7 +147,7 @@ impl Engine {
     ) -> Result<Self> {
         let mut engine = Self::new();
         let catalog = Catalog::from_relations(relations)?;
-        let order = engine.registration_order(&catalog)?;
+        let order = engine.registration_order(&catalog, true)?;
         let mut relations: BTreeMap<_, _> = catalog
             .into_iter()
             .map(|relation| (relation.name.clone(), relation))
@@ -185,7 +213,8 @@ impl Engine {
             });
         }
         self.context
-            .register_table(relation.name.as_str(), provider)?;
+            .register_table(relation.name.as_str(), provider.clone())?;
+        self.providers.insert(relation.name.clone(), provider);
         self.catalog.register(relation)?;
         Ok(())
     }
@@ -261,10 +290,12 @@ impl Engine {
         Ok(dependencies)
     }
 
-    fn registration_order(&self, catalog: &Catalog) -> Result<Vec<String>> {
+    fn registration_order(&self, catalog: &Catalog, validate_new: bool) -> Result<Vec<String>> {
         let mut pending = BTreeMap::new();
         for relation in catalog.relations() {
-            self.check_new_name(&relation.name)?;
+            if validate_new {
+                self.check_new_name(&relation.name)?;
+            }
             let dependencies = match &relation.kind {
                 RelationKind::Base { .. } => Vec::new(),
                 RelationKind::View { sql, .. } => self.view_dependencies(sql)?,
@@ -328,9 +359,12 @@ impl Engine {
     }
 
     /// Convenience for small interactive results. Large consumers should call
-    /// `plan_sql` and use DataFrame::execute_stream instead of collecting.
+    /// `execute` and consume QueryExecution::stream instead of collecting.
     pub async fn query(&self, sql: &str) -> Result<Vec<RecordBatch>> {
-        Ok(self.plan_sql(sql).await?.collect().await?)
+        self.execute(sql, self.query_options.clone())
+            .await?
+            .collect()
+            .await
     }
 
     fn check_new_name(&self, name: &str) -> Result<()> {

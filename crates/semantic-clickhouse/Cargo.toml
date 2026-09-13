@@ -8,15 +8,18 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+semantic-runtime.workspace = true
 datafusion.workspace = true
 datafusion-federation.workspace = true
-clickhouse.workspace = true
 arrow-ipc.workspace = true
 async-trait.workspace = true
 async-stream.workspace = true
 futures.workspace = true
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["time", "sync"] }
 reqwest.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

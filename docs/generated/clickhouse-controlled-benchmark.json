@@ -1,0 +1,328 @@
+{
+  "profile": "controlled",
+  "server_version": "25.8.3.66",
+  "records": [
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "latency_ms": 24.160874999999997,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "latency_ms": 22.234625,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "latency_ms": 25.230666,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "latency_ms": 21.283666999999998,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "latency_ms": 22.163249999999998,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "latency_ms": 21.379083,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "latency_ms": 22.786416,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "latency_ms": 22.291709,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "latency_ms": 21.631417,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "latency_ms": 27.475625,
+      "remote_rows": 50000,
+      "remote_bytes": 200968,
+      "rows": 100
+    },
+    {
+      "workload": "selective",
+      "federation": false,
+      "latency_ms": 15.545209000000002,
+      "remote_rows": 50000,
+      "remote_bytes": 200912,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": false,
+      "latency_ms": 16.19075,
+      "remote_rows": 50000,
+      "remote_bytes": 200912,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": false,
+      "latency_ms": 16.217375,
+      "remote_rows": 50000,
+      "remote_bytes": 200912,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": false,
+      "latency_ms": 16.151833,
+      "remote_rows": 50000,
+      "remote_bytes": 200912,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": false,
+      "latency_ms": 16.381584,
+      "remote_rows": 50000,
+      "remote_bytes": 200912,
+      "rows": 50
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "latency_ms": 5.593500000000001,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "latency_ms": 4.827334,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "latency_ms": 5.462,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "latency_ms": 5.649834,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "latency_ms": 5.441584,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "latency_ms": 6.393417,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "latency_ms": 6.703792,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "latency_ms": 6.6119580000000004,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "latency_ms": 6.508583,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "latency_ms": 7.164499999999999,
+      "remote_rows": 100,
+      "remote_bytes": 1080,
+      "rows": 100
+    },
+    {
+      "workload": "selective",
+      "federation": true,
+      "latency_ms": 4.581167,
+      "remote_rows": 50,
+      "remote_bytes": 544,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": true,
+      "latency_ms": 4.367167,
+      "remote_rows": 50,
+      "remote_bytes": 544,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": true,
+      "latency_ms": 3.724875,
+      "remote_rows": 50,
+      "remote_bytes": 544,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": true,
+      "latency_ms": 3.8479579999999998,
+      "remote_rows": 50,
+      "remote_bytes": 544,
+      "rows": 50
+    },
+    {
+      "workload": "selective",
+      "federation": true,
+      "latency_ms": 4.176125,
+      "remote_rows": 50,
+      "remote_bytes": 544,
+      "rows": 50
+    }
+  ],
+  "experiments": [
+    {
+      "experiment": "where",
+      "latency_ms": 2.424208,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "prewhere",
+      "latency_ms": 2.038459,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "parallel",
+      "latency_ms": 2.4402909999999998,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "where",
+      "latency_ms": 2.214292,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "prewhere",
+      "latency_ms": 2.4099579999999996,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "parallel",
+      "latency_ms": 2.5351660000000003,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "where",
+      "latency_ms": 1.702,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "prewhere",
+      "latency_ms": 1.712083,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "parallel",
+      "latency_ms": 2.493042,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "where",
+      "latency_ms": 1.701125,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "prewhere",
+      "latency_ms": 1.760708,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "parallel",
+      "latency_ms": 3.3064999999999998,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "where",
+      "latency_ms": 1.840125,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "prewhere",
+      "latency_ms": 1.719084,
+      "result": 12475500.0
+    },
+    {
+      "experiment": "parallel",
+      "latency_ms": 2.924583,
+      "result": 12475500.0
+    }
+  ],
+  "adoption_gate": {
+    "median_latency_improvement": 0.15,
+    "remote_bytes_improvement": 0.25,
+    "maximum_comparison_regression": 0.1
+  }
+}

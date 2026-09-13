@@ -1,0 +1,18 @@
+name: ClickHouse compatibility
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: ["25.8.3.66@sha256:3b28daecdf0625bd7dc27d555ae8f39042882045e49b04668ceccdd282f67d9b", "26.8.2.7@sha256:fa394da808cc53f76d0344429421d6c422a6ee85fe7450135c0e3cff4df9bcbb"]
+    env:
+      CLICKHOUSE_TEST_TAG: ${{ matrix.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p semantic-sources --features clickhouse --locked --test clickhouse connector_integration -- --ignored

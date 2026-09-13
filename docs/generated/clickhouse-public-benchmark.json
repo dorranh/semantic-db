@@ -1,0 +1,277 @@
+{
+  "profile": "public-smoke",
+  "requests": 32,
+  "performance_gate": false,
+  "records": [
+    {
+      "workload": "projection",
+      "federation": false,
+      "repetition": 1,
+      "latency_ms": 216.55504100000002,
+      "metrics": {
+        "remote_bytes": 21248,
+        "decoded_bytes": 28293,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "projection",
+      "federation": false,
+      "repetition": 2,
+      "latency_ms": 216.325333,
+      "metrics": {
+        "remote_bytes": 21248,
+        "decoded_bytes": 28293,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "projection",
+      "federation": false,
+      "repetition": 3,
+      "latency_ms": 219.916375,
+      "metrics": {
+        "remote_bytes": 21248,
+        "decoded_bytes": 28293,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "repetition": 1,
+      "latency_ms": 180.505834,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "repetition": 2,
+      "latency_ms": 189.913,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": false,
+      "repetition": 3,
+      "latency_ms": 178.841208,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "repetition": 1,
+      "latency_ms": 184.498291,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "repetition": 2,
+      "latency_ms": 186.643708,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": false,
+      "repetition": 3,
+      "latency_ms": 185.173666,
+      "metrics": {
+        "remote_bytes": 816,
+        "decoded_bytes": 1159,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    },
+    {
+      "workload": "projection",
+      "federation": true,
+      "repetition": 1,
+      "latency_ms": 195.74433299999998,
+      "metrics": {
+        "remote_bytes": 4272,
+        "decoded_bytes": 4700,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "projection",
+      "federation": true,
+      "repetition": 2,
+      "latency_ms": 185.010375,
+      "metrics": {
+        "remote_bytes": 4272,
+        "decoded_bytes": 4700,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "projection",
+      "federation": true,
+      "repetition": 3,
+      "latency_ms": 193.73766700000002,
+      "metrics": {
+        "remote_bytes": 4272,
+        "decoded_bytes": 4700,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Limit: skip=0, fetch=100\n  Sort: stories.id ASC NULLS LAST\n    Projection: stories.id, stories.title\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "repetition": 1,
+      "latency_ms": 162.783542,
+      "metrics": {
+        "remote_bytes": 440,
+        "decoded_bytes": 234,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "repetition": 2,
+      "latency_ms": 159.723875,
+      "metrics": {
+        "remote_bytes": 440,
+        "decoded_bytes": 234,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "aggregate",
+      "federation": true,
+      "repetition": 3,
+      "latency_ms": 166.45262499999998,
+      "metrics": {
+        "remote_bytes": 440,
+        "decoded_bytes": 234,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Sort: stories.type ASC NULLS LAST\n  Projection: stories.type, count(Int64(1)) AS count(*) AS n\n    Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n      Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n        TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "repetition": 1,
+      "latency_ms": 167.07425,
+      "metrics": {
+        "remote_bytes": 456,
+        "decoded_bytes": 250,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "repetition": 2,
+      "latency_ms": 166.450875,
+      "metrics": {
+        "remote_bytes": 456,
+        "decoded_bytes": 250,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    },
+    {
+      "workload": "partial",
+      "federation": true,
+      "repetition": 3,
+      "latency_ms": 164.553166,
+      "metrics": {
+        "remote_bytes": 456,
+        "decoded_bytes": 250,
+        "remote_requests": 1,
+        "cache_hits": 0,
+        "cache_misses": 0
+      },
+      "server_version": "26.9.1.36875",
+      "logical_plan": "Projection: n\n  Sort: stories.type ASC NULLS LAST\n    Projection: sqrt(CAST(count(Int64(1)) AS count(*) AS Float64)) AS n, stories.type\n      Aggregate: groupBy=[[stories.type]], aggr=[[count(Int64(1))]]\n        Filter: stories.id >= Int64(0) AND stories.id < Int64(1000)\n          TableScan: stories"
+    }
+  ]
+}
