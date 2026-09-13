@@ -7,16 +7,14 @@ use datafusion::{
 use std::sync::Arc;
 
 pub(super) fn optimizer_rules() -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
-    datafusion_federation::default_optimizer_rules()
-        .into_iter()
-        .map(|rule| {
-            if rule.name() == "federation_optimizer_rule" {
-                Arc::new(GuardedFederation(rule)) as Arc<dyn OptimizerRule + Send + Sync>
-            } else {
-                rule
-            }
-        })
-        .collect()
+    let mut rules = datafusion_federation::default_optimizer_rules();
+    let index = rules
+        .iter()
+        .position(|r| r.name() == "federation_optimizer_rule")
+        .expect("federation rule");
+    let rule = rules.remove(index);
+    rules.push(Arc::new(GuardedFederation(rule)));
+    rules
 }
 
 #[derive(Debug)]
@@ -50,8 +48,17 @@ impl OptimizerRule for GuardedFederation {
         })?;
         // Core 0.5.6 explicitly errors on a remaining InSubquery. Retain normal
         // scans for these plans, and do not involve federation in local queries.
-        if !has_remote || unsupported_subquery {
+        if !has_remote {
             return Ok(Transformed::no(plan));
+        }
+        if unsupported_subquery {
+            let expressions = plan.expressions();
+            let inputs = plan
+                .inputs()
+                .into_iter()
+                .map(|input| self.rewrite(input.clone(), config).map(|value| value.data))
+                .collect::<Result<Vec<_>>>()?;
+            return Ok(Transformed::yes(plan.with_new_exprs(expressions, inputs)?));
         }
         self.0.rewrite(plan, config)
     }

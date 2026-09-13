@@ -78,6 +78,21 @@ struct Args {
     /// Plan SQL or compile natural language without executing query rows.
     #[arg(long, requires = "batch")]
     dry_run: bool,
+    /// Bypass configured materializations for this invocation.
+    #[arg(long)]
+    bypass_cache: bool,
+    /// Query-wide deadline, including cache fills and local operators.
+    #[arg(long, default_value_t = 30)]
+    query_timeout_seconds: u64,
+    /// List published materialization generations and exit.
+    #[arg(long, requires = "config")]
+    cache_status: bool,
+    /// Invalidate a materialization key reported by --cache-status.
+    #[arg(long, requires = "config")]
+    cache_invalidate: Option<String>,
+    /// Refresh one configured relation and exit.
+    #[arg(long, requires = "config")]
+    cache_refresh: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -107,6 +122,37 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
     }
     let mut engine = if let Some(path) = args.config {
         let project = Project::from_path(path)?;
+        if (args.cache_status || args.cache_invalidate.is_some()) && args.cache_refresh.is_none() {
+            let manager = semantic_engine::MaterializationManager::new(
+                project
+                    .cache_options()
+                    .ok_or("project has no cache configuration")?,
+            )?;
+            if let Some(key) = &args.cache_invalidate {
+                manager
+                    .invalidate(
+                        key,
+                        &semantic_engine::QueryContext::new(semantic_engine::QueryOptions {
+                            timeout_seconds: args.query_timeout_seconds,
+                            ..Default::default()
+                        })?,
+                    )
+                    .await?;
+            }
+            if args.cache_status {
+                for manifest in manager.status()? {
+                    println!(
+                        "{} generation={} rows={} disk_bytes={} acquired_at_ms={}",
+                        manifest.key,
+                        manifest.generation,
+                        manifest.rows,
+                        manifest.disk_bytes,
+                        manifest.acquired_at_ms
+                    );
+                }
+            }
+            return Ok(());
+        }
         if args.inspect || args.validate {
             let inspection = project.inspect_project(&registry)?;
             show_inspection(&inspection.model, args.inspect, |source| {
@@ -172,6 +218,40 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
     }
     for (name, sql) in args.view {
         engine.create_view(&name, &sql).await?;
+    }
+    engine.set_query_options(semantic_engine::QueryOptions {
+        timeout_seconds: args.query_timeout_seconds,
+        bypass_materialization: args.bypass_cache,
+        ..Default::default()
+    })?;
+    if args.cache_status || args.cache_invalidate.is_some() || args.cache_refresh.is_some() {
+        let manager = engine
+            .materialization_manager()
+            .ok_or("project has no cache configuration")?;
+        if let Some(key) = args.cache_invalidate {
+            manager
+                .invalidate(
+                    &key,
+                    &semantic_engine::QueryContext::new(engine.query_options().clone())?,
+                )
+                .await?;
+        }
+        if let Some(name) = args.cache_refresh {
+            engine.refresh_materialization(&name).await?;
+        }
+        if args.cache_status {
+            for manifest in manager.status()? {
+                println!(
+                    "{} generation={} rows={} disk_bytes={} acquired_at_ms={}",
+                    manifest.key,
+                    manifest.generation,
+                    manifest.rows,
+                    manifest.disk_bytes,
+                    manifest.acquired_at_ms
+                );
+            }
+        }
+        return Ok(());
     }
     if let Some(request) = args.ask {
         let compiler = Compiler::new(config::provider()?);
@@ -278,11 +358,8 @@ async fn run_ask(
                 );
             }
             if !dry_run {
-                let batches = engine
-                    .plan_generated_sql(&query.sql)
-                    .await?
-                    .collect()
-                    .await?;
+                engine.plan_generated_sql(&query.sql).await?;
+                let batches = engine.query(&query.sql).await?;
                 println!("{}", pretty_format_batches(&batches)?);
                 let rows: usize = batches.iter().map(|batch| batch.num_rows()).sum();
                 println!("{rows} row(s)");

@@ -26,9 +26,9 @@ pub async fn check_query_equivalence(
                 format!("schema mismatch for {sql}"),
             ));
         }
-        let actual = concat_batches(&actual_schema, &actual_frame.collect().await?)
+        let actual = concat_batches(&actual_schema, &actual.query(sql).await?)
             .map_err(DataFusionError::from)?;
-        let expected = concat_batches(&expected_schema, &expected_frame.collect().await?)
+        let expected = concat_batches(&expected_schema, &expected.query(sql).await?)
             .map_err(DataFusionError::from)?;
         if actual != expected {
             return Err(SourceError::configuration(

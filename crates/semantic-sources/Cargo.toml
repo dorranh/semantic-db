@@ -13,6 +13,7 @@ github = ["dep:semantic-github"]
 clickhouse = ["dep:semantic-clickhouse"]
 
 [dependencies]
+semantic-runtime.workspace = true
 semantic-engine.workspace = true
 semantic-ossie.workspace = true
 semantic-github = { workspace = true, optional = true }
@@ -32,3 +33,7 @@ clickhouse.workspace = true
 
 [lints]
 workspace = true
+
+[[example]]
+name = "clickhouse_public_benchmark"
+required-features = ["clickhouse"]

@@ -21,6 +21,10 @@ pub(super) const COMMANDS: &[&str] = &[
     ".plan",
     ".ask-views",
     ".plan-views",
+    ".cache-status",
+    ".cache-refresh",
+    ".cache-invalidate",
+    ".cache-bypass",
     ".quit",
     ".exit",
 ];
@@ -110,7 +114,7 @@ impl Catalog {
                 );
             }
             match &input[leading..end] {
-                ".schema" => {
+                ".schema" | ".cache-refresh" => {
                     let start = end + input[end..].len() - input[end..].trim_start().len();
                     if pos < start {
                         return (pos, vec![]);
@@ -118,6 +122,16 @@ impl Catalog {
                     return (
                         start,
                         filter(self.relations.keys().cloned(), &input[start..pos]),
+                    );
+                }
+                ".cache-bypass" => {
+                    let start = end + input[end..].len() - input[end..].trim_start().len();
+                    if pos < start {
+                        return (pos, vec![]);
+                    }
+                    return (
+                        start,
+                        filter(["on".to_owned(), "off".to_owned()], &input[start..pos]),
                     );
                 }
                 ".view" => {

@@ -3,7 +3,7 @@
 //! Rows are fetched only when polled. Issue state equality can be pushed to
 //! GitHub. Other filters, joins, aggregates, and column selection stay local.
 //! Each scan has its own request budget and cursor state. There is no snapshot
-//! isolation, automatic retry, or query-wide budget across multiple scans.
+//! isolation or automatic retry. Engine execution supplies shared query budgets.
 
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -366,7 +366,7 @@ impl PartitionStream for GitHubPartition {
         &self.schema
     }
 
-    fn execute(&self, _ctx: Arc<TaskContext>) -> SendableRecordBatchStream {
+    fn execute(&self, ctx: Arc<TaskContext>) -> SendableRecordBatchStream {
         // No spawned task or prefetch: dropping the stream drops in-flight I/O.
         let state = Scan {
             github: self.github.clone(),
@@ -378,11 +378,21 @@ impl PartitionStream for GitHubPartition {
             issue_cursor: Cursor::default(),
             labels: VecDeque::new(),
             requests: 0,
+            query_context: semantic_runtime::QueryContext::from_task(&ctx),
         };
         Box::pin(RecordBatchStreamAdapter::new(
             self.schema.clone(),
             futures::stream::try_unfold(state, |mut state| async move {
-                Ok(state.next_batch().await?.map(|batch| (batch, state)))
+                let query = state.query_context.clone();
+                let batch = if let Some(query) = &query {
+                    query.run(state.next_batch()).await?
+                } else {
+                    state.next_batch().await?
+                };
+                if let (Some(query), Some(batch)) = (&query, &batch) {
+                    query.charge_decoded(batch.get_array_memory_size())?;
+                }
+                Ok(batch.map(|batch| (batch, state)))
             }),
         ))
     }
@@ -429,6 +439,7 @@ struct Scan {
     issue_cursor: Cursor,
     labels: VecDeque<PendingLabels>,
     requests: usize,
+    query_context: Option<Arc<semantic_runtime::QueryContext>>,
 }
 
 impl Scan {
@@ -438,6 +449,10 @@ impl Scan {
             return Err(error(
                 "request budget exhausted; query results are incomplete",
             ));
+        }
+        if let Some(query) = &self.query_context {
+            query.check()?;
+            query.request_started()?;
         }
         self.requests += 1;
         connection.requests.fetch_add(1, Ordering::Relaxed);
@@ -466,6 +481,9 @@ impl Scan {
         while let Some(chunk) = response.chunk().await.map_err(transport_error)? {
             if chunk.len() > max_bytes.saturating_sub(bytes.len()) {
                 return Err(error("response exceeds byte budget"));
+            }
+            if let Some(query) = &self.query_context {
+                query.charge_remote(chunk.len())?;
             }
             bytes.extend_from_slice(&chunk);
         }
