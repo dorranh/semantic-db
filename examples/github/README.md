@@ -86,12 +86,12 @@ Use explicit criteria in a query or a curated SQL view.
 
 ## Embed and verify
 
-The compact [Rust example](../../crates/semantic-db/examples/github.rs) loads
+The compact [Rust example](../../examples/github/src/main.rs) loads
 this same project and executes its default query. It reads process environment
 variables only; export `GITHUB_TOKEN` before running it:
 
 ```sh
-cargo run -p semantic-db --features sources,github --example github
+cargo run -p example-github
 cargo test -p semantic-github --locked
 ```
 

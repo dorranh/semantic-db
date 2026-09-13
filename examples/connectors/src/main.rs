@@ -184,11 +184,8 @@ mod tests {
                 },
             )
             .unwrap();
-        let project = Project::from_path(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/connectors/semantic-db.yaml"
-        ))
-        .unwrap();
+        let project =
+            Project::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/semantic-db.yaml")).unwrap();
         let engine = project.load(&registry, &|_| None).await.unwrap().engine;
         let frame = engine.plan_sql("SELECT * FROM items").await.unwrap();
         assert_eq!(requests.load(Ordering::Relaxed), 0);
@@ -234,12 +231,10 @@ mod tests {
                     .into_view(),
             )
             .unwrap();
-        let reference = semantic_ossie::OssieDocument::parse(include_str!(
-            "../../../examples/connectors/items.ossie.yaml"
-        ))
-        .unwrap()
-        .load(None, &reference_sources)
-        .unwrap();
+        let reference = semantic_ossie::OssieDocument::parse(include_str!("../items.ossie.yaml"))
+            .unwrap()
+            .load(None, &reference_sources)
+            .unwrap();
         semantic_sources::conformance::check_query_equivalence(
             &engine,
             &reference.engine,

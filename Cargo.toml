@@ -1,5 +1,14 @@
 [workspace]
-members = ["crates/*", "apps/*"]
+members = [
+    "crates/*",
+    "apps/*",
+    "examples/team_catalog",
+    "examples/ossie_wells",
+    "examples/authored_views",
+    "examples/github",
+    "examples/connectors",
+    "tests/performance",
+]
 resolver = "3"
 
 [workspace.package]
@@ -10,6 +19,8 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
+semantic-db = { path = "crates/semantic-db", default-features = false }
+semantic-cli = { path = "apps/semantic-cli" }
 semantic-materialization = { path = "crates/semantic-materialization" }
 semantic-runtime = { path = "crates/semantic-runtime" }
 semantic-sources = { path = "crates/semantic-sources" }

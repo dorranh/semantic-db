@@ -26,15 +26,15 @@ dependency versions as its host.
 From the repository root:
 
 ```sh
-cargo run -p semantic-cli --example custom_connector -- \
+cargo run -p example-custom-connector -- \
   --config examples/connectors/semantic-db.yaml --inspect
-cargo run -p semantic-cli --example custom_connector -- \
+cargo run -p example-custom-connector -- \
   --config examples/connectors/semantic-db.yaml \
   --query 'SELECT id FROM items WHERE id >= 4 LIMIT 1'
-cargo test -p semantic-cli --example custom_connector --locked
+cargo test -p example-custom-connector --locked
 ```
 
-The query returns ID 4. The [template](../apps/semantic-cli/examples/custom_connector.rs)
+The query returns ID 4. The [template](../examples/connectors/src/main.rs)
 is a small custom CLI binary backed by five simulated API items, delivered two
 at a time. It uses the same configuration loader, Ossie importer, SQL/NL commands,
 and REPL as the standard executable. Replace `PageStream::fetch_page` with your

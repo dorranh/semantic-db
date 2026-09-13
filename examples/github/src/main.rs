@@ -7,10 +7,7 @@ use semantic_db::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let project = Project::from_path(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/github/semantic-db.yaml"
-    ))?;
+    let project = Project::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/semantic-db.yaml"))?;
     let imported = project
         .load(&Registry::standard(), &|name| std::env::var(name).ok())
         .await?;
@@ -19,9 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let batches = imported
         .engine
-        .query(include_str!(
-            "../../../examples/github/open_issues_by_team.sql"
-        ))
+        .query(include_str!("../open_issues_by_team.sql"))
         .await?;
     println!("{}", pretty_format_batches(&batches)?);
     Ok(())

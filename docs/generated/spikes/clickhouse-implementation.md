@@ -146,8 +146,8 @@ cargo test --workspace --all-features --locked
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test -p semantic-sources --features clickhouse --test clickhouse connector_integration -- --ignored
 CLICKHOUSE_TEST_TAG=26.8.2.7 cargo test -p semantic-sources --features clickhouse --test clickhouse connector_integration -- --ignored
-cargo test -p semantic-sources --features clickhouse --test clickhouse clickhouse_controlled_benchmark -- --ignored
-SEMANTIC_PUBLIC_CLICKHOUSE=1 cargo run -p semantic-sources --features clickhouse --example clickhouse_public_benchmark
+cargo test -p semantic-performance --release --test clickhouse_controlled -- --ignored
+SEMANTIC_PUBLIC_CLICKHOUSE=1 cargo run -p semantic-performance --release --bin clickhouse_public
 ```
 
 Docker Desktop installations without `/var/run/docker.sock` may need `DOCKER_HOST` set to the socket reported by `docker context inspect`.

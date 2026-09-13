@@ -2002,6 +2002,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-authored-views"
+version = "0.1.0"
+dependencies = [
+ "semantic-db",
+ "tokio",
+]
+
+[[package]]
+name = "example-custom-connector"
+version = "0.1.0"
+dependencies = [
+ "datafusion",
+ "futures",
+ "semantic-cli",
+ "semantic-ossie",
+ "semantic-sources",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "example-github"
+version = "0.1.0"
+dependencies = [
+ "semantic-db",
+ "tokio",
+]
+
+[[package]]
+name = "example-ossie-wells"
+version = "0.1.0"
+dependencies = [
+ "semantic-db",
+ "tokio",
+]
+
+[[package]]
+name = "example-team-catalog"
+version = "0.1.0"
+dependencies = [
+ "semantic-db",
+ "tokio",
+]
+
+[[package]]
 name = "fancy-regex"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4030,13 +4076,11 @@ dependencies = [
  "datafusion",
  "directories",
  "dotenvy",
- "futures",
  "rustyline",
  "semantic-compiler",
  "semantic-engine",
  "semantic-ossie",
  "semantic-sources",
- "serde",
  "serde_json",
  "tokio",
 ]
@@ -4152,6 +4196,19 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "semantic-performance"
+version = "0.1.0"
+dependencies = [
+ "clickhouse",
+ "semantic-catalog",
+ "semantic-clickhouse",
+ "semantic-engine",
+ "serde_json",
+ "testcontainers",
  "tokio",
 ]
 

@@ -33,7 +33,3 @@ clickhouse.workspace = true
 
 [lints]
 workspace = true
-
-[[example]]
-name = "clickhouse_public_benchmark"
-required-features = ["clickhouse"]

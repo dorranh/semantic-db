@@ -107,7 +107,6 @@ See the guides below to use your own data or embed Semantic DB in your applicati
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
-cargo test -p semantic-cli --example custom_connector --locked
 ```
 
 Tests use fixtures and local HTTP servers; no API key is needed. Optional live

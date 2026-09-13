@@ -1,4 +1,4 @@
-//! Run with: cargo run -p semantic-db --example team_catalog
+//! Run with: cargo run -p example-team-catalog
 use std::sync::Arc;
 
 use semantic_db::{

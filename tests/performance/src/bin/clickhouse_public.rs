@@ -1,5 +1,5 @@
 //! Opt-in, sequential public-instance smoke benchmark (32 requests maximum).
-//! SEMANTIC_PUBLIC_CLICKHOUSE=1 cargo run -p semantic-sources --features clickhouse --example clickhouse_public_benchmark
+//! SEMANTIC_PUBLIC_CLICKHOUSE=1 cargo run -p semantic-performance --release --bin clickhouse_public
 use semantic_catalog::Relation;
 use semantic_clickhouse::{ClickHouse, ClickHouseConfig, ServerLimits, TableOptions};
 use semantic_engine::{Engine, QueryOptions};

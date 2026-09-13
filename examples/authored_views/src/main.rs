@@ -1,4 +1,4 @@
-//! Offline example: cargo run -p semantic-db --features ossie --example authored_views
+//! Offline example: cargo run -p example-authored-views
 //! An application supplies the typed selection here. Compiler::compile_views
 //! produces this same selection contract from natural language using a model.
 use semantic_db::{
@@ -10,17 +10,12 @@ use semantic_db::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let document = OssieDocument::parse(include_str!(
-        "../../../examples/geospatial/wells.ossie.yaml"
-    ))?;
+    let document = OssieDocument::parse(include_str!("../../geospatial/wells.ossie.yaml"))?;
     let mut bindings = SourceBindings::new();
     bindings
         .bind_csv(
             "fixtures.geospatial.wells",
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../examples/geospatial/wells.csv"
-            ),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../geospatial/wells.csv"),
         )
         .await?;
     let imported = document.load(Some("geospatial_wells"), &bindings)?;

@@ -34,7 +34,7 @@ An offline Rust example loads the same Ossie model and directly lowers a supplie
 typed selection, without an API key or model call:
 
 ```sh
-cargo run -p semantic-db --features ossie --example authored_views --locked
+cargo run -p example-authored-views --locked
 ```
 
 ## Author views in the project

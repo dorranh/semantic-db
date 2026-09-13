@@ -1,4 +1,4 @@
-//! Run with: cargo run -p semantic-db --features ossie --example ossie_wells
+//! Run with: cargo run -p example-ossie-wells
 use semantic_db::{
     engine::pretty_format_batches,
     ossie::{OssieDocument, SourceBindings},
@@ -6,17 +6,12 @@ use semantic_db::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let document = OssieDocument::parse(include_str!(
-        "../../../examples/geospatial/wells.ossie.yaml"
-    ))?;
+    let document = OssieDocument::parse(include_str!("../../geospatial/wells.ossie.yaml"))?;
     let mut sources = SourceBindings::new();
     sources
         .bind_csv(
             "fixtures.geospatial.wells",
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../examples/geospatial/wells.csv"
-            ),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../geospatial/wells.csv"),
         )
         .await?;
     let imported = document.load(Some("geospatial_wells"), &sources)?;
@@ -25,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let batches = imported
         .engine
-        .query(include_str!("../../../examples/geospatial/query.sql"))
+        .query(include_str!("../../geospatial/query.sql"))
         .await?;
     println!("{}", pretty_format_batches(&batches)?);
     Ok(())

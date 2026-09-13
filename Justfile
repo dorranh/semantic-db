@@ -10,14 +10,21 @@ lint:
 check:
     cargo check --workspace --all-targets --all-features --locked
 
-# Run offline workspace tests and the connector template tests.
+# Run offline workspace tests, including the example packages.
 test:
     cargo test --workspace --all-features --locked
-    cargo test -p semantic-cli --example custom_connector --locked
 
 # Run connector integration tests
 test-connectors:
     cargo test --workspace --all-features --locked connector_integration -- --ignored
+
+# Run controlled performance workloads (requires Docker).
+test-performance:
+    cargo test -p semantic-performance --release --locked --test clickhouse_controlled -- --ignored --nocapture
+
+# Run the opt-in public ClickHouse smoke benchmark.
+benchmark-public:
+    SEMANTIC_PUBLIC_CLICKHOUSE=1 cargo run -p semantic-performance --release --locked --bin clickhouse_public
 
 # Build and run the CLI, forwarding arguments unchanged.
 [positional-arguments]

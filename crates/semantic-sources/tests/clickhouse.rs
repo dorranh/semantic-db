@@ -10,14 +10,11 @@ use semantic_engine::Engine;
 use semantic_ossie::{OssieDocument, SourceBindings};
 use semantic_sources::{Project, ProjectConfig, Registry, conformance::check_query_equivalence};
 use serde_json::{Value, json};
-use std::{path::PathBuf, sync::Arc, time::Duration};
-use testcontainers::{
-    ContainerAsync, GenericImage, ImageExt,
-    core::{IntoContainerPort, WaitFor, wait::HttpWaitStrategy},
-    runners::AsyncRunner,
-};
+use std::{path::PathBuf, sync::Arc};
+#[path = "../../../tests/support/clickhouse.rs"]
+mod clickhouse_fixture;
+use clickhouse_fixture::{Database, PASSWORD};
 
-const PASSWORD: &str = "fixture-password";
 type TableFixture = (
     &'static str,
     &'static str,
@@ -61,72 +58,6 @@ const TABLES: &[TableFixture] = &[
         ],
     ),
 ];
-
-struct Database {
-    _container: ContainerAsync<GenericImage>,
-    endpoint: String,
-    admin: clickhouse::Client,
-}
-impl Database {
-    async fn start() -> Self {
-        let container = GenericImage::new(
-            "clickhouse/clickhouse-server",
-            &std::env::var("CLICKHOUSE_TEST_TAG").unwrap_or_else(|_| "25.8.3.66".into()),
-        )
-        .with_exposed_port(8123.tcp())
-        .with_wait_for(WaitFor::http(
-            HttpWaitStrategy::new("/ping")
-                .with_port(8123.tcp())
-                .with_expected_status_code(200u16),
-        ))
-        .with_env_var("CLICKHOUSE_DB", "drilling")
-        .with_env_var("CLICKHOUSE_USER", "fixture")
-        .with_env_var("CLICKHOUSE_PASSWORD", PASSWORD)
-        .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
-        .with_startup_timeout(Duration::from_secs(90))
-        .start()
-        .await
-        .expect("start ClickHouse (requires Docker)");
-        let endpoint = format!(
-            "http://{}:{}",
-            container.get_host().await.unwrap(),
-            container.get_host_port_ipv4(8123).await.unwrap()
-        );
-        let admin = clickhouse::Client::default()
-            .with_url(&endpoint)
-            .with_database("drilling")
-            .with_user("fixture")
-            .with_password(PASSWORD);
-        let database = Self {
-            _container: container,
-            endpoint,
-            admin,
-        };
-        // Fixture SQL is test-owned; one statement per request, no multiquery mode.
-        let sql = include_str!("../../../examples/clickhouse/drilling.sql")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("--"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        for statement in sql.split(';').filter(|sql| !sql.trim().is_empty()) {
-            database.execute(statement).await;
-        }
-        database
-    }
-    async fn execute(&self, sql: &str) {
-        self.admin
-            .query(sql)
-            .execute()
-            .await
-            .unwrap_or_else(|error| panic!("fixture statement failed: {sql}\n{error}"));
-    }
-    fn connection(&self, federation: bool) -> ClickHouse {
-        let mut config = ClickHouseConfig::new(&self.endpoint, "drilling", "fixture", PASSWORD);
-        config.federation = federation;
-        config.filter_pushdown = federation;
-        ClickHouse::new(config).unwrap()
-    }
-}
 
 fn document() -> OssieDocument {
     let datasets: Vec<Value> = TABLES
@@ -660,84 +591,6 @@ async fn connector_integration_types_final_and_partial_transfer() {
     let discovered = connection.table_names().await.unwrap();
     assert!(discovered.contains(&"typed".into()));
     assert!(connection.table("drilling_states").await.is_err());
-}
-
-#[tokio::test]
-#[ignore = "benchmark: requires Docker; writes docs/generated benchmark artifact"]
-async fn clickhouse_controlled_benchmark() {
-    use semantic_catalog::Relation;
-    let database = Database::start().await;
-    database.execute("CREATE TABLE bench ENGINE=MergeTree ORDER BY id AS SELECT number AS id,number%100 AS k,toFloat64(number) AS value,repeat(toString(cityHash64(number)),16) AS payload FROM numbers(50000)").await;
-    let mut records = vec![];
-    for federation in [false, true] {
-        let connection = database.connection(federation);
-        let provider = connection.table("bench").await.unwrap();
-        let mut engine = Engine::new();
-        engine
-            .register_table(
-                Relation::base("bench", provider.schema(), "benchmark"),
-                provider,
-            )
-            .unwrap();
-        for (workload, sql) in [
-            (
-                "aggregate",
-                "SELECT k,SUM(value) FROM bench GROUP BY k ORDER BY k",
-            ),
-            (
-                "partial",
-                "SELECT k,SQRT(SUM(value)) FROM bench GROUP BY k ORDER BY k",
-            ),
-            (
-                "selective",
-                "SELECT id FROM bench WHERE k=1 ORDER BY id LIMIT 50",
-            ),
-        ] {
-            for repetition in 0..6 {
-                let before = connection.metrics();
-                let start = std::time::Instant::now();
-                let batches = engine.query(sql).await.unwrap();
-                let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                let after = connection.metrics();
-                if repetition > 0 {
-                    records.push(json!({"workload":workload,"federation":federation,"latency_ms":elapsed,"remote_rows":after.rows-before.rows,"remote_bytes":after.bytes-before.bytes,"rows":batches.iter().map(|b|b.num_rows()).sum::<usize>()}));
-                }
-            }
-        }
-    }
-    let mut experiments = vec![];
-    for repetition in 0..6 {
-        for (name, clause) in [("where", "WHERE"), ("prewhere", "PREWHERE")] {
-            let sql = format!(
-                "SELECT sum(value) FROM bench {clause} k=1 SETTINGS optimize_move_to_prewhere=0,use_query_cache=0,max_threads=2"
-            );
-            let start = std::time::Instant::now();
-            let result = database.admin.query(&sql).fetch_one::<f64>().await.unwrap();
-            if repetition > 0 {
-                experiments.push(json!({"experiment":name,"latency_ms":start.elapsed().as_secs_f64()*1000.0,"result":result}));
-            }
-        }
-        let start = std::time::Instant::now();
-        let (left,right)=tokio::join!(
-            database.admin.query("SELECT sum(value) FROM bench WHERE k=1 AND id<25000 SETTINGS use_query_cache=0,max_threads=1").fetch_one::<f64>(),
-            database.admin.query("SELECT sum(value) FROM bench WHERE k=1 AND id>=25000 SETTINGS use_query_cache=0,max_threads=1").fetch_one::<f64>()
-        );
-        let result = left.unwrap() + right.unwrap();
-        if repetition > 0 {
-            experiments.push(json!({"experiment":"parallel","latency_ms":start.elapsed().as_secs_f64()*1000.0,"result":result}));
-        }
-    }
-    let version = database
-        .admin
-        .query("SELECT version()")
-        .fetch_one::<String>()
-        .await
-        .unwrap();
-    let report = json!({"profile":"controlled","server_version":version,"records":records,"experiments":experiments,"adoption_gate":{"median_latency_improvement":0.15,"remote_bytes_improvement":0.25,"maximum_comparison_regression":0.10}});
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/generated/clickhouse-controlled-benchmark.json");
-    std::fs::write(&path, serde_json::to_string_pretty(&report).unwrap()).unwrap();
-    println!("{}", path.display());
 }
 
 #[tokio::test]

@@ -96,7 +96,7 @@ This uses the model-provider configuration described in the root README. The
 library example works without an API key:
 
 ```sh
-cargo run -p semantic-db --features ossie --example ossie_wells
+cargo run -p example-ossie-wells
 ```
 
 Validate and inspect without Python or an upstream checkout:

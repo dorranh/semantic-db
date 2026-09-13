@@ -34,7 +34,7 @@ The optional `compiler` feature remains independent of configured loading.
 
 If you already have providers, use the direct Ossie bindings below. If you own
 another catalog representation with Arrow schemas, use `Engine::from_catalog`
-and `RelationBackend`. The [team catalog example](../crates/semantic-db/examples/team_catalog.rs)
+and `RelationBackend`. The [team catalog example](../examples/team_catalog/src/main.rs)
 demonstrates that lower-level path.
 
 ## Catalog definitions
@@ -142,10 +142,10 @@ Keys are explicitly unenforced declarations. The compiler receives these
 annotations as evidence, not as instructions that override its rules. Neither
 units in descriptions nor valid field types prove deterministic domain correctness.
 
-Run the complete [wells importer example](../crates/semantic-db/examples/ossie_wells.rs):
+Run the complete [wells importer example](../examples/ossie_wells/src/main.rs):
 
 ```sh
-cargo run -p semantic-db --features ossie --example ossie_wells
+cargo run -p example-ossie-wells
 ```
 
 ## Validation and failure behavior
