@@ -1,0 +1,66 @@
+---
+import { getCollection } from 'astro:content';
+import { groups, titleOf } from '../lib/navigation';
+import { pageUrl, sourceBase } from '../../scripts/documentation-links.mjs';
+import '../styles/docs.css';
+const { title, id, headings = [], source } = Astro.props;
+const entries = await getCollection('docs');
+const primary = new Set(groups.flatMap(group => group.entries.map(([id]) => id)));
+const notes = entries.filter(entry => !primary.has(entry.id) && entry.id !== 'generated/site-home')
+  .sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
+const isNote = notes.some(entry => entry.id === id);
+const sections = headings.filter((heading: { depth: number }) => heading.depth === 2);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={`${title}. Semantic DB documentation: semantic models, Rust integration, and federated SQL.`} />
+    <title>{title} · Semantic DB</title>
+    <link rel="icon" href={`${import.meta.env.BASE_URL}/favicon.svg`.replace('//', '/')} type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="brand" href={pageUrl('generated/site-home')} aria-label="Semantic DB home"><span class="mark" aria-hidden="true">s/db</span><span>Semantic DB</span></a>
+      <span class="header-label">Documentation</span>
+      <a class="repository" href="https://github.com/dorranh/semantic-db">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <div class="shell">
+      <aside class="sidebar">
+        <details class="navigation" open>
+          <summary>Browse documentation</summary>
+          <nav aria-label="Documentation">
+            <a class="overview" href={pageUrl('generated/site-home')} aria-current={id === 'generated/site-home' ? 'page' : undefined}>Overview</a>
+            {groups.map(group => <section class="nav-group">
+              <h2>{group.title}</h2>
+              {group.entries.map(([key, label]) => <a href={pageUrl(key)} aria-current={id === key ? 'page' : undefined}>{label}</a>)}
+            </section>)}
+            <details class="notes" open={isNote}>
+              <summary>Engineering notes &amp; history</summary>
+              {notes.map(entry => <a href={pageUrl(entry.id)} aria-current={id === entry.id ? 'page' : undefined}>{titleOf(entry)}</a>)}
+            </details>
+          </nav>
+        </details>
+        <p class="sidebar-foot">Ossie models<br />DataFusion execution<br />Arrow data</p>
+      </aside>
+      <main id="main" tabindex="-1">
+        <p class="eyebrow">{id === 'generated/site-home' ? 'Semantic query engine' : isNote ? 'Engineering notes & history' : id.startsWith('generated/') ? 'Generated guide' : 'Project guide'}</p>
+        {isNote && <p class="notice">Engineering notes may describe an earlier implementation stage. See <a href={pageUrl('generated/performance')}>Performance and federation</a> and <a href={pageUrl('generated/supported-types')}>Types and extensibility</a> for the current execution contract.</p>}
+        <article><slot /></article>
+        <footer><span>Semantic DB · Experimental</span>{source && <a href={sourceBase + source}>View Markdown source ↗</a>}</footer>
+      </main>
+      <aside class="toc" aria-label="On this page">
+        {sections.length > 0 && <nav aria-label="Page sections"><h2>On this page</h2>{sections.map((heading: { slug: string; text: string }) => <a href={`#${heading.slug}`}>{heading.text}</a>)}</nav>}
+      </aside>
+    </div>
+  </body>
+</html>
+<script>
+  const navigation = document.querySelector<HTMLDetailsElement>('.navigation');
+  const mobile = window.matchMedia('(max-width: 720px)');
+  const updateNavigation = () => { if (navigation) navigation.open = !mobile.matches; };
+  updateNavigation();
+  mobile.addEventListener('change', updateNavigation);
+</script>

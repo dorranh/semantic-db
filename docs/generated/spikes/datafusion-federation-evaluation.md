@@ -10,12 +10,12 @@ The recommendation assumes remote SQL databases are a near-term requirement. If 
 
 **What the two libraries contribute**
 
-| Component | Contribution | Work that remains with us |
-| --- | --- | --- |
-| DataFusion itself, already adopted | Relational planning, local joins/aggregations, Arrow execution, provider interfaces | Source implementations and remote execution decisions |
-| `datafusion-federation` | Finds subplans whose tables share a remote execution context; replaces them with federated nodes and plans their execution | Backend capability policy, identity boundaries, runtime controls |
-| `datafusion-table-providers` | Database access, schema discovery, type conversion, SQL scans, and federation integration for selected connectors | Our configuration/secret adapters, selected-backend qualification, upgrade coordination |
-| Semantic DB | Catalog meaning, Ossie field mappings, grounded SQL, connector registration, API row contracts | These remain product responsibilities |
+| Component                          | Contribution                                                                                                               | Work that remains with us                                                               |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| DataFusion itself, already adopted | Relational planning, local joins/aggregations, Arrow execution, provider interfaces                                        | Source implementations and remote execution decisions                                   |
+| `datafusion-federation`            | Finds subplans whose tables share a remote execution context; replaces them with federated nodes and plans their execution | Backend capability policy, identity boundaries, runtime controls                        |
+| `datafusion-table-providers`       | Database access, schema discovery, type conversion, SQL scans, and federation integration for selected connectors          | Our configuration/secret adapters, selected-backend qualification, upgrade coordination |
+| Semantic DB                        | Catalog meaning, Ossie field mappings, grounded SQL, connector registration, API row contracts                             | These remain product responsibilities                                                   |
 
 The libraries are complementary. Federation supplies planning infrastructure; table-providers supplies concrete source access. Registering a compatible provider alone does not enable whole-subplan federation: the session also needs the federation optimizer and query planner. The framework remains explicitly alpha. [Federation overview](https://github.com/datafusion-contrib/datafusion-federation/blob/c654ea75a15261f69fcdddedc6185d77a949743d/README.md), [provider overview](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/README.md).
 
@@ -39,11 +39,11 @@ flowchart TD
 
 The following versions were checked against the local manifests/lockfile, downloaded upstream source, and the crates.io API. Cached documentation pages lagged the registry for table-providers, so the registry was checked directly.
 
-| Component | Reviewed version/revision | DataFusion | Arrow |
-| --- | --- | --- | --- |
-| Semantic DB | `b430780a71548d18472db12aebdb837489bd225a` | Manifest and lock: 55.0.0 | Schema requirement 59.2.0; lock resolves 59.3.0 |
-| Federation | Published 0.5.6; HEAD `c654ea75a15261f69fcdddedc6185d77a949743d` | 55 | `arrow-json` requirement 59.2 |
-| Table-providers | Published 0.13.1; reviewed HEAD `e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc` | 54.0 | Requirements 58.0; upstream lock resolves 58.3.0 |
+| Component       | Reviewed version/revision                                                  | DataFusion                | Arrow                                            |
+| --------------- | -------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------ |
+| Semantic DB     | `b430780a71548d18472db12aebdb837489bd225a`                                 | Manifest and lock: 55.0.0 | Schema requirement 59.2.0; lock resolves 59.3.0  |
+| Federation      | Published 0.5.6; HEAD `c654ea75a15261f69fcdddedc6185d77a949743d`           | 55                        | `arrow-json` requirement 59.2                    |
+| Table-providers | Published 0.13.1; reviewed HEAD `e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc` | 54.0                      | Requirements 58.0; upstream lock resolves 58.3.0 |
 
 Federation 0.5.6 was published on 2 September; providers 0.13.1 on 28 August. The reviewed providers HEAD includes changes after that publication, including Oracle. Treat those additions as HEAD capabilities unless separately verified in a published package. [Federation release metadata](https://crates.io/api/v1/crates/datafusion-federation), [providers release metadata](https://crates.io/api/v1/crates/datafusion-table-providers), [federation manifest](https://github.com/datafusion-contrib/datafusion-federation/blob/c654ea75a15261f69fcdddedc6185d77a949743d/Cargo.toml), [providers manifest](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/Cargo.toml).
 
@@ -94,16 +94,16 @@ The reviewed contrib ADBC factory returns a regular scan provider and its pool d
 
 **Connector coverage needs to be evaluated per implementation**
 
-| Source | Assessment for Semantic DB |
-| --- | --- |
-| PostgreSQL | Strong first candidate: dedicated provider, connection pooling, conversion code, and a factory path that creates a federation adaptor. |
-| ClickHouse | Dedicated federation-capable provider; attractive if this is the first product requirement. Fix connection grouping before enabling it across independent credentials. |
-| MySQL, SQLite, DuckDB, ODBC | Federation integration is present in their factory paths. Useful future reuse; qualify only the backends we actually ship. |
-| MongoDB | Dedicated scan/filter/projection implementation. Do not infer remote joins or aggregation pipelines from the package's optional federation dependency. |
-| Flight SQL | Useful transport/provider infrastructure, but the inspected default driver submits a configured SQL query during metadata acquisition. It is not automatically an arbitrary-subplan `SQLExecutor`. |
+| Source                           | Assessment for Semantic DB                                                                                                                                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL                       | Strong first candidate: dedicated provider, connection pooling, conversion code, and a factory path that creates a federation adaptor.                                                                                 |
+| ClickHouse                       | Dedicated federation-capable provider; attractive if this is the first product requirement. Fix connection grouping before enabling it across independent credentials.                                                 |
+| MySQL, SQLite, DuckDB, ODBC      | Federation integration is present in their factory paths. Useful future reuse; qualify only the backends we actually ship.                                                                                             |
+| MongoDB                          | Dedicated scan/filter/projection implementation. Do not infer remote joins or aggregation pipelines from the package's optional federation dependency.                                                                 |
+| Flight SQL                       | Useful transport/provider infrastructure, but the inspected default driver submits a configured SQL query during metadata acquisition. It is not automatically an arbitrary-subplan `SQLExecutor`.                     |
 | ADBC / potential Snowflake route | Useful driver-based access, but the inspected factory returns `AdbcDBTable` without a federation adaptor, and its pool disallows join pushdown. Treat Snowflake integration and subplan federation as additional work. |
-| Oracle | Present in reviewed HEAD after 0.13.1 publication; do not assume the published facade contains it. |
-| GitHub / generic REST or GraphQL | Neither repository replaces our API row mapping, pagination, scope, or selective pushdown logic. |
+| Oracle                           | Present in reviewed HEAD after 0.13.1 publication; do not assume the published facade contains it.                                                                                                                     |
+| GitHub / generic REST or GraphQL | Neither repository replaces our API row mapping, pagination, scope, or selective pushdown logic.                                                                                                                       |
 
 Evidence: [Postgres factory](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/postgres/src/lib.rs), [ClickHouse integration](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/clickhouse/src/federation.rs), [MongoDB table](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/mongodb/src/table.rs), [Flight SQL driver](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/flightsql/src/sql.rs), [ADBC factory](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/adbc/src/lib.rs), [ADBC pool](https://github.com/datafusion-contrib/datafusion-table-providers/blob/e5fdc19ae2c8b0d806a82c4eedbd4538dbbc59fc/crates/adbc/src/pool.rs).
 
@@ -147,13 +147,13 @@ Table-providers has per-crate checks and database integration CI. This is valuab
 
 Open reports include recursive CTE failure, a join with a DISTINCT subquery, and unsupported functions. They identify useful regression cases; their existence is not proof every variant still fails. The inspected optimizer also explicitly rejects remaining `InSubquery` expressions and treats outer references conservatively. Test actual query shapes after DataFusion rewrites them. [Recursive CTE report](https://github.com/datafusion-contrib/datafusion-federation/issues/180), [DISTINCT join report](https://github.com/datafusion-contrib/datafusion-federation/issues/82), [optimizer source](https://github.com/datafusion-contrib/datafusion-federation/blob/c654ea75a15261f69fcdddedc6185d77a949743d/datafusion-federation/src/optimizer/mod.rs).
 
-| Approach | Initial effort | Continuing ownership | Assessment |
-| --- | --- | --- | --- |
-| Build connectors and federation ourselves | Highest | Drivers, conversions, SQL generation, planning, policies, tests, upgrades | Hard to justify for ordinary SQL sources |
-| Adopt providers, keep scan-level execution | Lower after version alignment | Adapters, scan correctness, runtime policy | Useful baseline; forfeits general join/aggregate subplan pushdown |
-| Adopt both with selected-backend qualification | Moderate, with concrete integration risks | Adapters, capability restrictions, runtime policy, dependency matrix | Attractive for multiple supported SQL backends |
-| Use federation with our own SQL executors | Backend-dependent; relatively contained for Arrow-native ClickHouse | Transport integration, scan fallback, backend semantics, runtime policy | Preferred first experiment for ClickHouse; assess other backends separately |
-| Broad permanent fork of both | High and recurring | Upstream merges plus most specialist maintenance | Reserve for demonstrated product needs |
+| Approach                                       | Initial effort                                                      | Continuing ownership                                                      | Assessment                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Build connectors and federation ourselves      | Highest                                                             | Drivers, conversions, SQL generation, planning, policies, tests, upgrades | Hard to justify for ordinary SQL sources                                    |
+| Adopt providers, keep scan-level execution     | Lower after version alignment                                       | Adapters, scan correctness, runtime policy                                | Useful baseline; forfeits general join/aggregate subplan pushdown           |
+| Adopt both with selected-backend qualification | Moderate, with concrete integration risks                           | Adapters, capability restrictions, runtime policy, dependency matrix      | Attractive for multiple supported SQL backends                              |
+| Use federation with our own SQL executors      | Backend-dependent; relatively contained for Arrow-native ClickHouse | Transport integration, scan fallback, backend semantics, runtime policy   | Preferred first experiment for ClickHouse; assess other backends separately |
+| Broad permanent fork of both                   | High and recurring                                                  | Upstream merges plus most specialist maintenance                          | Reserve for demonstrated product needs                                      |
 
 The largest saving from reuse is sharing database conversion and execution machinery, and avoiding duplicate subplan extraction/planning code. The remaining maintenance is substantial but more focused. Adoption should reduce our ownership to product-specific constraints and small upstreamable fixes rather than a second query engine inside Semantic DB.
 
@@ -169,18 +169,18 @@ For a ClickHouse-first direction, evaluate an owned connector with core federati
 
 The acceptance cases should include:
 
-| Case | Evidence required |
-| --- | --- |
-| Filter and projected field aliases | Correct schema/results and physical remote column names |
-| Same-connection join plus aggregate | Remote SQL includes the join/aggregate; result and duplicate multiplicity match reference |
-| Sort plus limit | Correct ordering, NULL placement, and result count; reduced transfer on the fixture |
-| Remote plus CSV/GitHub join | Correct local join and separate remote subplans; measured transfer volume |
-| Unsupported/local-only expression | Local residual evaluation or clear pre-execution rejection |
-| Residual filter plus limit | Matching rows on later batches are not lost |
-| Independent connections with identical endpoint/database | No accidental fusion, including different users or session options |
-| Decimal, timestamp, NULL, and text edge cases | Exact supported semantics, with unsupported mappings rejected |
-| Cancellation, timeout, and late stream failure | Bounded work and failed-query propagation; observe backend cancellation separately |
-| Repeated executions and schema changes | Fresh execution state and documented schema-refresh behavior |
+| Case                                                     | Evidence required                                                                         |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Filter and projected field aliases                       | Correct schema/results and physical remote column names                                   |
+| Same-connection join plus aggregate                      | Remote SQL includes the join/aggregate; result and duplicate multiplicity match reference |
+| Sort plus limit                                          | Correct ordering, NULL placement, and result count; reduced transfer on the fixture       |
+| Remote plus CSV/GitHub join                              | Correct local join and separate remote subplans; measured transfer volume                 |
+| Unsupported/local-only expression                        | Local residual evaluation or clear pre-execution rejection                                |
+| Residual filter plus limit                               | Matching rows on later batches are not lost                                               |
+| Independent connections with identical endpoint/database | No accidental fusion, including different users or session options                        |
+| Decimal, timestamp, NULL, and text edge cases            | Exact supported semantics, with unsupported mappings rejected                             |
+| Cancellation, timeout, and late stream failure           | Bounded work and failed-query propagation; observe backend cancellation separately        |
+| Repeated executions and schema changes                   | Fresh execution state and documented schema-refresh behavior                              |
 
 Adopt if this proves real remote work reduction through our normal configuration path, preserves our semantic and access boundaries, and requires only contained patches. If scan reuse works but safe subplan pushdown remains expensive, ship the selected providers first. If API-driven cross-source joins dominate performance, prioritize targeted runtime-filter or lookup work based on measured workloads; neither library removes that problem.
 

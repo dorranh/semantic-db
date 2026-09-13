@@ -7,6 +7,18 @@ Start with [Add a dataset](../adding-datasets.md) or [Build a connector](../buil
 The [embedding guide](../embedding.md) covers library integration; the
 [catalog comparison](../catalog-prior-art.md) records standards and prior art.
 
+## Current guides
+
+- [Types and extensibility](supported-types.md): physical/logical types and the UDF extension boundary.
+- [Database comparison](database-comparison.md): Semantic DB, semantic layers, and other query engines.
+- [Performance and federation](performance.md): pushdown, joins, shared budgets, and materialization.
+- [Documentation site](docs-site.md): run `just docs`, maintain content, and configure GitHub Pages.
+
+## Design and implementation notes
+
+These notes include historical design stages; use the current guides above for
+the supported type and execution contracts.
+
 1. [System architecture](architecture.md): boundaries, crate ownership, and query flow.
 2. [Catalog and derived relations](catalog-and-derived-relations.md): metadata, views, row types, and lineage.
 3. [Grounding and federation](grounding-and-federation.md): semantic compilation, validation, and backend execution.

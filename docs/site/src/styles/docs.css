@@ -1,0 +1,387 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap');
+:root {
+  --ink:#20364b;
+  --muted:#52677d;
+  --blue:#155dc4;
+  --line:#d9e3ee;
+  --paper:#fff;
+  --panel:#f1f6fc;
+  --wash:#e4efff;
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  color:var(--ink);
+  background:var(--paper);
+  font-size:16px;
+  line-height:1.65;
+}
+
+* {
+  box-sizing:border-box;
+}
+
+body {
+  margin:0;
+}
+
+a {
+  color:var(--blue);
+  text-underline-offset:3px;
+}
+
+a:hover {
+  text-decoration-thickness:2px;
+}
+
+a:focus-visible,summary:focus-visible {
+  outline:3px solid var(--blue);
+  outline-offset:4px;
+}
+
+h1,h2,h3 {
+  line-height:1.2;
+  letter-spacing:-.025em;
+  color:var(--ink);
+  scroll-margin-top:6rem;
+}
+
+h1 {
+  font-size:clamp(2rem,3.6vw,3.25rem);
+  font-weight:500;
+  margin:0 0 1.8rem;
+  max-width:22ch;
+}
+
+h2 {
+  font-size:1.6rem;
+  font-weight:500;
+  margin:2.7rem 0 1.1rem;
+}
+
+h3 {
+  font-size:1.2rem;
+  margin-top:2rem;
+}
+
+p {
+  margin:0 0 1.25rem;
+}
+
+li {
+  margin:.5rem 0;
+}
+
+strong {
+  font-weight:600;
+}
+
+.header {
+  height:80px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  gap:2rem;
+  padding:0 2rem;
+  background:var(--paper);
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+
+.brand {
+  display:flex;
+  align-items:center;
+  gap:.85rem;
+  color:var(--ink);
+  font-size:1.2rem;
+  font-weight:600;
+  text-decoration:none;
+}
+
+.mark {
+  font:500 17px 'IBM Plex Mono',monospace;
+  letter-spacing:-1px;
+  color:white;
+  background:var(--blue);
+  padding:9px 8px;
+  border-radius:8px;
+}
+
+.header-label {
+  font-size:.9rem;
+  color:var(--muted);
+  border-left:1px solid var(--line);
+  padding-left:2rem;
+}
+
+.repository {
+  margin-left:auto;
+  font-size:.9rem;
+  text-decoration:none;
+}
+
+.shell {
+  display:grid;
+  grid-template-columns:260px minmax(0,900px) 210px;
+  max-width:1510px;
+  margin:auto;
+}
+
+.sidebar {
+  padding:2rem 1.25rem 2rem 1.5rem;
+  position:sticky;
+  top:80px;
+  height:calc(100dvh - 80px);
+  overflow:auto;
+  border-right:1px solid var(--line);
+  background:var(--panel);
+}
+
+.navigation>summary {
+  display:none;
+}
+
+.sidebar a {
+  display:block;
+  padding:.4rem .75rem;
+  text-decoration:none;
+  color:var(--muted);
+  font-size:.9rem;
+  line-height:1.45;
+  border-radius:5px;
+}
+
+.sidebar a:hover {
+  background:var(--wash);
+  color:var(--blue);
+}
+
+.sidebar a[aria-current=page] {
+  background:var(--wash);
+  color:var(--blue);
+  box-shadow:inset 3px 0 var(--blue);
+  font-weight:600;
+}
+
+.nav-group h2,.toc h2 {
+  font:500 .72rem 'IBM Plex Mono',monospace;
+  text-transform:uppercase;
+  letter-spacing:.065em;
+  margin:1.8rem .75rem .6rem;
+  color:var(--muted);
+}
+
+.notes {
+  margin-top:1.8rem;
+}
+
+.notes summary {
+  cursor:pointer;
+  color:var(--muted);
+  font-size:.85rem;
+  padding:.5rem .75rem;
+}
+
+.sidebar-foot {
+  font:400 .7rem/1.8 'IBM Plex Mono',monospace;
+  color:var(--muted);
+  padding:2rem .75rem 0;
+  margin-top:2rem;
+  border-top:1px solid var(--line);
+}
+
+main {
+  padding:3rem clamp(1.5rem,4vw,4rem);
+  min-width:0;
+}
+
+.eyebrow {
+  font:500 .72rem 'IBM Plex Mono',monospace;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--blue);
+  margin-bottom:1.5rem;
+}
+
+.toc {
+  padding:2.7rem 1.2rem;
+  position:sticky;
+  top:80px;
+  height:calc(100dvh - 80px);
+  overflow:auto;
+}
+
+.toc h2 {
+  margin:.3rem 0 1rem;
+}
+
+.toc a {
+  font-size:.82rem;
+  line-height:1.5;
+  color:var(--muted);
+  display:block;
+  text-decoration:none;
+  border-left:1px solid var(--line);
+  padding:.35rem 0 .35rem 1rem;
+}
+
+.toc a:hover {
+  color:var(--blue);
+  border-color:var(--blue);
+}
+
+code,pre {
+  font-family:'IBM Plex Mono',monospace;
+}
+
+code {
+  font-size:.84em;
+  background:var(--panel);
+  padding:.13em .3em;
+  border-radius:3px;
+  overflow-wrap:anywhere;
+}
+
+pre {
+  border:1px solid var(--line);
+  border-left:3px solid var(--blue);
+  padding:1.2rem;
+  overflow:auto;
+  line-height:1.7;
+  border-radius:4px;
+  font-size:.85rem;
+  margin:1.5rem 0;
+}
+
+pre code {
+  padding:0;
+  background:none;
+  overflow-wrap:normal;
+}
+
+table {
+  display:block;
+  max-width:100%;
+  overflow:auto;
+  border-collapse:collapse;
+  font-size:.88rem;
+  margin:1.5rem 0 2rem;
+}
+
+th,td {
+  text-align:left;
+  border-bottom:1px solid var(--line);
+  padding:.8rem 1rem;
+  vertical-align:top;
+  min-width:130px;
+}
+
+th {
+  background:var(--panel);
+  font-weight:600;
+}
+
+td:first-child {
+  font-weight:500;
+}
+
+blockquote,.notice {
+  margin:1.5rem 0;
+  padding:1rem 1.2rem;
+  background:var(--panel);
+  border-left:3px solid var(--blue);
+  font-size:.9rem;
+}
+
+blockquote p:last-child {
+  margin:0;
+}
+
+footer {
+  display:flex;
+  gap:1rem;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  border-top:1px solid var(--line);
+  margin-top:4rem;
+  padding-top:1.3rem;
+  font-size:.78rem;
+  color:var(--muted);
+}
+
+.skip {
+  position:fixed;
+  left:1rem;
+  top:-100px;
+  padding:.7rem 1rem;
+  background:white;
+  z-index:10;
+}
+
+.skip:focus {
+  top:1rem;
+}
+
+img {
+  max-width:100%;
+}
+
+@media(min-width:1450px) {
+  .shell {
+    grid-template-columns:260px minmax(0,1040px) 210px;
+  }
+}
+
+@media(max-width:1150px) {
+  .shell {
+    grid-template-columns:240px minmax(0,1fr);
+  }
+  .toc {
+    display:none;
+  }
+}
+
+@media(max-width:720px) {
+  .header {
+    height:68px;
+    padding:0 1rem;
+    gap:1rem;
+  }
+  .header-label {
+    display:none;
+  }
+  .shell {
+    display:block;
+  }
+  .sidebar {
+    position:static;
+    height:auto;
+    padding:.65rem 1rem;
+    border-right:0;
+    border-bottom:1px solid var(--line);
+  }
+  .navigation>summary {
+    display:list-item;
+    cursor:pointer;
+    font-weight:500;
+    padding:.5rem;
+  }
+  .navigation nav {
+    padding-bottom:1rem;
+  }
+  .sidebar-foot {
+    display:none;
+  }
+  main {
+    padding:2rem 1.25rem;
+  }
+  h1 {
+    font-size:2.25rem;
+  }
+  th,td {
+    padding:.7rem;
+    min-width:120px;
+  }
+  .brand {
+    font-size:1.05rem;
+  }
+}
+

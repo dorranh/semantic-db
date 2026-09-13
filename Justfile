@@ -28,3 +28,16 @@ cli *args:
 [positional-arguments]
 repl example="geospatial":
     cargo run -p semantic-cli --locked -- --config "examples/$1/semantic-db.yaml"
+
+# Install the pinned documentation dependencies.
+docs-install:
+    npm --prefix docs/site ci --no-audit --no-fund
+
+# Launch the Astro documentation site (requires Node >=22.12 and npm).
+[positional-arguments]
+docs *args: docs-install
+    npm --prefix docs/site run dev -- "$@"
+
+# Build the GitHub Pages site and check internal links.
+docs-build: docs-install
+    npm --prefix docs/site run build

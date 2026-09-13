@@ -1,4 +1,4 @@
-# ClickHouse connector implementation
+ClickHouse connector implementation
 
 Worktree: `codex/clickhouse-connector`. Implementation and validation: 2026-09-13.
 
@@ -75,21 +75,21 @@ Federation runs after normal logical simplification. A scoped renderer uses inte
 
 Fallback scans push projection, qualified predicates, and safe limits. Empty projections preserve row counts. `federation` and `filter_pushdown` are independent toggles.
 
-| Family | Remote qualification |
-| --- | --- |
-| Projection, filter, sort, limit, grouping | Supported expressions; explicit null ordering |
-| Joins | Equality inner/outer/semi/anti joins, nulls do not match |
-| Aggregates | Builtin COUNT/SUM/AVG/MIN/MAX; exact single-expression COUNT DISTINCT; FILTER |
-| Empty aggregates | SUM/AVG/MIN/MAX use OrNull; COUNT retains zero |
-| Arithmetic | Float64 arithmetic; integer arithmetic remains local |
-| Casts | Identity and lossless integer/Float32 widening; other casts remain local |
-| Conditionals | CASE, COALESCE, NULLIF, BETWEEN |
-| IN | Non-nullable input and literal non-null list; other forms remain local or decorrelate |
-| Text | Builtin lower/upper translated to UTF8 variants; LIKE without custom escapes/ILIKE |
-| Date parts | Literal year/month/day/hour/minute on UTC or unzoned timestamp columns |
-| Windows | Builtin row_number, rank, dense_rank; unsupported window functions remain local |
-| Set operations | UNION ALL |
-| Other functions | Local, including arbitrary UDFs, broad date truncation/timezone operations and unqualified casts |
+| Family                                    | Remote qualification                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Projection, filter, sort, limit, grouping | Supported expressions; explicit null ordering                                                    |
+| Joins                                     | Equality inner/outer/semi/anti joins, nulls do not match                                         |
+| Aggregates                                | Builtin COUNT/SUM/AVG/MIN/MAX; exact single-expression COUNT DISTINCT; FILTER                    |
+| Empty aggregates                          | SUM/AVG/MIN/MAX use OrNull; COUNT retains zero                                                   |
+| Arithmetic                                | Float64 arithmetic; integer arithmetic remains local                                             |
+| Casts                                     | Identity and lossless integer/Float32 widening; other casts remain local                         |
+| Conditionals                              | CASE, COALESCE, NULLIF, BETWEEN                                                                  |
+| IN                                        | Non-nullable input and literal non-null list; other forms remain local or decorrelate            |
+| Text                                      | Builtin lower/upper translated to UTF8 variants; LIKE without custom escapes/ILIKE               |
+| Date parts                                | Literal year/month/day/hour/minute on UTC or unzoned timestamp columns                           |
+| Windows                                   | Builtin row_number, rank, dense_rank; unsupported window functions remain local                  |
+| Set operations                            | UNION ALL                                                                                        |
+| Other functions                           | Local, including arbitrary UDFs, broad date truncation/timezone operations and unqualified casts |
 
 Floating-point comparisons, ordering, grouping, join keys, MIN/MAX, distinct counts, IN/BETWEEN and NULLIF stay local because DataFusion and ClickHouse handle NaN differently. Float64 arithmetic and non-distinct SUM/AVG/COUNT remain qualified. Codec workspace is bounded independently of the whole query byte budget and included in decode memory admission.
 
@@ -123,21 +123,21 @@ Custom CA/mTLS/proxy/role options are configured through reqwest/ClickHouse; pro
 
 Controlled fixture: 50,000 MergeTree rows, five measured repetitions after warmup. These measurements describe this machine and fixture.
 
-| Workload | Local fallback median | Federated median | Received bytes, fallback → federated |
-| --- | ---: | ---: | ---: |
-| Aggregate | 22.235 ms | 5.462 ms | 200,968 → 1,080 |
-| Partial federation | 22.292 ms | 6.612 ms | 200,968 → 1,080 |
-| Selective projection | 16.191 ms | 4.176 ms | 200,912 → 544 |
+| Workload             | Local fallback median | Federated median | Received bytes, fallback → federated |
+| -------------------- | --------------------: | ---------------: | -----------------------------------: |
+| Aggregate            |             22.235 ms |         5.462 ms |                      200,968 → 1,080 |
+| Partial federation   |             22.292 ms |         6.612 ms |                      200,968 → 1,080 |
+| Selective projection |             16.191 ms |         4.176 ms |                        200,912 → 544 |
 
 Experimental PREWHERE: 1.761 ms versus 1.840 ms WHERE, about 4.3% improvement. Two client requests: 2.535 ms, about 37.8% slower. Neither meets the adoption gate of at least 15% median latency or 25% bytes improvement, with no comparison regressing more than 10%. No explicit PREWHERE/client-parallel scan mode was enabled. ClickHouse's own server optimizations remain available.
 
 Public instance: `sql-clickhouse.clickhouse.com:443`, user `demo`, version `26.9.1.36875`. The opt-in run completed 32 sequential requests including metadata and warmups, within the 40-request cap. It uses Hacker News IDs below 1,000, a 10-second deadline, 10,000-row blocks/results, and explicit read/result byte limits. This smoke run is not a CI performance gate.
 
-| Public workload | Fallback median | Federated median | Received bytes |
-| --- | ---: | ---: | ---: |
-| Projection | 216.555 ms | 193.738 ms | 21,248 → 4,272 |
-| Aggregate | 180.506 ms | 162.784 ms | 816 → 440 |
-| Partial federation | 185.174 ms | 166.451 ms | 816 → 456 |
+| Public workload    | Fallback median | Federated median | Received bytes |
+| ------------------ | --------------: | ---------------: | -------------: |
+| Projection         |      216.555 ms |       193.738 ms | 21,248 → 4,272 |
+| Aggregate          |      180.506 ms |       162.784 ms |      816 → 440 |
+| Partial federation |      185.174 ms |       166.451 ms |      816 → 456 |
 
 Artifacts: [controlled results](clickhouse-controlled-benchmark.json), [public results](clickhouse-public-benchmark.json).
 

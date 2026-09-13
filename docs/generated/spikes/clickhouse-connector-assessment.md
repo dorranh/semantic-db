@@ -17,13 +17,13 @@ Each diagnostic below executed one remote request. Bytes are the connector's
 HTTP-payload counter, before Arrow IPC decompression; they are not decoded array
 memory or ClickHouse storage bytes read.
 
-| Query over the six-row `samples` fixture | Federation | Received rows | Received bytes |
-| --- | --- | ---: | ---: |
-| Grouped `SUM(depth_m)`, ordered by `well_id` | Enabled | 2 | 504 |
-| Same query with `SQRT(SUM(depth_m))` | Enabled; falls back | 6 | 1,568 |
-| `SELECT well_id FROM samples` | Enabled | 6 | 544 |
-| `SELECT well_id FROM samples` | Disabled | 6 | 1,568 |
-| `WHERE depth_m >= 15 AND SQRT(duration_min) > 1` | Enabled; falls back | 6 | 1,568 |
+| Query over the six-row `samples` fixture         | Federation          | Received rows | Received bytes |
+| ------------------------------------------------ | ------------------- | ------------: | -------------: |
+| Grouped `SUM(depth_m)`, ordered by `well_id`     | Enabled             |             2 |            504 |
+| Same query with `SQRT(SUM(depth_m))`             | Enabled; falls back |             6 |          1,568 |
+| `SELECT well_id FROM samples`                    | Enabled             |             6 |            544 |
+| `SELECT well_id FROM samples`                    | Disabled            |             6 |          1,568 |
+| `WHERE depth_m >= 15 AND SQRT(duration_min) > 1` | Enabled; falls back |             6 |          1,568 |
 
 The last query returns three rows locally. Its ordinary comparison is eligible
 for remote execution, but the unsupported scalar expression prevents this
@@ -40,18 +40,18 @@ does not measure process peak memory. The server's Arrow codec was `lz4_frame`.
 Priority 1 means the next implementation tranche. Priority 2 means valuable
 follow-up work. Priority 3 depends on actual deployment or workload needs.
 
-| Priority | Missing capability | Expected value | Relative effort |
-| --- | --- | --- | --- |
-| 1 | Projection and supported predicates in fallback scans | Avoid transferring unused columns and rejected rows | Medium |
-| 1 | Preserve supported subplans below unsupported operators | Keep large reductions such as GROUP BY remote | High |
-| 1 | Decoded-memory accounting and shared query budgets | Bound resource use across decoding and multiple scans | Medium–high |
-| 1 | Run connector integration tests in CI; expand compatibility coverage | Detect SQL, transport, and server-version regressions | Medium initially; ongoing |
-| 2 | Broader, type-aware SQL pushdown | Support common semantic metrics and time-based analysis efficiently | Medium per feature family |
-| 2 | Query metrics, fallback reasons, structured errors | Explain slow queries and diagnose failures | Medium |
-| 2 | Runtime join filters and useful statistics | Reduce data transfer for mixed-source joins | High |
-| 2 | Explicit type and schema-evolution contracts | Make broader ClickHouse schemas dependable | Medium–high |
-| 3 | Engine-aware read options, discovery, deployment configuration | Reduce setup friction for more installations | Varies |
-| 3 | Codec, dictionary, batch-size, and client-parallelism tuning | Improve measured transport bottlenecks | Benchmark first |
+| Priority | Missing capability                                                   | Expected value                                                      | Relative effort           |
+| -------- | -------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------- |
+| 1        | Projection and supported predicates in fallback scans                | Avoid transferring unused columns and rejected rows                 | Medium                    |
+| 1        | Preserve supported subplans below unsupported operators              | Keep large reductions such as GROUP BY remote                       | High                      |
+| 1        | Decoded-memory accounting and shared query budgets                   | Bound resource use across decoding and multiple scans               | Medium–high               |
+| 1        | Run connector integration tests in CI; expand compatibility coverage | Detect SQL, transport, and server-version regressions               | Medium initially; ongoing |
+| 2        | Broader, type-aware SQL pushdown                                     | Support common semantic metrics and time-based analysis efficiently | Medium per feature family |
+| 2        | Query metrics, fallback reasons, structured errors                   | Explain slow queries and diagnose failures                          | Medium                    |
+| 2        | Runtime join filters and useful statistics                           | Reduce data transfer for mixed-source joins                         | High                      |
+| 2        | Explicit type and schema-evolution contracts                         | Make broader ClickHouse schemas dependable                          | Medium–high               |
+| 3        | Engine-aware read options, discovery, deployment configuration       | Reduce setup friction for more installations                        | Varies                    |
+| 3        | Codec, dictionary, batch-size, and client-parallelism tuning         | Improve measured transport bottlenecks                              | Benchmark first           |
 
 ### 1. Make fallback scans selective
 
