@@ -37,13 +37,17 @@ app.get("/api/members", async (_req, res) =>
 );
 app.get("/api/packages/:name", async (req, res) => {
   const values = [req.params.name];
-  const [summary, issues, trend] = await Promise.all([
+  const [summary, trend] = await Promise.all([
     semantic.query(queries.package, values),
-    semantic.query(queries.issues, values),
     semantic.query(queries.trend, values),
   ]);
   if (!summary.rows.length)
     return res.status(404).json({ error: "Package not found" });
+  // Supply a bound repository predicate so the provider can prune remote pagination.
+  const issues = await semantic.query(queries.issues, [
+    req.params.name,
+    summary.rows[0].repository,
+  ]);
   res.json({
     package: summary.rows[0],
     issues: issues.rows,

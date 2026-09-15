@@ -37,6 +37,11 @@ test("three-source reads, Semantic DB writes, reconciliation, and pg interoperab
   assert.equal(initial.package.downloads, expected);
   assert.equal(initial.package.open_issues, "2");
   assert.equal(initial.trend.length, 14);
+  assert.equal(initial.issues.length, 3);
+  assert.ok(initial.issues.some((i: any) => i.state === "CLOSED"));
+  assert.ok(initial.issues.every((i: any) => i.repository === "psf/requests"));
+  const unknown = await fetch(base + "/packages/not-a-package");
+  assert.equal(unknown.status, 404);
   const chHeaders = {
     Authorization:
       "Basic " + Buffer.from("maintenance:maintenance").toString("base64"),

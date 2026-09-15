@@ -109,6 +109,8 @@ if (mode === "setup" || mode === "reset") {
     launch(path.join(root, "target/debug/semantic-server"), [
       "--config",
       process.env.SEMANTIC_LIVE ? "semantic-db.live.yaml" : "semantic-db.yaml",
+      "--query-timeout-seconds",
+      process.env.SEMANTIC_LIVE ? "120" : "30",
     ]);
     await wait("http://127.0.0.1:5545/health");
     launch(process.execPath, ["--import", "tsx", "server/index.ts"]);

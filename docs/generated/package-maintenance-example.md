@@ -220,6 +220,36 @@ The configured repository scope is fixed at startup. The fixture-only quiet repo
 is not queried in live mode. Application mappings outside scope have no observed issues;
 this does not establish that those repositories have no issues upstream.
 
+The issue panel includes both open and closed issues. It first resolves the selected
+package, then binds its repository into the Semantic DB detail query. The GitHub
+provider follows cursors within one scan, fetching every matching page. Repository
+equality (including `lower(repository)`) prunes pagination for other repositories.
+One initial page per configured repository establishes its canonical name, preserving
+correctness when a configured name is an alias after a rename.
+
+Live mode allows 128 GitHub requests per scan and a 120-second query deadline;
+the Node client's query timeout is 130 seconds. Fixture mode keeps its 24-request,
+30-second engine and 35-second client limits. These are total scan/query budgets,
+not per-page budgets, and are never reset while following a cursor. A later-page
+failure, exhausted budget, or cancellation still fails the whole collected result.
+The panel's sorting requires complete matching input before it can return rows.
+Live mode caches the GitHub `issues` relation for 300 seconds from successful
+publication in `.run/cache/live`, with 64 MiB memory and per-fill limits and a
+256 MiB disk budget. The first query after a miss or expiry fetches all issue states
+across all configured repositories before publishing the cache; subsequent queries
+reuse that complete generation. Refresh is demand-driven, with no stale fallback
+after a failed fill. Cache age does not bound the age of upstream observations.
+Package and triage tables remain uncached, so edits are joined to the cached issues
+on every read. ClickHouse downloads and fixture mode remain uncached. Restart the
+live server after changing cache settings.
+
+The same live engine deadline applies to `npm run reconcile`, which still observes
+all configured repositories and both issue states, bypassing the issue cache.
+
+The server also exposes `--query-timeout-seconds` for launches outside the example
+lifecycle script (default 30). Repository scope, request limits and memory limits
+remain enforced; there are no automatic retries.
+
 ClickHouse queries have explicit package/date predicates and finite server/response
 budgets. The local integration checks inspect the native query log to ensure these
 predicates reach ClickHouse. Verify the same query plans and limits on your deployment;

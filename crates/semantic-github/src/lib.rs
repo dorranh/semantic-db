@@ -1,7 +1,8 @@
 //! Experimental, read-only GitHub GraphQL tables over an explicit repository set.
 //!
-//! Rows are fetched only when polled. Issue state equality can be pushed to
-//! GitHub. Other filters, joins, aggregates, and column selection stay local.
+//! Rows are fetched only when polled. Issue state equality is pushed to GitHub;
+//! repository equality prunes pagination after resolving canonical names on the
+//! first page. Other filters, joins, aggregates, and column selection stay local.
 //! Each scan has its own request budget and cursor state. There is no snapshot
 //! isolation or automatic retry. Engine execution supplies shared query budgets.
 
@@ -226,13 +227,14 @@ impl GitHub {
             github: self.clone(),
             kind,
             state_filter: None,
+            repository_filters: vec![],
             schema: schema.clone(),
         });
         Ok(Arc::new(StreamingTable::try_new(schema, vec![partition])?))
     }
 }
 
-/// Minimal custom provider: translate one exact predicate, then reuse DataFusion's
+/// Translate supported predicates, then reuse DataFusion's
 /// streaming plan for projection and safe limits. All row I/O remains in Scan.
 #[derive(Debug)]
 struct IssueTable {
@@ -257,6 +259,61 @@ fn state_equality(expr: &Expr) -> Option<&str> {
         .then_some(pair.1.as_str())
 }
 
+#[derive(Debug, Clone)]
+struct RepositoryFilter {
+    value: String,
+    lowercase: bool,
+}
+impl RepositoryFilter {
+    fn matches(&self, repository: &str) -> bool {
+        if self.lowercase {
+            repository.to_lowercase() == self.value
+        } else {
+            repository == self.value
+        }
+    }
+}
+fn repository_equality(expr: &Expr) -> Option<RepositoryFilter> {
+    let Expr::BinaryExpr(binary) = expr else {
+        return None;
+    };
+    if binary.op != Operator::Eq {
+        return None;
+    }
+    for (column, literal) in [
+        (binary.left.as_ref(), binary.right.as_ref()),
+        (binary.right.as_ref(), binary.left.as_ref()),
+    ] {
+        let value = match literal {
+            Expr::Literal(
+                ScalarValue::Utf8(Some(v))
+                | ScalarValue::Utf8View(Some(v))
+                | ScalarValue::LargeUtf8(Some(v)),
+                _,
+            ) => v,
+            _ => continue,
+        };
+        let lowercase = match column {
+            Expr::Column(c) if c.name == "repository" => false,
+            Expr::ScalarFunction(f)
+                if f.func
+                    .inner()
+                    .downcast_ref::<datafusion::functions::string::lower::LowerFunc>()
+                    .is_some()
+                    && matches!(f.args.as_slice(), [Expr::Column(c)] if c.name == "repository") =>
+            {
+                true
+            }
+            _ => continue,
+        };
+        return Some(RepositoryFilter {
+            value: value.clone(),
+            lowercase,
+        });
+    }
+    None
+}
+
 #[async_trait]
 impl TableProvider for IssueTable {
     fn schema(&self) -> SchemaRef {
@@ -272,7 +329,9 @@ impl TableProvider for IssueTable {
         Ok(filters
             .iter()
             .map(|expr| {
-                if self.github.connection.config.filter_pushdown && state_equality(expr).is_some() {
+                if self.github.connection.config.filter_pushdown
+                    && (state_equality(expr).is_some() || repository_equality(expr).is_some())
+                {
                     TableProviderFilterPushDown::Exact
                 } else {
                     TableProviderFilterPushDown::Unsupported
@@ -288,7 +347,12 @@ impl TableProvider for IssueTable {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mut state_filter: Option<String> = None;
+        let mut repository_filters = vec![];
         for filter in filters {
+            if let Some(repository) = repository_equality(filter) {
+                repository_filters.push(repository);
+                continue;
+            }
             let state = state_equality(filter)
                 .ok_or_else(|| error("unsupported filter passed to issue scan"))?;
             if state_filter
@@ -307,6 +371,7 @@ impl TableProvider for IssueTable {
             kind: Kind::Issues,
             schema: schema.clone(),
             state_filter,
+            repository_filters,
         });
         StreamingTable::try_new(schema, vec![partition])?
             .scan(session, projection, &[], limit)
@@ -357,6 +422,7 @@ impl Kind {
 struct GitHubPartition {
     github: GitHub,
     state_filter: Option<String>,
+    repository_filters: Vec<RepositoryFilter>,
     kind: Kind,
     schema: SchemaRef,
 }
@@ -372,6 +438,8 @@ impl PartitionStream for GitHubPartition {
             github: self.github.clone(),
             kind: self.kind,
             state_filter: self.state_filter.clone(),
+            repository_filters: self.repository_filters.clone(),
+            repository_name: None,
             schema: self.schema.clone(),
             repository_index: 0,
             canonical_repositories: BTreeSet::new(),
@@ -432,6 +500,8 @@ struct PendingLabels {
 struct Scan {
     github: GitHub,
     state_filter: Option<String>,
+    repository_filters: Vec<RepositoryFilter>,
+    repository_name: Option<String>,
     kind: Kind,
     schema: SchemaRef,
     repository_index: usize,
@@ -553,9 +623,27 @@ impl Scan {
             {
                 return Err(error("repository aliases resolve to duplicate scope"));
             }
+            if first_page {
+                self.repository_name = Some(repository.name_with_owner.clone());
+            } else if self.repository_name.as_deref() != Some(&repository.name_with_owner) {
+                return Err(error("repository identity changed during pagination"));
+            }
+            // Resolve the canonical name before pruning: configured repository names
+            // can be aliases after a rename. Never infer disjointness from their text.
+            if self
+                .repository_filters
+                .iter()
+                .any(|f| !f.matches(&repository.name_with_owner))
+            {
+                self.repository_index += 1;
+                self.issue_cursor = Cursor::default();
+                self.repository_name = None;
+                continue;
+            }
             if !self.issue_cursor.advance(repository.issues.page_info)? {
                 self.repository_index += 1;
                 self.issue_cursor = Cursor::default();
+                self.repository_name = None;
             }
             match self.kind {
                 Kind::Issues => {

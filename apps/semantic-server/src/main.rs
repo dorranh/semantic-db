@@ -28,6 +28,9 @@ struct Args {
     port: u16,
     #[arg(long, default_value_t = 5545)]
     http_port: u16,
+    /// Deadline for each query, including all remote pages and local processing.
+    #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
+    query_timeout_seconds: u64,
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,9 +43,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => return Err("could not read .env".into()),
     };
     let secret = |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned());
-    let imported = Project::from_path(&args.config)?
+    let mut imported = Project::from_path(&args.config)?
         .load(&Registry::standard(), &secret)
         .await?;
+    imported
+        .engine
+        .set_query_options(semantic_db::QueryOptions {
+            timeout_seconds: args.query_timeout_seconds,
+            ..Default::default()
+        })?;
     let engine = Arc::new(imported.engine);
     let compiler = if let Some(key) = secret("OPENAI_API_KEY").filter(|s| !s.is_empty()) {
         let model = secret("OPENAI_MODEL").ok_or("set OPENAI_MODEL when enabling Ask")?;

@@ -1,5 +1,11 @@
 {
   "ossie": "model.ossie.yaml",
+  "cache":
+    {
+      "directory": ".run/cache/live",
+      "max_memory_bytes": 67108864,
+      "max_disk_bytes": 268435456,
+    },
   "connections":
     {
       "app":
@@ -15,7 +21,7 @@
           "token_env": "GITHUB_TOKEN",
           "repositories": ["psf/requests", "urllib3/urllib3", "encode/httpx"],
           "page_size": 100,
-          "max_requests_per_scan": 24,
+          "max_requests_per_scan": 128,
         },
       "pypi":
         {
@@ -40,7 +46,13 @@
         { "connection": "app", "schema": "public", "table": "members" },
       "app.issue_triage":
         { "connection": "app", "schema": "public", "table": "issue_triage" },
-      "github.issues": { "connection": "github", "collection": "issues" },
+      "github.issues":
+        {
+          "connection": "github",
+          "collection": "issues",
+          "materialization":
+            { "max_age_seconds": 300, "max_fill_bytes": 67108864 },
+        },
       "pypi.daily": { "connection": "pypi", "table": "pypi_downloads_per_day" },
     },
   "views":

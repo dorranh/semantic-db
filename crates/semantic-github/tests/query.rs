@@ -747,3 +747,157 @@ async fn rejects_remote_rows_that_violate_an_exact_pushed_filter() {
         .to_string();
     assert!(error.contains("violates pushed issue state filter"));
 }
+
+fn history_response(request: &Value) -> Value {
+    let v = &request["variables"];
+    let (canonical, count) = match v["name"].as_str().unwrap() {
+        "old-name" => ("Acme/Widget", 30),
+        "other" => ("acme/other", 40),
+        "empty" => ("acme/empty", 0),
+        _ => panic!("unexpected repository"),
+    };
+    let nodes = (1..=count)
+        .map(|n| issue(n, if n % 2 == 0 { "OPEN" } else { "CLOSED" }, None))
+        .filter(|node| {
+            v["states"]
+                .as_array()
+                .is_none_or(|states| states.contains(&node["state"]))
+        })
+        .collect::<Vec<_>>();
+    let offset = v["after"]
+        .as_str()
+        .map(|s| s.parse::<usize>().unwrap())
+        .unwrap_or(0);
+    let end = (offset + v["first"].as_u64().unwrap() as usize).min(nodes.len());
+    let cursor = (end < nodes.len()).then(|| end.to_string());
+    json!({"data":{"repository":{"nameWithOwner":canonical,"issues":page(nodes[offset..end].to_vec(),cursor.as_deref())}}})
+}
+fn history_config(server: &Server) -> GitHubConfig {
+    let mut c = server.config();
+    c.filter_pushdown = true;
+    c.repositories = vec![
+        "acme/old-name".into(),
+        "acme/other".into(),
+        "acme/empty".into(),
+    ];
+    c.page_size = 1;
+    c.max_requests_per_scan = 128;
+    c
+}
+#[tokio::test]
+async fn repository_pruning_preserves_canonical_aliases_case_and_residual_semantics() {
+    let server = Server::new(|r, _| (200, history_response(r).to_string(), Duration::ZERO));
+    let c = history_config(&server);
+    let github = GitHub::new(c.clone()).unwrap();
+    let optimized = remote(&github).await;
+    let mut baseline_config = c;
+    baseline_config.filter_pushdown = false;
+    let baseline = remote(&GitHub::new(baseline_config).unwrap()).await;
+    for sql in [
+        "SELECT repository,number,state FROM issues WHERE lower(repository)='acme/widget' ORDER BY number",
+        "SELECT repository,number,state FROM issues WHERE 'Acme/Widget'=repository ORDER BY number",
+        "SELECT number FROM issues WHERE repository='acme/widget'",
+        "SELECT number FROM issues WHERE lower(repository)='ACME/WIDGET'",
+        "SELECT repository,number FROM issues WHERE repository='Acme/Widget' OR number=1 ORDER BY repository,number",
+        "SELECT number FROM issues WHERE lower(repository)='acme/widget' AND state='CLOSED' ORDER BY number",
+    ] {
+        assert_eq!(
+            result(&optimized, sql).await,
+            result(&baseline, sql).await,
+            "{sql}"
+        );
+    }
+    let start = server.requests.lock().unwrap().len();
+    result(
+        &optimized,
+        "SELECT number FROM issues WHERE lower(repository)='acme/widget' ORDER BY number",
+    )
+    .await;
+    let requests = server.requests.lock().unwrap();
+    let requests = &requests[start..];
+    assert_eq!(requests.len(), 32);
+    assert!(
+        requests
+            .iter()
+            .filter(|r| r["variables"]["name"] != "old-name")
+            .all(|r| r["variables"]["after"].is_null())
+    );
+}
+#[tokio::test]
+async fn bound_repository_filter_reads_beyond_24_pages_through_views_and_keeps_closed_issues() {
+    let server = Server::new(|r, _| (200, history_response(r).to_string(), Duration::ZERO));
+    let mut c = history_config(&server);
+    c.max_requests_per_scan = 32;
+    let github = GitHub::new(c).unwrap();
+    let mut engine = remote(&github).await;
+    engine
+        .create_view(
+            "selected_issues",
+            "SELECT repository AS repo, number, state FROM issues",
+        )
+        .await
+        .unwrap();
+    engine
+        .create_view(
+            "packages",
+            "SELECT 'requests' AS name, 'acme/widget' AS repository",
+        )
+        .await
+        .unwrap();
+    let sql = "SELECT i.number,i.state FROM selected_issues i JOIN packages p ON lower(i.repo)=lower(p.repository) WHERE p.name=$1 AND lower(i.repo)=lower($2::text) ORDER BY i.number";
+    engine.describe_read(sql, &[]).await.unwrap();
+    assert_eq!(github.request_count(), 0);
+    let batches = engine
+        .execute_parameters(
+            sql,
+            vec![
+                datafusion::common::ScalarValue::Utf8(Some("requests".into())),
+                datafusion::common::ScalarValue::Utf8(Some("ACME/WIDGET".into())),
+            ],
+            semantic_engine::QueryOptions::default(),
+        )
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    assert_eq!(batches.iter().map(|b| b.num_rows()).sum::<usize>(), 30);
+    let output = pretty_format_batches(&batches).unwrap().to_string();
+    assert!(output.contains("CLOSED"));
+    assert!(output.contains("30"));
+    assert_eq!(github.request_count(), 32);
+}
+#[tokio::test]
+async fn pruned_history_still_rejects_late_errors_and_repository_identity_changes() {
+    for changed_identity in [false, true] {
+        let server = Server::new(move |r, _| {
+            let mut response = history_response(r);
+            if r["variables"]["after"] == "27" {
+                if changed_identity {
+                    response["data"]["repository"]["nameWithOwner"] = json!("acme/renamed");
+                } else {
+                    response = json!({"errors":[{"message":"injected late failure"}],"data":null});
+                }
+            }
+            (200, response.to_string(), Duration::ZERO)
+        });
+        let github = GitHub::new(history_config(&server)).unwrap();
+        let e = remote(&github).await;
+        let failure = e
+            .query(
+                "SELECT number FROM issues WHERE lower(repository)='acme/widget' ORDER BY number",
+            )
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            failure.contains(if changed_identity {
+                "identity changed"
+            } else {
+                "partial data rejected"
+            }),
+            "{failure}"
+        );
+        assert_eq!(github.request_count(), 28);
+    }
+}
