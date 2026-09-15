@@ -226,6 +226,85 @@ async fn provider_errors_do_not_trigger_repairs() {
     ));
 }
 
+// Scripted responses verify catalog exposure, validation and execution, not
+// whether a live model reliably chooses the best relation for a question.
+#[tokio::test]
+async fn composes_view_queries_and_uses_base_data_outside_the_view_window() {
+    let mut engine = Engine::new();
+    engine
+        .register_csv(
+            "pypi_downloads",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/downloads.csv"),
+        )
+        .await
+        .unwrap();
+    engine
+        .create_view(
+            "downloads_daily",
+            "SELECT project, date, SUM(count) AS downloads FROM pypi_downloads \
+             WHERE date >= DATE '2026-09-01' AND date < DATE '2026-09-15' \
+             GROUP BY project, date",
+        )
+        .await
+        .unwrap();
+    for (request, sql, relation, expected) in [
+        (
+            "Show requests downloads on 2026-09-01",
+            "SELECT downloads FROM downloads_daily WHERE project = 'requests' AND date = DATE '2026-09-01'",
+            "downloads_daily",
+            "20",
+        ),
+        (
+            "Sum requests downloads in the demo window",
+            "SELECT SUM(downloads) AS downloads FROM downloads_daily WHERE project = 'requests'",
+            "downloads_daily",
+            "50",
+        ),
+        (
+            "Sum requests downloads from 2026-08-31 inclusive to 2026-09-01 exclusive",
+            "SELECT SUM(count) AS downloads FROM pypi_downloads WHERE project = 'requests' AND date >= DATE '2026-08-31' AND date < DATE '2026-09-01'",
+            "pypi_downloads",
+            "11",
+        ),
+        (
+            "Sum requests downloads from 2026-09-15 inclusive to 2026-09-16 exclusive",
+            "SELECT SUM(count) AS downloads FROM pypi_downloads WHERE project = 'requests' AND date >= DATE '2026-09-15' AND date < DATE '2026-09-16'",
+            "pypi_downloads",
+            "40",
+        ),
+    ] {
+        let proposal = json!({"status":"grounded","query":{"sql":sql,"evidence":[{
+            "phrase": request,
+            "catalog_reference": relation,
+            "interpretation": format!("Use {relation} for requests downloads within the requested dates, summing contributions where requested")
+        }]}});
+        let (compiler, calls) = compiler(vec![proposal.to_string()]);
+        let result = compiler.compile(&engine, request).await.unwrap();
+        assert_eq!(serde_json::to_value(&result.outcome).unwrap(), proposal);
+        assert!(result.view_selection.is_none());
+        assert_eq!(result.attempts, 1);
+        let batches = engine.query(sql).await.unwrap();
+        assert_eq!(
+            pretty_format_batches(&batches).unwrap().to_string(),
+            format!(
+                "+-----------+\n| downloads |\n+-----------+\n| {expected}        |\n+-----------+"
+            )
+        );
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        let context: serde_json::Value = serde_json::from_str(&calls[0][1].content).unwrap();
+        let catalog = context["catalog"].as_array().unwrap();
+        assert_eq!(catalog.len(), 2);
+        assert!(
+            catalog
+                .iter()
+                .any(|r| r["name"] == "pypi_downloads" && r["view_sql"].is_null())
+        );
+        assert!(catalog.iter().any(|r| r["name"] == "downloads_daily"
+            && r["view_sql"].as_str().unwrap().contains("2026-09-15")));
+    }
+}
+
 async fn view_fixture() -> Engine {
     let mut engine = fixture().await;
     engine

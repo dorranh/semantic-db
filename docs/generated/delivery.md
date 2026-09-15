@@ -41,7 +41,9 @@ execute it. The general `.ask` mode remains available for SQL exploration but
 has different grounding guarantees from `.ask-views`.
 
 The server exposes `/health`, `/catalog`, and `/compile` over HTTP. `/compile`
-returns SQL/evidence, clarification, or unsupported; SQL execution uses the
+uses the general compiler over the full catalog, preferring authored views when
+their definitions fit and composing queries over views or base relations as
+needed. It returns SQL/evidence, clarification, or unsupported; SQL execution uses the
 PostgreSQL frontend. The same model configuration works across both apps when
 `OPENAI_API_KEY`, `OPENAI_MODEL`, and any provider URL are explicitly set.
 SQL-only operation requires no model credentials.

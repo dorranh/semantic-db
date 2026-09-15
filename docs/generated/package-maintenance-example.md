@@ -3,8 +3,9 @@
 This example joins application-owned Postgres tables, repository-scoped GitHub
 issues, and ClickHouse PyPI download aggregates through Semantic DB. React/Vite
 provides the UI; a Node backend reads and writes through Semantic DB with `pg`.
-Prisma owns application migrations and setup seeding. The optional Ask panel compiles questions against the
-same authored views.
+Prisma owns application migrations and setup seeding. The optional Ask panel compiles
+questions against the full semantic catalog, reusing authored views when their
+definitions fit and querying other relations when needed.
 
 ## Review stages
 
@@ -141,10 +142,26 @@ remains future work; richer guarantee reports and sessions are library APIs.
 The HTTP side exposes `GET /health`, `GET /catalog`, and `POST /compile` with
 `{"question":"..."}`. It has no SQL execution route. Compilation returns the existing
 `Compilation` outcome: grounded SQL/evidence, clarification, or unsupported.
+The shared endpoint uses the general compiler: it can filter, aggregate, and join
+views or base relations while preserving the question's constraints. For example,
+it can count packages by team or query download dates outside a view's fixed demo
+window. SQL and grounding evidence identify the catalog mappings used; ambiguous
+meanings still require clarification. Explicit view-only library and CLI modes
+remain available separately.
 The app executes grounded SQL through `pg`. For Ask, set `OPENAI_API_KEY`,
 `OPENAI_MODEL`, and optionally `OPENAI_BASE_URL` in the example `.env`, then restart.
 The compiler receives semantic metadata and the question, not source row samples.
 Without model configuration the entire workspace still runs and Ask is disabled.
+
+Run `cargo build -p semantic-server --locked`, then `npm run test:ask` from the
+example directory for a standalone browser check. It requires `agent-browser` and
+port 3001 to be free. The check loads the example model and views against temporary
+CSV fixtures, supplies deterministic model responses, and exercises the real
+compiler, PostgreSQL execution, application API, and UI. It covers view queries,
+aggregates, base data outside the view's date window, clarification, and unsupported
+questions. No model credentials or Docker services are needed. This validates the
+integration, not a live model's selection accuracy. Set `SEMANTIC_SERVER_BIN` to
+use a different server binary.
 
 ## Postgres connector contract
 

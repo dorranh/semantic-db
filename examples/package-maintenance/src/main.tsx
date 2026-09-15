@@ -513,8 +513,8 @@ function ModelPanel() {
       <p className="eyebrow">BEHIND THE QUERY</p>
       <h2>Meaning, defined once.</h2>
       <p>
-        The same authored views power this workspace and natural-language
-        questions.
+        Authored views power this workspace. Ask uses the semantic catalog to
+        query those views or other relations, with SQL and supporting evidence.
       </p>
       {error ? (
         <p role="alert">{error}</p>
@@ -593,7 +593,8 @@ function AskPanel({ enabled }: { enabled: boolean }) {
       <h2>A question with a traceable answer.</h2>
       <p>
         Ask about package ownership, download observations, or issue triage.
-        Every answer uses an authored view.
+        Ask uses an authored view when it fits, or generates a query over other
+        catalog relations. Each answer includes SQL and supporting evidence.
       </p>
       {!enabled ? (
         <div className="setup-note">

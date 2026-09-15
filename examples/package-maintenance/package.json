@@ -21,6 +21,7 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
     "test:e2e": "node tests/browser.mjs",
+    "test:ask": "node tests/ask-browser.mjs",
     "reconcile": "node scripts/reconcile.mjs"
   },
   "dependencies": {

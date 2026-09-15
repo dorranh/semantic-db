@@ -75,7 +75,9 @@ Content-Type: application/json
 {"question":"List active items"}
 ```
 
-Inspect the returned compilation outcome. Execute successful SQL using the
+The compiler uses authored views when their definitions fit, or generates SQL
+over other catalog relations. Inspect the returned SQL and grounding evidence.
+Execute successful SQL using the
 PostgreSQL driver, and display clarification/unsupported outcomes to the user.
 The source repository's package-maintenance application provides a full working
 example of this flow. `/health` reports whether Ask is configured; `/catalog`

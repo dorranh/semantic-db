@@ -52,6 +52,6 @@ async fn compile(
             Json(json!({"error": "Provide a question between 1 and 8000 bytes"})),
         ));
     }
-    compiler.compile_views(&s.engine, &request.question).await.map(Json)
+    compiler.compile(&s.engine, &request.question).await.map(Json)
         .map_err(|_| (StatusCode::BAD_GATEWAY, Json(json!({"error": "Compilation failed; check model configuration or revise the question"}))))
 }

@@ -21,6 +21,7 @@ jobs:
       - run: cargo test -p semantic-postgres -p semantic-sources --features semantic-sources/postgres --locked connector_integration_postgres -- --ignored
       - run: cargo build -p semantic-server --features github --locked
       - run: npm install --global agent-browser@0.34.0 && agent-browser install --with-deps
+      - run: npm run test:ask
       - name: Application and browser checks
         run: |
           mkdir -p .run

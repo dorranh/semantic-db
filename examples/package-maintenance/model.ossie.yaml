@@ -5,7 +5,7 @@
       "name": "package_maintenance",
       "description": "Application ownership and triage joined with GitHub issues and PyPI adoption.",
       "ai_context": {
-        "instructions": "Use package_overview for package ownership, observed downloads and current open issue counts; issue_workspace for triage; downloads_daily for the fixed demonstration window 2026-09-01 inclusive to 2026-09-15 exclusive. Missing download data means unknown, not zero. Counts are only for configured repository scope. Priority 1 is high, 2 normal, 3 low. Never invent a definition of stale, healthy, or neglected. A shared repository issue count appears on each mapped package and is not additive across packages."
+        "instructions": "Prefer package_overview for package ownership, observed downloads and current open issue counts; issue_workspace for triage; downloads_daily for the fixed demonstration window 2026-09-01 inclusive to 2026-09-15 exclusive, when those definitions fit the question. Compose queries over these views or other catalog relations as needed. For explicitly requested dates outside the demonstration window, query pypi_downloads with the requested date bounds instead of using the fixed-window views. Missing download data means unknown, not zero. Counts are only for configured repository scope. Priority 1 is high, 2 normal, 3 low. Never invent a definition of stale, healthy, or neglected. A shared repository issue count appears on each mapped package and is not additive across packages."
       },
       "datasets": [
         {
