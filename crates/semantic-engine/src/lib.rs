@@ -2,7 +2,9 @@
 
 mod federation;
 mod materialization;
+mod parameters;
 mod query;
+pub use parameters::ReadDescription;
 pub use query::{PreparedQuery, QueryExecution};
 pub use semantic_materialization::{CacheOptions, MaterializationManager, MaterializationPolicy};
 pub use semantic_runtime::SourceDescriptor;

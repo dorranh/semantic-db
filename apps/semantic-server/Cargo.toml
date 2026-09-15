@@ -1,0 +1,30 @@
+[package]
+name = "semantic-server"
+description = "Semantic DB PostgreSQL protocol and optional compilation server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+semantic-db = { workspace = true, features = ["sources", "postgres", "github", "clickhouse", "compiler"] }
+datafusion-postgres.workspace = true
+datafusion.workspace = true
+axum.workspace = true
+tokio = { workspace = true, features = ["net", "signal", "time", "sync"] }
+async-trait.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+dotenvy.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+tokio-postgres.workspace = true
+semantic-catalog.workspace = true
+
+[lints]
+workspace = true

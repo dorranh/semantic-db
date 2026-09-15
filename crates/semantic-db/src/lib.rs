@@ -24,6 +24,8 @@ pub use semantic_github as github;
 #[cfg(feature = "ossie")]
 pub use semantic_ossie as ossie;
 pub use semantic_plan as plan;
+#[cfg(feature = "postgres")]
+pub use semantic_postgres as postgres;
 #[cfg(feature = "sources")]
 pub use semantic_sources as sources;
 
@@ -34,5 +36,5 @@ pub use semantic_engine::{Engine, EngineError, RelationBackend, TableProvider};
 
 pub use semantic_engine::{
     CacheOptions, MaterializationManager, MaterializationPolicy, PreparedQuery, QueryContext,
-    QueryExecution, QueryOptions, SourceDescriptor,
+    QueryExecution, QueryOptions, ReadDescription, SourceDescriptor,
 };

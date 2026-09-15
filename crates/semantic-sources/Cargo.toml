@@ -11,6 +11,7 @@ publish.workspace = true
 default = []
 github = ["dep:semantic-github"]
 clickhouse = ["dep:semantic-clickhouse"]
+postgres = ["dep:semantic-postgres"]
 
 [dependencies]
 semantic-runtime.workspace = true
@@ -18,6 +19,7 @@ semantic-engine.workspace = true
 semantic-ossie.workspace = true
 semantic-github = { workspace = true, optional = true }
 semantic-clickhouse = { workspace = true, optional = true }
+semantic-postgres = { workspace = true, optional = true }
 datafusion.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -26,6 +28,7 @@ futures.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+tokio-postgres.workspace = true
 semantic-catalog.workspace = true
 tokio.workspace = true
 testcontainers.workspace = true

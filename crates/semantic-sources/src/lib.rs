@@ -25,6 +25,8 @@ pub use builtin::ClickHouseConnector;
 pub use builtin::CsvConnector;
 #[cfg(feature = "github")]
 pub use builtin::GitHubConnector;
+#[cfg(feature = "postgres")]
+pub use builtin::PostgresConnector;
 
 pub type Options = Map<String, Value>;
 pub type Result<T> = std::result::Result<T, SourceError>;
@@ -99,11 +101,15 @@ impl Registry {
         Self::default()
     }
 
-    /// CSV plus connectors enabled by the `github` and `clickhouse` features.
+    /// CSV plus connectors enabled by the `github`, `clickhouse`, and `postgres` features.
     pub fn standard() -> Self {
         let mut registry = Self::new();
         registry
             .register("csv", CsvConnector)
+            .expect("unique builtin");
+        #[cfg(feature = "postgres")]
+        registry
+            .register("postgres", PostgresConnector)
             .expect("unique builtin");
         #[cfg(feature = "github")]
         registry

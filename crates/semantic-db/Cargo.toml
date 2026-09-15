@@ -14,6 +14,7 @@ ossie = ["dep:semantic-ossie"]
 sources = ["ossie", "dep:semantic-sources"]
 github = ["dep:semantic-github", "semantic-sources?/github"]
 clickhouse = ["dep:semantic-clickhouse", "semantic-sources?/clickhouse"]
+postgres = ["dep:semantic-postgres", "semantic-sources?/postgres"]
 
 [dependencies]
 semantic-sources = { workspace = true, optional = true }
@@ -24,6 +25,7 @@ semantic-compiler = { workspace = true, optional = true }
 semantic-ossie = { workspace = true, optional = true }
 semantic-github = { workspace = true, optional = true }
 semantic-clickhouse = { workspace = true, optional = true }
+semantic-postgres = { workspace = true, optional = true }
 datafusion.workspace = true
 
 [dev-dependencies]

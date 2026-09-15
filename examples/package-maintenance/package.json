@@ -1,0 +1,44 @@
+{
+  "name": "semantic-package-maintenance",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "setup": "node scripts/lifecycle.mjs setup",
+    "start": "node scripts/lifecycle.mjs start",
+    "stop": "node scripts/lifecycle.mjs stop",
+    "reset": "node scripts/lifecycle.mjs reset",
+    "dev": "vite --host 127.0.0.1",
+    "api": "tsx server/index.ts",
+    "fixture": "node fixtures/github.mjs",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:integration": "node --import tsx --test tests/integration/*.test.ts",
+    "test:e2e": "node tests/browser.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.2",
+    "express": "5.1.0",
+    "pg": "8.16.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.5",
+    "@types/node": "24.10.1",
+    "@types/pg": "8.15.6",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "prisma": "6.19.2",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vite": "7.2.2"
+  }
+}

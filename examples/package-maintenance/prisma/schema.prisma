@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Package {
+  name String @id
+  repository String
+  team String
+  notes String @default("")
+  @@map("packages")
+}
+model Member {
+  id String @id
+  name String
+  triage IssueTriage[]
+  @@map("members")
+}
+model IssueTriage {
+  issueId String @id @map("issue_id")
+  assigneeId String? @map("assignee_id")
+  assignee Member? @relation(fields: [assigneeId], references: [id])
+  priority Int @default(2)
+  notes String @default("")
+  @@map("issue_triage")
+}

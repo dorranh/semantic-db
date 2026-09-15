@@ -1,0 +1,34 @@
+name: semantic-package-maintenance
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    environment:
+      POSTGRES_USER: maintenance
+      POSTGRES_PASSWORD: maintenance
+      POSTGRES_DB: maintenance
+    ports: ["127.0.0.1:5543:5432"]
+    volumes: ["postgres:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maintenance -d maintenance"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.2
+    environment:
+      CLICKHOUSE_USER: maintenance
+      CLICKHOUSE_PASSWORD: maintenance
+      CLICKHOUSE_DB: pypi
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["127.0.0.1:8124:8123"]
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+      - ./fixtures/clickhouse.sql:/docker-entrypoint-initdb.d/01-fixture.sql:ro
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "maintenance", "--password", "maintenance", "--query", "SELECT 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  postgres:
+  clickhouse:

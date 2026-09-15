@@ -204,3 +204,46 @@ async fn stricter_view_freshness_refreshes_cached_ancestors() {
     );
     std::fs::remove_dir_all(path).unwrap();
 }
+
+#[tokio::test]
+async fn parameterized_reads_preserve_materializations() {
+    use datafusion::common::ScalarValue;
+    let path = std::env::temp_dir().join(format!(
+        "semantic-parameters-cache-{}",
+        semantic_runtime::unique_id()
+    ));
+    let engine = engine(&path, 7, "SELECT x FROM source").await;
+    engine
+        .describe_read("SELECT x FROM summary WHERE x=$1", &[])
+        .await
+        .unwrap();
+    assert!(
+        engine
+            .materialization_manager()
+            .unwrap()
+            .status()
+            .unwrap()
+            .is_empty()
+    );
+    let rows = engine
+        .execute_parameters(
+            "SELECT x FROM summary WHERE x=$1",
+            vec![ScalarValue::Int64(Some(7))],
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    assert_eq!(rows[0].num_rows(), 1);
+    assert!(
+        !engine
+            .materialization_manager()
+            .unwrap()
+            .status()
+            .unwrap()
+            .is_empty()
+    );
+    std::fs::remove_dir_all(path).unwrap();
+}

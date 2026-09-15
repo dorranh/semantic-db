@@ -30,6 +30,11 @@ semantic-plan = { path = "crates/semantic-plan" }
 semantic-ossie = { path = "crates/semantic-ossie" }
 semantic-github = { path = "crates/semantic-github" }
 semantic-clickhouse = { path = "crates/semantic-clickhouse" }
+semantic-postgres = { path = "crates/semantic-postgres" }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
+deadpool-postgres = "0.14.2"
+datafusion-postgres = { git = "https://github.com/datafusion-contrib/datafusion-postgres", rev = "ffb14a52b3d7c7489559812e1ec38096f225ce93" }
+axum = "0.8"
 datafusion-federation = { version = "=0.5.6", features = ["sql"] }
 clickhouse = { version = "0.15.2", default-features = false, features = ["rustls-tls-ring", "rustls-tls-webpki-roots"] }
 arrow-ipc = { version = "59.2", features = ["lz4", "zstd"] }

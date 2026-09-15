@@ -36,6 +36,33 @@ cli *args:
 repl example="geospatial":
     cargo run -p semantic-cli --locked -- --config "examples/$1/semantic-db.yaml"
 
+# Set up and launch the package-maintenance dashboard, preserving application edits.
+package-maintenance: package-maintenance-setup
+    npm --prefix examples/package-maintenance start
+
+# Install dependencies, start databases, apply migrations, and seed missing records.
+package-maintenance-setup:
+    npm --prefix examples/package-maintenance ci
+    npm --prefix examples/package-maintenance run setup
+
+# Stop the dashboard and databases, preserving their volumes.
+package-maintenance-stop:
+    npm --prefix examples/package-maintenance run stop
+
+# DELETE the example database volumes and recreate the fixtures.
+package-maintenance-reset:
+    npm --prefix examples/package-maintenance run reset
+
+# Run application unit tests, TypeScript checks, and the production UI build after setup.
+package-maintenance-check:
+    npm --prefix examples/package-maintenance test
+    npm --prefix examples/package-maintenance run build
+
+# Test the running dashboard; requires agent-browser and its Chromium installation.
+package-maintenance-test:
+    npm --prefix examples/package-maintenance run test:integration
+    npm --prefix examples/package-maintenance run test:e2e
+
 # Install the pinned documentation dependencies.
 docs-install:
     npm --prefix docs/site ci --no-audit --no-fund

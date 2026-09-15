@@ -1,6 +1,11 @@
 use super::*;
 use datafusion::prelude::{CsvReadOptions, SessionContext};
 use serde::de::DeserializeOwned;
+#[cfg(feature = "postgres")]
+#[path = "postgres.rs"]
+mod postgres;
+#[cfg(feature = "postgres")]
+pub use postgres::PostgresConnector;
 
 #[cfg(feature = "clickhouse")]
 #[path = "clickhouse.rs"]
