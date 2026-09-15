@@ -19,7 +19,7 @@ jobs:
       - run: npm run setup
       - run: npm test && npm run build
       - run: cargo test -p semantic-postgres -p semantic-sources --features semantic-sources/postgres --locked connector_integration_postgres -- --ignored
-      - run: cargo build -p semantic-server --locked
+      - run: cargo build -p semantic-server --features github --locked
       - run: npm install --global agent-browser@0.34.0 && agent-browser install --with-deps
       - name: Application and browser checks
         run: |
@@ -31,6 +31,7 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:5173/ > /dev/null
+          npm run reconcile
           npm run test:integration
           npm run test:e2e
       - uses: actions/upload-artifact@v4

@@ -51,29 +51,29 @@ or dashboard compatibility. The existing package-maintenance application is the
 full source example of `pg` integration and optional Ask. Keep its application
 write boundary separate from query compilation.
 
-## Combining with transactional semantics
+## Transactional integration
 
-This branch starts at `6cef945`, before the uncommitted transactional changes on
-`feature/e2e-flow`. `ConnectorFactory::prepare_source` is an additive, offline
-normalization hook; it does not replace `SourceConnection` or its loading method.
-At integration, pass its resolved options into the transactional branch's
-`resource(...)` call. Preserve `SourceResource`, resource identities, read/write
-bindings, optional Ossie models, application tables, and existing scope handling.
-For application tables without Ossie, the default options remain unchanged and
-file readers infer the schema normally. Give file factories the transactional
-branch's appropriate storage namespace without claiming snapshot/write support.
+`ConnectorFactory::prepare_source` normalizes model-guided options offline before
+`SourceConnection::resource` loads a source. The loader retains the connector's
+resource identity and read/write bindings, validates reversible model mappings
+and exposed target keys, and preserves existing authorization and cache scopes.
+Ossie is optional for application-only projects. Application tables without a
+model use the configured options directly; file readers infer their schema.
 
-Keep writes, read guarantees, and reconciliation documented against their actual
-interfaces after the branches combine. This release work does not add file
-writes or stronger transactional guarantees.
+File factories supply a storage namespace but do not certify a transaction
+domain, resource identity, or snapshot. Files and ClickHouse remain read-only.
+PostgreSQL supports writes through the transaction interfaces documented in
+[writes and reconciliation](writes-and-reconciliation-implementation.md).
+These interfaces define the supported guarantees; PostgreSQL wire compatibility
+alone does not imply them.
 
 ## Verification
 
 `cargo test -p semantic-sources -p semantic-cli -p semantic-server --test files --locked`
 checks all five formats, gzip CSV/NDJSON, model-guided parsing, directories,
 cross-format joins, and both executable frontends. Existing database connector
-tests remain the authority for their pushdown and type contracts. Run the full
-workspace checks before merging and repeat transactional tests after integration.
+tests remain the authority for their pushdown and type contracts. The full
+workspace suite also checks transaction, checked-input, and write behavior.
 
 Remote file storage, JSON CLI output, runtime plugins, and production service
 hardening remain separate milestones. Hand-curated top-level docs are unchanged.

@@ -334,3 +334,126 @@ async fn timestamp_guidance_preserves_nanosecond_fraction() {
         .unwrap();
     assert_eq!(values.value(0) % 1_000_000_000, 123_456_789);
 }
+
+#[tokio::test]
+async fn app_only_files_load_without_ossie_and_remain_read_only() {
+    let files = Files::new();
+    for name in Files::FORMATS {
+        files.write(
+            "app.json",
+            &json!({
+                "connections": {"local": {"connector": "file"}},
+                "app_tables": {"items": {"connection": "local", "path": name}},
+                "views": {"totals": {"sql_file": "totals.sql"}}
+            })
+            .to_string(),
+        );
+        files.write("totals.sql", "SELECT SUM(qty) AS total FROM items");
+        let project = Project::from_path(files.0.join("app.json")).unwrap();
+        assert!(
+            project
+                .inspect_project(&Registry::standard())
+                .unwrap()
+                .model
+                .datasets
+                .is_empty()
+        );
+        let loaded = project
+            .load(&Registry::standard(), &|_| None)
+            .await
+            .unwrap();
+        let rows = loaded
+            .engine
+            .query("SELECT total FROM totals")
+            .await
+            .unwrap();
+        assert_eq!(
+            rows[0]
+                .column(0)
+                .as_any()
+                .downcast_ref::<datafusion::arrow::array::Int64Array>()
+                .unwrap()
+                .value(0),
+            5,
+            "{name}"
+        );
+        assert!(
+            loaded
+                .engine
+                .prepare_write("DELETE FROM items")
+                .await
+                .is_err(),
+            "{name}"
+        );
+        let snapshot = loaded
+            .engine
+            .explain_read(
+                "SELECT * FROM totals",
+                semantic_engine::ReadOptions {
+                    consistency: semantic_engine::ReadConsistency::Snapshot,
+                    ..Default::default()
+                },
+            )
+            .await;
+        assert!(
+            snapshot.is_err(),
+            "{name}: file scans must not claim snapshot support"
+        );
+    }
+}
+
+#[tokio::test]
+async fn modeled_files_keep_observed_reads_without_transaction_capabilities() {
+    let files = Files::new();
+    for connector in ["file", "csv"] {
+        let project =
+            Project::from_path(files.config_connector(connector, json!({"path": "items.csv"})))
+                .unwrap();
+        let loaded = project
+            .load(&Registry::standard(), &|_| None)
+            .await
+            .unwrap();
+        let result = loaded
+            .engine
+            .execute_read(
+                "SELECT code FROM products ORDER BY code",
+                vec![],
+                Default::default(),
+            )
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        assert!(
+            pretty_format_batches(&result.batches)
+                .unwrap()
+                .to_string()
+                .contains("00123")
+        );
+        assert_eq!(
+            result.report.established,
+            semantic_engine::ReadConsistency::Observed
+        );
+        assert!(
+            loaded
+                .engine
+                .explain_read(
+                    "SELECT code FROM selected_products",
+                    semantic_engine::ReadOptions {
+                        consistency: semantic_engine::ReadConsistency::Snapshot,
+                        ..Default::default()
+                    }
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            loaded
+                .engine
+                .prepare_write("DELETE FROM products")
+                .await
+                .is_err()
+        );
+    }
+}

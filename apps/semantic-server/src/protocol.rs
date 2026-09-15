@@ -18,14 +18,14 @@ use pgwire::{
         cancel::{CancelHandler, DefaultCancelHandler},
         portal::{Format, Portal},
         query::{ExtendedQueryHandler, SimpleQueryHandler},
-        results::{FieldInfo, QueryResponse, Response},
+        results::{FieldInfo, QueryResponse, Response, Tag},
         stmt::QueryParser,
         store::PortalStore,
     },
     error::{ErrorInfo, PgWireError, PgWireResult},
     messages::{PgWireBackendMessage, PgWireFrontendMessage},
 };
-use semantic_db::{Engine, ReadDescription};
+use semantic_db::{Engine, WriteOptions, WriteOutcome, is_write_explanation, is_write_statement};
 use std::sync::Arc;
 
 pub struct Handlers {
@@ -36,9 +36,10 @@ pub struct Handlers {
 impl Handlers {
     pub fn new(engine: Arc<Engine>) -> Self {
         let manager = Arc::new(ConnectionManager::new());
+        let read_only = !engine.has_write_bindings();
         Self {
             service: Arc::new(Service { engine }),
-            startup: Arc::new(Startup(manager.clone())),
+            startup: Arc::new(Startup(manager.clone(), read_only)),
             cancel: Arc::new(DefaultCancelHandler::new(manager)),
         }
     }
@@ -57,7 +58,7 @@ impl PgWireServerHandlers for Handlers {
         self.cancel.clone()
     }
 }
-pub struct Startup(Arc<ConnectionManager>);
+pub struct Startup(Arc<ConnectionManager>, bool);
 #[async_trait]
 impl StartupHandler for Startup {
     async fn on_startup<C>(
@@ -95,7 +96,7 @@ impl StartupHandler for Startup {
                 .insert::<Arc<ConnectionHandle>>(handle);
             client.session_extensions().insert::<ConnectionGuard>(guard);
             let mut parameters = DefaultServerParameterProvider::default();
-            parameters.default_transaction_read_only = true;
+            parameters.default_transaction_read_only = self.1;
             parameters.is_superuser = false;
             auth::finish_authentication(client, &parameters).await?;
         }
@@ -108,7 +109,8 @@ pub struct Service {
 #[derive(Clone)]
 pub struct Statement {
     sql: String,
-    description: ReadDescription,
+    parameters: Vec<DataType>,
+    schema: datafusion::arrow::datatypes::SchemaRef,
 }
 fn error(message: impl Into<String>) -> PgWireError {
     PgWireError::UserError(Box::new(ErrorInfo::new(
@@ -120,6 +122,18 @@ fn error(message: impl Into<String>) -> PgWireError {
 fn engine_error(e: semantic_db::EngineError) -> PgWireError {
     error(e.to_string())
 }
+fn write_cancellation(result: PgWireResult<()>, write: bool) -> PgWireResult<()> {
+    match result {
+        Err(PgWireError::QueryCanceled) if write => {
+            Err(PgWireError::UserError(Box::new(ErrorInfo::new(
+                "ERROR".into(),
+                "08007".into(),
+                "OutcomeUnknown: write execution was cancelled; inspect destination state before retrying".into(),
+            ))))
+        }
+        result => result,
+    }
+}
 impl Service {
     async fn read(
         &self,
@@ -127,6 +141,62 @@ impl Service {
         values: Vec<ScalarValue>,
         format: &Format,
     ) -> PgWireResult<Response> {
+        if is_write_statement(sql) {
+            let prepared = self.engine.prepare_write(sql).await.map_err(engine_error)?;
+            if is_write_explanation(sql) {
+                let explanation = prepared.explain().await.map_err(engine_error)?;
+                let schema = Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
+                    datafusion::arrow::datatypes::Field::new("write_plan", DataType::Utf8, false),
+                ]));
+                let batch = datafusion::arrow::record_batch::RecordBatch::try_new(
+                    schema.clone(),
+                    vec![Arc::new(datafusion::arrow::array::StringArray::from(vec![
+                        serde_json::to_string(&explanation)
+                            .map_err(|_| error("explanation encoding failed"))?,
+                    ]))],
+                )
+                .map_err(|_| error("explanation encoding failed"))?;
+                let fields = Arc::new(arrow_schema_to_pg_fields(&schema, format, None)?);
+                return Ok(Response::Query(QueryResponse::new(
+                    fields.clone(),
+                    stream::iter(encode_recordbatch(fields, batch)),
+                )));
+            }
+            let command = prepared.explain().await.map_err(engine_error)?.operation;
+            let result = prepared
+                .execute(
+                    values,
+                    WriteOptions {
+                        query: self.engine.query_options().clone(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(engine_error)?;
+            if result.outcome != WriteOutcome::Committed {
+                let code = if result.outcome == WriteOutcome::OutcomeUnknown {
+                    "08007".to_owned()
+                } else {
+                    result.code.clone().unwrap_or_else(|| "40000".into())
+                };
+                return Err(PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "ERROR".into(),
+                    code,
+                    format!(
+                        "{:?}: {}",
+                        result.outcome,
+                        result
+                            .message
+                            .unwrap_or_else(|| "write did not commit".into())
+                    ),
+                ))));
+            }
+            let mut tag = Tag::new(&command).with_rows(result.affected_rows.unwrap_or(0) as usize);
+            if command == "INSERT" {
+                tag = tag.with_oid(0);
+            }
+            return Ok(Response::Execution(tag));
+        }
         let mut execution = self
             .engine
             .execute_parameters(sql, values, self.engine.query_options().clone())
@@ -164,6 +234,20 @@ impl Service {
 }
 #[async_trait]
 impl SimpleQueryHandler for Service {
+    async fn on_query<C>(
+        &self,
+        client: &mut C,
+        query: pgwire::messages::simplequery::Query,
+    ) -> PgWireResult<()>
+    where
+        C: ClientInfo + ClientPortalStore + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
+        C::PortalStore: PortalStore,
+        C::Error: std::fmt::Debug,
+        PgWireError: From<C::Error>,
+    {
+        let write = is_write_statement(&query.query) && !is_write_explanation(&query.query);
+        write_cancellation(self._on_query(client, query).await, write)
+    }
     async fn do_query<C>(&self, _: &mut C, query: &str) -> PgWireResult<Vec<Response>>
     where
         C: ClientInfo + ClientPortalStore + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
@@ -195,39 +279,79 @@ impl QueryParser for Service {
                     .transpose()
             })
             .collect::<PgWireResult<Vec<_>>>()?;
-        let description = self
-            .engine
-            .describe_read(sql, &hints)
-            .await
-            .map_err(engine_error)?;
+        let (parameters, schema) = if is_write_statement(sql) {
+            let description = self
+                .engine
+                .describe_write(sql, &hints)
+                .await
+                .map_err(engine_error)?;
+            (
+                description.parameters,
+                if is_write_explanation(sql) {
+                    Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
+                        datafusion::arrow::datatypes::Field::new(
+                            "write_plan",
+                            DataType::Utf8,
+                            false,
+                        ),
+                    ]))
+                } else {
+                    Arc::new(datafusion::arrow::datatypes::Schema::empty())
+                },
+            )
+        } else {
+            let description = self
+                .engine
+                .describe_read(sql, &hints)
+                .await
+                .map_err(engine_error)?;
+            (description.parameters, description.schema)
+        };
         Ok(Some(Statement {
             sql: sql.to_owned(),
-            description,
+            parameters,
+            schema,
         }))
     }
+
     fn get_parameter_types(&self, stmt: &Statement) -> PgWireResult<Vec<Type>> {
-        stmt.description
-            .parameters
-            .iter()
-            .map(into_pg_type)
-            .collect()
+        stmt.parameters.iter().map(into_pg_type).collect()
     }
     fn get_result_schema(
         &self,
         stmt: &Statement,
         format: Option<&Format>,
     ) -> PgWireResult<Vec<FieldInfo>> {
-        arrow_schema_to_pg_fields(
-            &stmt.description.schema,
-            format.unwrap_or(&Format::UnifiedText),
-            None,
-        )
+        arrow_schema_to_pg_fields(&stmt.schema, format.unwrap_or(&Format::UnifiedText), None)
     }
 }
 #[async_trait]
 impl ExtendedQueryHandler for Service {
     type Statement = Statement;
     type QueryParser = Service;
+    async fn on_execute<C>(
+        &self,
+        client: &mut C,
+        message: pgwire::messages::extendedquery::Execute,
+    ) -> PgWireResult<()>
+    where
+        C: ClientInfo + ClientPortalStore + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
+        C::PortalStore: PortalStore<Statement = Self::Statement>,
+        C::Error: std::fmt::Debug,
+        PgWireError: From<C::Error>,
+    {
+        let write = client
+            .portal_store()
+            .get_portal(message.name.as_deref().unwrap_or(pgwire::api::DEFAULT_NAME))
+            .is_some_and(|entry| match entry {
+                pgwire::api::store::Entry::Value(portal) => {
+                    let sql = &portal.statement.statement.sql;
+                    is_write_statement(sql) && !is_write_explanation(sql)
+                }
+                pgwire::api::store::Entry::Empty => false,
+            });
+        write_cancellation(self._on_execute(client, message).await, write)
+    }
     fn query_parser(&self) -> Arc<Service> {
         Arc::new(Service {
             engine: self.engine.clone(),
@@ -246,12 +370,7 @@ impl ExtendedQueryHandler for Service {
         PgWireError: From<C::Error>,
     {
         let stmt = &portal.statement.statement;
-        let types = stmt
-            .description
-            .parameters
-            .iter()
-            .map(Some)
-            .collect::<Vec<_>>();
+        let types = stmt.parameters.iter().map(Some).collect::<Vec<_>>();
         let values = deserialize_parameters(portal, &types)?;
         let datafusion::common::ParamValues::List(values) = values else {
             return Err(error("positional parameters required"));

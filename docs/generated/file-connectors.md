@@ -31,10 +31,17 @@ Arrow use their built-in compression rather than an outer compressed file.
 The binary enables DataFusion's compression and Avro codec features; encrypted
 Parquet is not included. Gzip is covered by the end-to-end binary smoke tests.
 
-Files and ClickHouse are read sources in this delivery. PostgreSQL write support
-and consistency guarantees are being developed separately; assess them by the
-specific library/client interface after integration. File readers use DataFusion
-batch execution; CLI/server result buffering still applies. File support does
+| Connector | Writes | Read consistency |
+| --- | --- | --- |
+| `postgres` | Opt-in INSERT, UPDATE, DELETE and restricted keyed MERGE; explicit library transactions | Observed reads; verified single-domain snapshots and session-scoped commit receipts |
+| `clickhouse` | Read-only | Observed reads; no snapshot/session guarantee |
+| `file`, `csv`, `json`, `parquet`, `avro`, `arrow` | Read-only | Observed reads; no filesystem snapshot guarantee |
+
+PostgreSQL connections stay read-only unless `write_enabled: true`. Writable
+Ossie projections must be reversible and expose a supported target key; authored
+views remain read-only targets. See [writes and reconciliation](writes-and-reconciliation-implementation.md)
+for the precise API, supported statements, and checked-input restrictions.
+File readers use DataFusion batch execution; CLI/server result buffering still applies. File support does
 not imply filesystem snapshots, watched directories, or query-time refresh.
 
 ## Minimal project

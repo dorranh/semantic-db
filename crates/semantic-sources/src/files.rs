@@ -286,6 +286,9 @@ fn compatible(logical: &str, physical: &DataType) -> bool {
 }
 
 impl ConnectorFactory for FileConnector {
+    fn resource_namespace(&self) -> Option<&'static str> {
+        Some("file")
+    }
     fn prepare_source(
         &self,
         options: &Options,
@@ -311,6 +314,9 @@ impl ConnectorFactory for FileConnector {
     }
 }
 impl ConnectorFactory for CsvConnector {
+    fn resource_namespace(&self) -> Option<&'static str> {
+        Some("csv")
+    }
     fn prepare_source(
         &self,
         options: &Options,

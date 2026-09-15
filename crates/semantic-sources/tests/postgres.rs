@@ -55,3 +55,126 @@ fn postgres_configuration_is_checked_offline() {
             .is_err()
     );
 }
+
+#[tokio::test]
+#[ignore = "requires Docker"]
+async fn connector_integration_postgres_app_only_loading() {
+    let db = fixture::Database::start().await;
+    db.client
+        .batch_execute("CREATE TABLE app_items(id bigint PRIMARY KEY,label text NOT NULL)")
+        .await
+        .unwrap();
+    let directory = std::env::temp_dir().join(format!(
+        "semantic-app-only-{}",
+        semantic_runtime::unique_id()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    std::fs::write(directory.join("v.sql"), "SELECT id,label FROM items").unwrap();
+    let config = json!({"connections":{"app":{"connector":"postgres","connection_string_env":"PG","write_enabled":true}},"app_tables":{"items":{"connection":"app","schema":"public","table":"app_items"}},"views":{"labels":{"sql_file":"v.sql"}}});
+    std::fs::write(directory.join("semantic-db.yaml"), config.to_string()).unwrap();
+    let project = Project::from_path(directory.join("semantic-db.yaml")).unwrap();
+    assert!(
+        project
+            .inspect_project(&Registry::standard())
+            .unwrap()
+            .model
+            .datasets
+            .is_empty()
+    );
+    let loaded = project
+        .load(&Registry::standard(), &|_| Some(db.url.clone()))
+        .await
+        .unwrap();
+    let result = loaded
+        .engine
+        .prepare_write("INSERT INTO items(id,label) VALUES(1,'app only')")
+        .await
+        .unwrap()
+        .execute(vec![], semantic_engine::WriteOptions::default())
+        .await
+        .unwrap();
+    assert!(result.success(), "{result:?}");
+    assert_eq!(
+        loaded.engine.query("SELECT * FROM labels").await.unwrap()[0].num_rows(),
+        1
+    );
+    assert!(
+        loaded
+            .engine
+            .prepare_write("DELETE FROM labels")
+            .await
+            .is_err()
+    );
+    let mut missing = config.clone();
+    missing["app_tables"]["items"]["table"] = "absent_table".into();
+    std::fs::write(directory.join("missing.yaml"), missing.to_string()).unwrap();
+    assert!(
+        Project::from_path(directory.join("missing.yaml"))
+            .unwrap()
+            .load(&Registry::standard(), &|_| Some(db.url.clone()))
+            .await
+            .is_err()
+    );
+    let absent: Option<String> = db
+        .client
+        .query_one("SELECT to_regclass('public.absent_table')::text", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert!(absent.is_none());
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[path = "../../../tests/support/file_sources.rs"]
+mod file_fixtures;
+
+#[tokio::test]
+#[ignore = "requires Docker"]
+async fn connector_integration_postgres_checked_merge_from_modeled_files() {
+    let db = fixture::Database::start().await;
+    db.client
+        .batch_execute("CREATE TABLE file_items(code text PRIMARY KEY, qty bigint NOT NULL)")
+        .await
+        .unwrap();
+    let files = file_fixtures::Files::new();
+    for (connector, name) in [
+        ("file", "items.csv"),
+        ("csv", "items.csv"),
+        ("json", "items.jsonl"),
+        ("parquet", "items.parquet"),
+        ("avro", "items.avro"),
+        ("arrow", "items.arrow"),
+    ] {
+        db.client
+            .batch_execute("TRUNCATE file_items")
+            .await
+            .unwrap();
+        let config = files.config_connector(connector, json!({"path": name}));
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        value["connections"]["app"] =
+            json!({"connector": "postgres", "connection_string_env": "PG", "write_enabled": true});
+        value["app_tables"] =
+            json!({"stored": {"connection": "app", "schema": "public", "table": "file_items"}});
+        std::fs::write(&config, value.to_string()).unwrap();
+        let loaded = Project::from_path(config)
+            .unwrap()
+            .load(&Registry::standard(), &|_| Some(db.url.clone()))
+            .await
+            .unwrap();
+        let sql = "REQUIRE IDEMPOTENT MERGE INTO stored t USING (SELECT code,qty FROM selected_products) s ON t.code=s.code WHEN MATCHED THEN UPDATE SET qty=s.qty WHEN NOT MATCHED THEN INSERT(code,qty) VALUES(s.code,s.qty)";
+        let prepared = loaded.engine.prepare_write(sql).await.unwrap();
+        for _ in 0..2 {
+            let result = prepared.execute(vec![], Default::default()).await.unwrap();
+            assert!(result.success(), "{connector}: {result:?}");
+        }
+        let rows = db
+            .client
+            .query("SELECT code,qty FROM file_items ORDER BY code", &[])
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2, "{connector}");
+        assert_eq!(rows[0].get::<_, String>(0), "00123", "{connector}");
+        assert_eq!(rows[0].get::<_, i64>(1), 2, "{connector}");
+    }
+}

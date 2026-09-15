@@ -52,7 +52,8 @@ try {
   run("snapshot", "-i");
   assert.match(run("get", "text", "body"), /SUM\(downloads\)/);
   run("find", "role", "button", "click", "--name", "Ask the model OPTIONAL");
-  run("wait", "--text", "Ask is not configured.");
+  const health = await fetch("http://127.0.0.1:3001/api/health").then((r) => r.json());
+  run("wait", "--text", health.ask_enabled ? "Your question" : "Ask is not configured.");
   run("find", "role", "button", "click", "--name", "Workspace");
   run("wait", "--text", "Save package");
   run("screenshot", "--full", ".run/desktop.png");

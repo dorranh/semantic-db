@@ -16,6 +16,7 @@ default = []
 github = ["semantic-sources/github"]
 
 [dependencies]
+serde_json.workspace = true
 semantic-sources = { workspace = true, features = ["clickhouse", "postgres"] }
 semantic-engine.workspace = true
 semantic-compiler.workspace = true
@@ -30,7 +31,6 @@ directories = "6"
 [dev-dependencies]
 arrow-avro = { version = "59.2", default-features = false }
 flate2 = "1"
-serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -73,7 +73,7 @@ if (mode === "setup" || mode === "reset") {
       if (e.code !== "ESRCH") throw e;
     }
   }
-  run("cargo", ["build", "-p", "semantic-server", "--locked"], root);
+  run("cargo", ["build", "-p", "semantic-server", "--features", "github", "--locked"], root);
   process.title = processTitle;
   writeFileSync(".run/pid", String(process.pid));
   const children = [];

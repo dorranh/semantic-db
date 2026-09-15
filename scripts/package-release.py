@@ -41,7 +41,12 @@ def main():
         # Keep documentation paths stable inside the release archive.
         guides = stage / "docs"
         guides.mkdir()
-        for file in ("delivery.md", "file-connectors.md", "release-quickstart.md"):
+        for file in (
+            "delivery.md", "file-connectors.md", "release-quickstart.md",
+            "writes-and-reconciliation-implementation.md",
+            "writes-and-reconciliation-strategy.md",
+            "writes-and-reconciliation-design.md",
+        ):
             shutil.copy2(root / "docs/generated" / file, guides / file)
         shutil.copytree(root / "docs/generated/skills", stage / "skills")
         if suffix:

@@ -177,3 +177,170 @@ async fn late_errors_and_cancel_do_not_publish_partial_success() {
     assert!(client.simple_query("SELECT 1").await.is_ok());
     server.abort();
 }
+
+struct FakeWrites {
+    schema: datafusion::arrow::datatypes::SchemaRef,
+    calls: std::sync::atomic::AtomicUsize,
+    stall: std::sync::atomic::AtomicBool,
+    started: tokio::sync::Notify,
+}
+impl semantic_db::WriteConnection for FakeWrites {
+    fn inspect_target<'a>(
+        &'a self,
+        _: &'a str,
+    ) -> futures::future::BoxFuture<'a, semantic_db::engine::Result<semantic_db::TargetInspection>>
+    {
+        Box::pin(async move {
+            Ok(semantic_db::TargetInspection {
+                physical_namespace: "fake".into(),
+                schema: self.schema.clone(),
+                revision: "v1".into(),
+                resource: "items".into(),
+                domain: "fake".into(),
+                unique_keys: vec![vec!["id".into()]],
+                checked_eligible: true,
+                supported_operations: vec!["UPDATE".into()],
+                atomic_writes: true,
+            })
+        })
+    }
+    fn validate_operation<'a>(
+        &'a self,
+        _: &'a semantic_db::MutationPlan,
+    ) -> futures::future::BoxFuture<'a, semantic_db::engine::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+    fn apply<'a>(
+        &'a self,
+        _: &'a semantic_db::MutationPlan,
+        _: &'a semantic_db::StagedInput,
+        _: &'a [datafusion::common::ScalarValue],
+        _: Arc<semantic_db::QueryContext>,
+    ) -> futures::future::BoxFuture<'a, semantic_db::engine::Result<semantic_db::WriteResult>> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.started.notify_one();
+            if self.stall.load(std::sync::atomic::Ordering::SeqCst) {
+                futures::future::pending::<()>().await;
+            }
+            Ok(semantic_db::WriteResult {
+                outcome: semantic_db::WriteOutcome::Committed,
+                operation_id: "fake".into(),
+                boundary: "fake".into(),
+                atomic: true,
+                idempotent: false,
+                receipt: None,
+                affected_rows: Some(1),
+                code: None,
+                message: None,
+                external_observations: vec![],
+            })
+        })
+    }
+    fn begin<'a>(
+        &'a self,
+        _: semantic_db::TransactionOptions,
+    ) -> futures::future::BoxFuture<
+        'a,
+        semantic_db::engine::Result<Arc<dyn semantic_db::ConnectorSession>>,
+    > {
+        Box::pin(async {
+            Err(datafusion::error::DataFusionError::Execution("unsupported".into()).into())
+        })
+    }
+}
+#[tokio::test]
+async fn writes_prepare_without_mutation_and_report_unknown_on_protocol_cancellation() {
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        datasource::MemTable,
+    };
+    use std::{collections::BTreeMap, sync::atomic::Ordering};
+    let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+    let connection = Arc::new(FakeWrites {
+        schema: schema.clone(),
+        calls: 0.into(),
+        stall: false.into(),
+        started: tokio::sync::Notify::new(),
+    });
+    let mut engine = Engine::new();
+    engine
+        .register_table(
+            semantic_db::Relation::base("items", schema.clone(), "fake"),
+            Arc::new(MemTable::try_new(schema, vec![vec![]]).unwrap()),
+        )
+        .unwrap();
+    engine
+        .attach_write_binding(
+            "items",
+            semantic_db::WriteBinding {
+                connection: connection.clone(),
+                target: "items".into(),
+                columns: BTreeMap::from([("id".into(), "id".into())]),
+            },
+        )
+        .await
+        .unwrap();
+    let socket = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = socket.local_addr().unwrap().port();
+    let handlers = Arc::new(Handlers::new(Arc::new(engine)));
+    let server = tokio::spawn(async move {
+        while let Ok((s, _)) = socket.accept().await {
+            let h = handlers.clone();
+            tokio::spawn(async move {
+                let _ = process_socket(s, None, h).await;
+            });
+        }
+    });
+    let (client, conn) =
+        tokio_postgres::connect(&format!("host=127.0.0.1 port={port} user=local"), NoTls)
+            .await
+            .unwrap();
+    tokio::spawn(conn);
+    let prepared = client
+        .prepare("UPDATE items SET id=$1::bigint")
+        .await
+        .unwrap();
+    assert!(prepared.columns().is_empty());
+    client
+        .simple_query("EXPLAIN UPDATE items SET id=1")
+        .await
+        .unwrap();
+    assert_eq!(connection.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(client.execute(&prepared, &[&1i64]).await.unwrap(), 1);
+    connection.started.notified().await;
+    connection.stall.store(true, Ordering::SeqCst);
+    for prepared_mode in [false, true] {
+        let token = client.cancel_token();
+        let pending = async {
+            if prepared_mode {
+                client.execute(&prepared, &[&2i64]).await.map(|_| ())
+            } else {
+                client
+                    .simple_query("UPDATE items SET id=2")
+                    .await
+                    .map(|_| ())
+            }
+        };
+        let cancellation = async {
+            connection.started.notified().await;
+            token.cancel_query(NoTls).await.unwrap();
+        };
+        let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            tokio::join!(pending, cancellation)
+        })
+        .await
+        .unwrap();
+        let error = result.unwrap_err();
+        assert_eq!(error.code().unwrap().code(), "08007");
+        assert!(
+            error
+                .as_db_error()
+                .unwrap()
+                .message()
+                .contains("OutcomeUnknown")
+        );
+        assert!(client.simple_query("SELECT 1").await.is_ok());
+    }
+    server.abort();
+}

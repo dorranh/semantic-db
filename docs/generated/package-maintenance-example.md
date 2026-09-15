@@ -2,8 +2,8 @@
 
 This example joins application-owned Postgres tables, repository-scoped GitHub
 issues, and ClickHouse PyPI download aggregates through Semantic DB. React/Vite
-provides the UI; a Node backend queries Semantic DB with `pg` and writes directly
-to Postgres with Prisma. The optional Ask panel compiles questions against the
+provides the UI; a Node backend reads and writes through Semantic DB with `pg`.
+Prisma owns application migrations and setup seeding. The optional Ask panel compiles questions against the
 same authored views.
 
 ## Review stages
@@ -18,7 +18,7 @@ same authored views.
    the Ask panel, fixture controls, example CI, and this guide.
 
 Each stage builds on the preceding foundation. Generated documentation is kept here;
-future reconciliation behavior is described at the end without claiming those guarantees.
+the implemented reconciliation command is described at the end.
 
 ## Run locally
 
@@ -94,7 +94,7 @@ The UI preserves 64-bit counts as decimal strings; chart scaling uses BigInt
 arithmetic. PostgreSQL dates/timestamps retain their textual precision at the
 Node API boundary. All application-facing joins execute in Semantic DB.
 
-Prisma owns DDL and writes. Ossie is checked against existing source schemas.
+Prisma owns migrations and setup seeding. Runtime writes use Semantic DB. Ossie is checked against existing source schemas.
 Project loading never creates tables, applies migrations, or treats descriptive
 Ossie keys as enforced constraints. Materialization is disabled in this example.
 After an acknowledged save the app performs a new federated read. This demonstrates
@@ -123,19 +123,20 @@ query-budget path. Parameter indices are ordered numerically; values are bound,
 never inserted into SQL text. Use explicit SQL casts when inference is ambiguous.
 
 The initial frontend supports `pg`, prepared statements, typed NULLs, text/binary
-results, basic `psql` queries, cancellation, and recovery after errors. DDL, DML,
-transactions, multiple statements and session changes are rejected. Startup accepts
+results, basic `psql` queries, cancellation, and recovery after errors. Explicit
+parameterized mutations use the engine write dispatcher. DDL, raw transaction
+control, multiple statements and session changes are rejected. Startup accepts
 UTF-8 encoding and connection identity fields; nonempty `options` and other session
 settings are rejected. PostgreSQL
 wire compatibility does not imply PostgreSQL SQL, catalog, ORM, or transaction
-compatibility. Future custom modifiers can reach the engine through these handlers.
+compatibility. `REQUIRE IDEMPOTENT MERGE` reaches the engine through these handlers.
 
 Responses are collected before sending rows, with a **64 MiB / 100,000 row** server
 result cap and the engine's execution budgets. This deliberately prevents partial
 results from becoming application successes. Closing an in-progress client without
 sending CancelRequest may leave work running until the query deadline; resources
 are released when execution completes or is cancelled. Incremental wire streaming
-and richer read/write guarantee reports are future work.
+remains future work; richer guarantee reports and sessions are library APIs.
 
 The HTTP side exposes `GET /health`, `GET /catalog`, and `POST /compile` with
 `{"question":"..."}`. It has no SQL execution route. Compilation returns the existing
@@ -157,6 +158,7 @@ connections:
     connection_string_env: APP_DATABASE_URL
     pool_size: 8
     batch_size: 1024
+    write_enabled: true
 sources:
   app.packages:
     connection: app
@@ -244,20 +246,33 @@ Failure after page one affects only scans that actually request another page. Th
 requests detail query includes closed issues and exercises this failure; a filtered
 query that fits on one page can still complete legitimately.
 
-## Subsequent write/reconciliation milestones
+## Writes and reconciliation
 
-Keep `server/mutations.ts` as the application write boundary. Replace its Prisma
-operations when Semantic DB's write APIs are ready; the UI need not change.
+Runtime saves in `server/mutations.ts` use parameterized Semantic DB UPDATE and MERGE.
+Prisma is not loaded by the application server. Existing validation and UI behavior
+are preserved. Lost commit acknowledgements receive an explicit unknown-outcome
+message; the application does not automatically retry mutations.
 
-Add a separate synchronized issue table (not `issue_triage`) for reconciliation:
+After applying the additive migration with `npm run setup` and starting the app:
 
-1. Observe GitHub into staged input; update only synchronized columns.
-2. Replay identical input and compare logical rows; preserve human triage fields.
-3. Change the fixture issue state and observe a subsequent convergent run.
-4. Inject a late page error and verify no partial destination publication.
-5. Add transaction read-own-writes, rollback, isolation, conflicting runs, and
-   lost-acknowledgement tests as the corresponding APIs are implemented.
+```sh
+npm run reconcile
+```
 
-These are future scenarios, not implemented guarantees. Direct Prisma transactions
-cannot stand in for Semantic DB transactions; no distributed commit or coordinated
-cross-source snapshot is implied.
+The command executes `writes/reconcile_issues.sql` through Semantic DB and prints the
+outcome and saved `synced_issues` rows. Repeating unchanged observations produces no
+additional logical changes. Later runs propagate changed GitHub state. The separate
+`issue_triage` table preserves human assignments, priorities and notes. Missing source
+rows are retained; a failed or partial source scan is never authoritative absence.
+The dashboard continues showing live-source observations.
+
+Runs hold `.run/reconcile.lock` before scanning sources. If a crashed process leaves
+this file, verify its recorded PID is no longer running before removing it. No
+background scheduler or cross-deployment coordination is supplied.
+
+Integration tests cover replay, changed fixture state, preserved triage, and late-page
+failure without destination publication. Native conformance tests cover snapshot
+sessions, transaction read-own-writes, rollback, composite keys, schema changes,
+expiry and receipt visibility. See the
+[implementation guide](writes-and-reconciliation-implementation.md) for the public
+interfaces and conservative Postgres capability restrictions.

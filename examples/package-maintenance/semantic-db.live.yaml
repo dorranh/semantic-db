@@ -4,7 +4,8 @@
     "app": {
       "connector": "postgres",
       "connection_string_env": "APP_DATABASE_URL",
-      "batch_size": 256
+      "batch_size": 256,
+      "write_enabled": true
     },
     "github": {
       "connector": "github",
@@ -69,6 +70,13 @@
     "package_overview": {
       "sql_file": "views/package_overview.sql",
       "description": "One row per tracked package with application ownership, observed downloads in the demo window, open issues, and unassigned open issues. Missing downloads are unknown. Repository issue counts repeat for shared mappings."
+    }
+  },
+  "app_tables": {
+    "synced_issues": {
+      "connection": "app",
+      "schema": "public",
+      "table": "synced_issues"
     }
   }
 }

@@ -1,5 +1,11 @@
 //! Deterministic SQL execution with a descriptive relation catalog.
 
+mod contracts;
+mod reads;
+mod writes;
+pub use contracts::*;
+pub use reads::*;
+pub use writes::{PreparedWrite, WriteDescription, is_write_explanation, is_write_statement};
 mod federation;
 mod materialization;
 mod parameters;
@@ -8,6 +14,7 @@ pub use parameters::ReadDescription;
 pub use query::{PreparedQuery, QueryExecution};
 pub use semantic_materialization::{CacheOptions, MaterializationManager, MaterializationPolicy};
 pub use semantic_runtime::SourceDescriptor;
+pub use semantic_runtime::staging::{StagedInput, StagingOptions};
 pub use semantic_runtime::{QueryContext, QueryOptions};
 
 use std::{
@@ -23,7 +30,8 @@ use datafusion::{
     prelude::{CsvReadOptions, SessionConfig, SessionContext},
     sql::{parser::Statement, sqlparser::ast::Statement as SqlStatement},
 };
-use semantic_catalog::{Catalog, CatalogError, Relation, RelationKind};
+pub use semantic_catalog::Relation;
+use semantic_catalog::{Catalog, CatalogError, RelationKind};
 use thiserror::Error;
 
 pub use datafusion::arrow::record_batch::RecordBatch;
@@ -91,6 +99,11 @@ pub struct Engine {
     materializations: Option<Arc<MaterializationManager>>,
     identity: String,
     query_options: QueryOptions,
+    read_bindings: BTreeMap<String, ReadBinding>,
+    write_bindings: BTreeMap<String, WriteBinding>,
+    binding_generation: u64,
+    write_domains: BTreeMap<String, String>,
+    resource_identities: BTreeMap<String, ResourceIdentity>,
 }
 
 impl Default for Engine {
@@ -127,7 +140,16 @@ impl Engine {
             materializations: None,
             identity: semantic_runtime::unique_id(),
             query_options: QueryOptions::default(),
+            read_bindings: BTreeMap::new(),
+            write_bindings: BTreeMap::new(),
+            binding_generation: 0,
+            write_domains: BTreeMap::new(),
+            resource_identities: BTreeMap::new(),
         })
+    }
+
+    pub fn has_write_bindings(&self) -> bool {
+        !self.write_bindings.is_empty()
     }
 
     pub fn catalog(&self) -> &Catalog {
@@ -218,6 +240,7 @@ impl Engine {
             .register_table(relation.name.as_str(), provider.clone())?;
         self.providers.insert(relation.name.clone(), provider);
         self.catalog.register(relation)?;
+        self.binding_generation += 1;
         Ok(())
     }
 

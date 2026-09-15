@@ -22,7 +22,7 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
     about = "Query registered data with SQL or natural language",
     args_conflicts_with_subcommands = true,
     group(ArgGroup::new("model_input").args(["config", "ossie"])),
-    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views"]))
+    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views", "write", "explain_write"]))
 )]
 struct Args {
     #[command(subcommand)]
@@ -66,6 +66,24 @@ struct Args {
     /// Execute one SQL statement and exit.
     #[arg(short, long, conflicts_with_all = ["file", "ask"])]
     query: Option<String>,
+    /// Execute one explicitly authored mutation through the write dispatcher.
+    #[arg(long, value_name = "SQL")]
+    write: Option<String>,
+    /// Explain a mutation without executing its source or destination changes.
+    #[arg(long, value_name = "SQL")]
+    explain_write: Option<String>,
+    #[arg(long, default_value = "observed", value_parser = ["observed", "snapshot"])]
+    read_consistency: String,
+    #[arg(
+        long,
+        default_value = "configured",
+        value_name = "configured|bypass|MAX_AGE_SECONDS"
+    )]
+    read_cache: String,
+    #[arg(long)]
+    explain_read: bool,
+    #[arg(long)]
+    read_report: bool,
     /// Read one SQL statement from a file and exit.
     #[arg(short, long, conflicts_with = "ask")]
     file: Option<std::path::PathBuf>,
@@ -253,6 +271,12 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
         }
         return Ok(());
     }
+    if let Some(sql) = args.explain_write {
+        return run_write(&engine, &sql, true).await;
+    }
+    if let Some(sql) = args.write {
+        return run_write(&engine, &sql, args.dry_run).await;
+    }
     if let Some(request) = args.ask {
         let compiler = Compiler::new(config::provider()?);
         return run_ask(&engine, &compiler, &request, args.dry_run, false).await;
@@ -262,7 +286,53 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
         return run_ask(&engine, &compiler, &request, args.dry_run, true).await;
     }
     if let Some(query) = args.query {
-        return run_sql(&engine, &query, args.dry_run).await;
+        if args.read_consistency == "observed"
+            && args.read_cache == "configured"
+            && !args.read_report
+            && !args.explain_read
+        {
+            return run_sql(&engine, &query, args.dry_run).await;
+        }
+        if args.dry_run {
+            return run_sql(&engine, &query, true).await;
+        }
+        let options = semantic_engine::ReadOptions {
+            query: engine.query_options().clone(),
+            consistency: if args.read_consistency == "snapshot" {
+                semantic_engine::ReadConsistency::Snapshot
+            } else {
+                semantic_engine::ReadConsistency::Observed
+            },
+            cache: match args.read_cache.as_str() {
+                "configured" => semantic_engine::ReadCache::Configured,
+                "bypass" => semantic_engine::ReadCache::Bypass,
+                age => {
+                    semantic_engine::ReadCache::MaxAge(std::time::Duration::from_secs(age.parse()?))
+                }
+            },
+            ..Default::default()
+        };
+        if args.explain_read {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&engine.explain_read(&query, options).await?)?
+            );
+            return Ok(());
+        }
+        let result = engine
+            .execute_read(&query, vec![], options)
+            .await?
+            .collect()
+            .await?;
+        println!("{}", pretty_format_batches(&result.batches)?);
+        println!(
+            "{} row(s)",
+            result.batches.iter().map(|b| b.num_rows()).sum::<usize>()
+        );
+        if args.read_report {
+            eprintln!("{}", serde_json::to_string_pretty(&result.report)?);
+        }
+        return Ok(());
     }
     if let Some(path) = args.file {
         return run_sql(&engine, &std::fs::read_to_string(path)?, args.dry_run).await;
@@ -369,6 +439,31 @@ async fn run_ask(
             println!("Needs clarification: {question}")
         }
         GroundingOutcome::Unsupported { reason } => println!("Unsupported: {reason}"),
+    }
+    Ok(())
+}
+
+async fn run_write(engine: &Engine, sql: &str, explain: bool) -> Result<()> {
+    let prepared = engine.prepare_write(sql).await?;
+    if explain {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&prepared.explain().await?)?
+        );
+        return Ok(());
+    }
+    let result = prepared
+        .execute(
+            vec![],
+            semantic_engine::WriteOptions {
+                query: engine.query_options().clone(),
+                ..Default::default()
+            },
+        )
+        .await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    if !result.success() {
+        return Err(format!("write outcome: {:?}", result.outcome).into());
     }
     Ok(())
 }

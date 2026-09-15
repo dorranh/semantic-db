@@ -1,5 +1,6 @@
 //! Connector-independent execution state. Never place query state on a shared connection.
 pub mod ipc;
+pub mod staging;
 
 use datafusion::{
     error::{DataFusionError, Result},
@@ -49,6 +50,7 @@ pub struct QueryOptions {
     pub max_remote_requests: usize,
     pub max_decoded_bytes: usize,
     pub bypass_materialization: bool,
+    pub max_cache_age_ms: Option<u64>,
     pub refresh_materializations: Vec<String>,
 }
 impl Default for QueryOptions {
@@ -59,6 +61,7 @@ impl Default for QueryOptions {
             max_remote_requests: 256,
             max_decoded_bytes: 1024 * 1024 * 1024,
             bypass_materialization: false,
+            max_cache_age_ms: None,
             refresh_materializations: vec![],
         }
     }
@@ -86,11 +89,20 @@ pub struct QueryMetrics {
     pub cache_misses: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct CacheObservation {
+    pub relation: String,
+    pub generation: String,
+    pub published_at_ms: u64,
+    pub age_ms: u64,
+}
+
 #[derive(Debug)]
 pub struct QueryContext {
     pub id: String,
     pub options: QueryOptions,
     deadline: Instant,
+    caches: std::sync::Mutex<Vec<CacheObservation>>,
     cancelled: AtomicBool,
     notification: Notify,
     remote_bytes: AtomicUsize,
@@ -104,6 +116,7 @@ impl QueryContext {
         options.validate()?;
         Ok(Arc::new(Self {
             id: unique_id(),
+            caches: Default::default(),
             deadline: Instant::now() + Duration::from_secs(options.timeout_seconds),
             options,
             cancelled: AtomicBool::new(false),
@@ -118,8 +131,17 @@ impl QueryContext {
     pub fn from_task(task: &TaskContext) -> Option<Arc<Self>> {
         task.session_config().get_extension::<Self>()
     }
+    pub fn record_cache(&self, observation: CacheObservation) {
+        self.caches.lock().unwrap().push(observation);
+    }
+    pub fn cache_observations(&self) -> Vec<CacheObservation> {
+        self.caches.lock().unwrap().clone()
+    }
     pub fn deadline(&self) -> Instant {
         self.deadline
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
     }
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);

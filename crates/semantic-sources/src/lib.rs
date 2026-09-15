@@ -81,6 +81,10 @@ pub trait ConnectorFactory: Send + Sync {
         Ok(options.clone())
     }
 
+    /// A connector-issued storage namespace; None cannot certify checked-input identity.
+    fn resource_namespace(&self) -> Option<&'static str> {
+        None
+    }
     fn validate_connection(&self, options: &Options) -> Result<()>;
     fn validate_source(&self, options: &Options) -> Result<()>;
     fn connect<'a>(
@@ -91,7 +95,32 @@ pub trait ConnectorFactory: Send + Sync {
 }
 
 /// A reusable connection/client serving one or more source bindings.
+pub struct SourceResource {
+    pub provider: Arc<dyn TableProvider>,
+    pub read: Option<semantic_engine::ReadBinding>,
+    pub write: Option<semantic_engine::WriteBinding>,
+}
+
 pub trait SourceConnection: Send + Sync {
+    fn read_connection(&self) -> Option<Arc<dyn semantic_engine::ReadConnection>> {
+        None
+    }
+    fn write_connection(&self) -> Option<Arc<dyn semantic_engine::WriteConnection>> {
+        None
+    }
+    fn resource<'a>(
+        &'a self,
+        options: &'a Options,
+        base_dir: &'a Path,
+    ) -> BoxFuture<'a, Result<SourceResource>> {
+        Box::pin(async move {
+            Ok(SourceResource {
+                provider: self.table(options, base_dir).await?,
+                read: None,
+                write: None,
+            })
+        })
+    }
     /// Opaque access identity; None keeps materializations session-local.
     fn authorization_scope(&self) -> Option<String> {
         None
@@ -184,7 +213,9 @@ impl Registry {
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     pub cache: Option<semantic_engine::CacheOptions>,
-    pub ossie: PathBuf,
+    pub ossie: Option<PathBuf>,
+    #[serde(default)]
+    pub app_tables: BTreeMap<String, SourceConfig>,
     pub model: Option<String>,
     #[serde(default)]
     pub connections: BTreeMap<String, ConnectionConfig>,
@@ -234,7 +265,7 @@ pub struct SourceConfig {
 
 pub struct Project {
     config: ProjectConfig,
-    document: OssieDocument,
+    document: Option<OssieDocument>,
     base_dir: PathBuf,
     views: BTreeMap<String, ViewInspection>,
 }
@@ -258,7 +289,10 @@ impl Project {
             SourceError::configuration("config_schema", path.display().to_string(), e.to_string())
         })?;
         let base_dir = path.parent().unwrap_or(Path::new(".")).to_owned();
-        let model_path = base_dir.join(&config.ossie);
+        let Some(ossie) = &config.ossie else {
+            return Self::new_optional(config, None, base_dir);
+        };
+        let model_path = base_dir.join(ossie);
         let yaml = std::fs::read_to_string(&model_path).map_err(|e| {
             SourceError::configuration(
                 "model_read",
@@ -273,7 +307,18 @@ impl Project {
     /// base directory explicitly. The `ossie` path is not read by this method.
     /// View SQL files are read once here; recreate the Project to pick up edits.
     pub fn new(config: ProjectConfig, document: OssieDocument, base_dir: PathBuf) -> Result<Self> {
-        if config.ossie.as_os_str().is_empty() {
+        Self::new_optional(config, Some(document), base_dir)
+    }
+    fn new_optional(
+        config: ProjectConfig,
+        document: Option<OssieDocument>,
+        base_dir: PathBuf,
+    ) -> Result<Self> {
+        if config
+            .ossie
+            .as_ref()
+            .is_some_and(|p| p.as_os_str().is_empty())
+        {
             return Err(SourceError::configuration(
                 "config_schema",
                 "/ossie",
@@ -340,7 +385,23 @@ impl Project {
 
     /// Offline model inspection plus project views in dependency order.
     pub fn inspect_project(&self, registry: &Registry) -> Result<ProjectInspection> {
-        let inspection = self.document.inspect(self.config.model.as_deref())?;
+        let inspection = match &self.document {
+            Some(d) => d.inspect(self.config.model.as_deref())?,
+            None => {
+                if self.config.model.is_some() {
+                    return Err(SourceError::configuration(
+                        "config_schema",
+                        "/model",
+                        "model selection requires ossie",
+                    ));
+                }
+                ModelInspection {
+                    name: "application".into(),
+                    datasets: vec![],
+                    warnings: vec![],
+                }
+            }
+        };
         if let Some(cache) = &self.config.cache {
             cache.validate()?;
         }
@@ -379,7 +440,12 @@ impl Project {
                 .validate_connection(&connection.options)
                 .map_err(|e| e.context(path))?;
         }
-        for (name, source) in &self.config.sources {
+        for (name, source) in self
+            .config
+            .sources
+            .iter()
+            .chain(self.config.app_tables.iter())
+        {
             let path = format!("/sources/{}", pointer(name));
             let connection = self
                 .config
@@ -423,6 +489,21 @@ impl Project {
                 .prepare_source(&binding.options, &inspection, source)
                 .map_err(|error| error.context(format!("/sources/{}", pointer(source))))?;
         }
+        let names: BTreeSet<_> = inspection
+            .datasets
+            .iter()
+            .map(|d| d.name.as_str())
+            .collect();
+        for name in self.config.app_tables.keys() {
+            semantic_engine::Engine::new().validate_view_definition(name, "SELECT 1")?;
+            if names.contains(name.as_str()) {
+                return Err(SourceError::configuration(
+                    "duplicate_relation",
+                    "/app_tables",
+                    "application table conflicts with imported dataset",
+                ));
+            }
+        }
         let views = self.inspect_views(&inspection)?;
         Ok(ProjectInspection {
             model: inspection,
@@ -437,6 +518,7 @@ impl Project {
             .iter()
             .map(|dataset| dataset.name.clone())
             .collect();
+        ready.extend(self.config.app_tables.keys().cloned());
         let mut pending = self.views.clone();
         for (name, view) in &mut pending {
             let path = format!("/views/{}", pointer(name));
@@ -519,6 +601,7 @@ impl Project {
         let mut connections: BTreeMap<&str, Arc<dyn SourceConnection>> = BTreeMap::new();
         let mut bindings = SourceBindings::new();
         let mut scopes = BTreeMap::new();
+        let mut resources = BTreeMap::new();
         for source in required {
             let binding = &self.config.sources[source];
             let config = &self.config.connections[&binding.connection];
@@ -536,19 +619,98 @@ impl Project {
                 &inspection.model,
                 source,
             )?;
-            let provider = connections[binding.connection.as_str()]
-                .table(&options, &self.base_dir)
+            let resource = connections[binding.connection.as_str()]
+                .resource(&options, &self.base_dir)
                 .await
                 .map_err(|e| e.context(format!("/sources/{}", pointer(source))))?;
             scopes.insert(
                 source.to_owned(),
                 connections[binding.connection.as_str()].authorization_scope(),
             );
-            bindings.bind(source, provider)?;
+            bindings.bind(source, resource.provider.clone())?;
+            resources.insert(source.to_owned(), resource);
         }
-        let mut imported = self
-            .document
-            .load(self.config.model.as_deref(), &bindings)?;
+        let mut imported = match &self.document {
+            Some(d) => d.load(self.config.model.as_deref(), &bindings)?,
+            None => ImportedCatalog {
+                engine: semantic_engine::Engine::new(),
+                warnings: vec![],
+            },
+        };
+        for dataset in &inspection.model.datasets {
+            let resource = &resources[&dataset.source];
+            let source_config = &self.config.sources[&dataset.source];
+            let connector = &self.config.connections[&source_config.connection].connector;
+            if resource.read.is_none()
+                && let Some(namespace) = registry
+                    .factory(connector, "/sources")?
+                    .resource_namespace()
+            {
+                imported.engine.attach_resource_identity(
+                    &dataset.name,
+                    semantic_engine::ResourceIdentity {
+                        namespace: namespace.into(),
+                        domain: None,
+                        resource: None,
+                    },
+                )?;
+            }
+            let columns = dataset
+                .fields
+                .iter()
+                .map(|f| (f.name.clone(), f.source_column.clone()))
+                .collect();
+            if let Some(read) = &resource.read {
+                let mut read = read.clone();
+                read.columns = columns;
+                imported.engine.attach_read_binding(&dataset.name, read)?;
+            }
+            if let Some(write) = &resource.write {
+                let mut write = write.clone();
+                write.columns = dataset
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.clone(), f.source_column.clone()))
+                    .collect();
+                let info = write.connection.inspect_target(&write.target).await?;
+                let reversible =
+                    write.columns.values().collect::<BTreeSet<_>>().len() == write.columns.len();
+                let exposes_key = info.unique_keys.is_empty()
+                    || info
+                        .unique_keys
+                        .iter()
+                        .any(|key| key.iter().all(|k| write.columns.values().any(|c| c == k)));
+                if reversible && exposes_key {
+                    imported
+                        .engine
+                        .attach_write_binding(&dataset.name, write)
+                        .await?;
+                }
+            }
+        }
+        for (name, binding) in &self.config.app_tables {
+            if !connections.contains_key(binding.connection.as_str()) {
+                let config = &self.config.connections[&binding.connection];
+                let connection = registry
+                    .factory(&config.connector, "/app_tables")?
+                    .connect(&config.options, secrets)
+                    .await?;
+                connections.insert(&binding.connection, connection);
+            }
+            let resource = connections[binding.connection.as_str()]
+                .resource(&binding.options, &self.base_dir)
+                .await?;
+            imported.engine.register_table(
+                semantic_engine::Relation::base(name, resource.provider.schema(), "application"),
+                resource.provider,
+            )?;
+            if let Some(read) = resource.read {
+                imported.engine.attach_read_binding(name, read)?;
+            }
+            if let Some(write) = resource.write {
+                imported.engine.attach_write_binding(name, write).await?;
+            }
+        }
         if let Some(options) = &self.config.cache {
             let mut options = options.clone();
             options.directory = self.base_dir.join(&options.directory);

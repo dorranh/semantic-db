@@ -180,6 +180,9 @@ impl SourceOptions {
     }
 }
 impl ConnectorFactory for ClickHouseConnector {
+    fn resource_namespace(&self) -> Option<&'static str> {
+        Some("clickhouse")
+    }
     fn validate_connection(&self, value: &Options) -> Result<()> {
         options::<ConnectionOptions>(value)?
             .config(&|_| None, true)
