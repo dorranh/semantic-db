@@ -7,14 +7,17 @@ A semantic query engine for all your data. Give your datasets business meaning t
 
 ## Overview
 
-The primary goal of semantic DB is simple - provide a single, semantically-rich interface for consuming data in your applications allowing
-you to assign meaning once and work with your (relational) data through a common interface.
+The primary goal of semantic DB is simple: provide a single, semantically-rich interface for working with data in your applications.
+Define meaning once, then query across databases, files, and APIs through a common relational interface.
 
 It accomplishes this with the help of [Ossie](https://ossie.apache.org/) (a format for specifying semantic models) and [DataFusion/Arrow](https://datafusion.apache.org/index.html) for queries.
 
 It natively supports federation via DataFusion's federation module along with its own set of external connectors.
 
-If you are only ever working with a single database you likely should explore a native Ossie integration if one exists.
+A common tradeoff with a unified data interface is performance and transactional guarantees.
+Semantic DB lets you start with your existing data sources and adapt your storage as your application needs faster queries or stronger guarantees.
+
+If you are only ever working with a single database you likely should explore its native semantic features if they exist.
 However, if like most of us you have to work across many disparate data sources you should give Semantic DB a go!
 
 ## Quickstart
