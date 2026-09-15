@@ -187,9 +187,24 @@ A single large Postgres value may allocate before the decoded budget rejects it.
 
 ## Live sources
 
-Copy/edit `semantic-db.live.yaml`: supply a real HTTPS ClickHouse endpoint and
-read-only user/password, and a GitHub token with access to the listed repositories.
-The ClickHouse database must expose ClickPy's `pypi_downloads_per_day` schema
+The live configuration uses [ClickPy's public demo instance](https://github.com/ClickHouse/clickpy#configuration):
+`https://sql-clickhouse.clickhouse.com:443`, database `pypi`, user `demo`, with no
+password. Supply a real `GITHUB_TOKEN` in `.env` with access to the listed repositories.
+The fixture's `CLICKHOUSE_PASSWORD` is not used by the public live configuration.
+
+The public account caps `max_block_size` at 10,000, so the live configuration sets
+`max_block_size: 10000`. The connector's default of 65,536 exceeds that cap and
+causes HTTP 500 / ClickHouse code 452 (`SETTING_CONSTRAINT_VIOLATION`), including
+during metadata loading. This block size controls response batching, not the total
+number of rows that a query can read.
+
+The public account also enables legacy integer encoding for Arrow dates. The live
+configuration sets `date_as_uint16: false` to request Arrow Date32 values, matching
+the semantic model. Leave this option unset on older ClickHouse versions that do
+not support `output_format_arrow_date_as_uint16` (introduced in 26.2).
+
+For a private instance, change the endpoint and user and add `password_env` for its
+password. Its database must expose ClickPy's `pypi_downloads_per_day` schema
 (`date Date`, `project String`, `count Int64`). No giant raw downloads import is needed.
 
 Review `views/downloads_daily.sql` and the model's window descriptions together if

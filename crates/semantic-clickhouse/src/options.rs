@@ -33,6 +33,9 @@ pub struct ClickHouseConfig {
     pub codec: ArrowCodec,
     pub dictionary_output: bool,
     pub string_as_binary: bool,
+    /// Override the server's legacy Date-as-UInt16 Arrow representation.
+    /// None preserves compatibility with servers predating this setting.
+    pub date_as_uint16: Option<bool>,
     pub max_block_size: usize,
     pub server: ServerLimits,
 }
@@ -145,6 +148,7 @@ impl ClickHouseConfig {
             codec: ArrowCodec::Lz4,
             dictionary_output: false,
             string_as_binary: false,
+            date_as_uint16: None,
             max_block_size: 65536,
             server: ServerLimits::default(),
         }

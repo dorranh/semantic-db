@@ -1,82 +1,69 @@
 {
   "ossie": "model.ossie.yaml",
-  "connections": {
-    "app": {
-      "connector": "postgres",
-      "connection_string_env": "APP_DATABASE_URL",
-      "batch_size": 256,
-      "write_enabled": true
+  "connections":
+    {
+      "app":
+        {
+          "connector": "postgres",
+          "connection_string_env": "APP_DATABASE_URL",
+          "batch_size": 256,
+          "write_enabled": true,
+        },
+      "github":
+        {
+          "connector": "github",
+          "token_env": "GITHUB_TOKEN",
+          "repositories": ["psf/requests", "urllib3/urllib3", "encode/httpx"],
+          "page_size": 100,
+          "max_requests_per_scan": 24,
+        },
+      "pypi":
+        {
+          "connector": "clickhouse",
+          "endpoint": "https://sql-clickhouse.clickhouse.com:443",
+          "database": "pypi",
+          "user": "demo",
+          "federation": true,
+          "query_timeout_seconds": 15,
+          "max_response_bytes": 16777216,
+          "max_block_size": 10000,
+          "date_as_uint16": false,
+          "server":
+            { "max_rows_to_read": 1000000, "max_bytes_to_read": 134217728 },
+        },
     },
-    "github": {
-      "connector": "github",
-      "token_env": "GITHUB_TOKEN",
-      "repositories": [
-        "psf/requests",
-        "urllib3/urllib3",
-        "encode/httpx"
-      ],
-      "page_size": 100,
-      "max_requests_per_scan": 24
+  "sources":
+    {
+      "app.packages":
+        { "connection": "app", "schema": "public", "table": "packages" },
+      "app.members":
+        { "connection": "app", "schema": "public", "table": "members" },
+      "app.issue_triage":
+        { "connection": "app", "schema": "public", "table": "issue_triage" },
+      "github.issues": { "connection": "github", "collection": "issues" },
+      "pypi.daily": { "connection": "pypi", "table": "pypi_downloads_per_day" },
     },
-    "pypi": {
-      "connector": "clickhouse",
-      "endpoint": "https://YOUR-CLICKHOUSE-HOST:8443",
-      "database": "pypi",
-      "user": "YOUR-READ-ONLY-USER",
-      "password_env": "CLICKHOUSE_PASSWORD",
-      "federation": true,
-      "query_timeout_seconds": 15,
-      "max_response_bytes": 16777216,
-      "server": {
-        "max_rows_to_read": 1000000,
-        "max_bytes_to_read": 134217728
-      }
-    }
-  },
-  "sources": {
-    "app.packages": {
-      "connection": "app",
-      "schema": "public",
-      "table": "packages"
+  "views":
+    {
+      "downloads_daily":
+        {
+          "sql_file": "views/downloads_daily.sql",
+          "description": "One row per package/day for the explicitly bounded demo window. Sum of physical daily contributions.",
+        },
+      "issue_workspace":
+        {
+          "sql_file": "views/issue_workspace.sql",
+          "description": "One row per observed GitHub issue with optional application assignee, priority and human notes. Priority 1 is high.",
+        },
+      "package_overview":
+        {
+          "sql_file": "views/package_overview.sql",
+          "description": "One row per tracked package with application ownership, observed downloads in the demo window, open issues, and unassigned open issues. Missing downloads are unknown. Repository issue counts repeat for shared mappings.",
+        },
     },
-    "app.members": {
-      "connection": "app",
-      "schema": "public",
-      "table": "members"
+  "app_tables":
+    {
+      "synced_issues":
+        { "connection": "app", "schema": "public", "table": "synced_issues" },
     },
-    "app.issue_triage": {
-      "connection": "app",
-      "schema": "public",
-      "table": "issue_triage"
-    },
-    "github.issues": {
-      "connection": "github",
-      "collection": "issues"
-    },
-    "pypi.daily": {
-      "connection": "pypi",
-      "table": "pypi_downloads_per_day"
-    }
-  },
-  "views": {
-    "downloads_daily": {
-      "sql_file": "views/downloads_daily.sql",
-      "description": "One row per package/day for the explicitly bounded demo window. Sum of physical daily contributions."
-    },
-    "issue_workspace": {
-      "sql_file": "views/issue_workspace.sql",
-      "description": "One row per observed GitHub issue with optional application assignee, priority and human notes. Priority 1 is high."
-    },
-    "package_overview": {
-      "sql_file": "views/package_overview.sql",
-      "description": "One row per tracked package with application ownership, observed downloads in the demo window, open issues, and unassigned open issues. Missing downloads are unknown. Repository issue counts repeat for shared mappings."
-    }
-  },
-  "app_tables": {
-    "synced_issues": {
-      "connection": "app",
-      "schema": "public",
-      "table": "synced_issues"
-    }
-  }
 }

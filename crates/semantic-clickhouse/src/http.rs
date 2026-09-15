@@ -78,6 +78,12 @@ pub(crate) async fn request(
         ("sort_overflow_mode".into(), "throw".into()),
         ("use_query_cache".into(), "0".into()),
     ];
+    if let Some(legacy_dates) = config.date_as_uint16 {
+        params.push((
+            "output_format_arrow_date_as_uint16".into(),
+            if legacy_dates { "1" } else { "0" }.into(),
+        ));
+    }
     params.extend(
         config
             .server
