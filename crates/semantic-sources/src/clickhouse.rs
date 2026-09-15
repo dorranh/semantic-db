@@ -31,6 +31,7 @@ struct ConnectionOptions {
     codec: Option<semantic_clickhouse::ArrowCodec>,
     dictionary_output: Option<bool>,
     string_as_binary: Option<bool>,
+    date_as_uint16: Option<bool>,
     server: Option<semantic_clickhouse::ServerLimits>,
     roles: Option<Vec<String>>,
     failover_endpoints: Option<Vec<String>>,
@@ -124,6 +125,7 @@ impl ConnectionOptions {
         if let Some(value) = &self.string_as_binary {
             config.string_as_binary = *value;
         }
+        config.date_as_uint16 = self.date_as_uint16;
         if let Some(value) = &self.server {
             config.server = value.clone();
         }
