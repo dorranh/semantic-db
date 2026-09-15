@@ -7,6 +7,7 @@
 
 mod builtin;
 pub mod conformance;
+mod files;
 
 use datafusion::catalog::TableProvider;
 use futures::future::BoxFuture;
@@ -22,11 +23,11 @@ use thiserror::Error;
 
 #[cfg(feature = "clickhouse")]
 pub use builtin::ClickHouseConnector;
-pub use builtin::CsvConnector;
 #[cfg(feature = "github")]
 pub use builtin::GitHubConnector;
 #[cfg(feature = "postgres")]
 pub use builtin::PostgresConnector;
+pub use files::{CsvConnector, FileConnector, FileFormat};
 
 pub type Options = Map<String, Value>;
 pub type Result<T> = std::result::Result<T, SourceError>;
@@ -69,6 +70,17 @@ impl SourceError {
 /// `connect` may obtain metadata, but table rows belong in lazy execution streams.
 /// Return sanitized errors: the host includes connector errors in diagnostics.
 pub trait ConnectorFactory: Send + Sync {
+    /// Resolve model-guided source options offline, before any connection is opened.
+    /// Default preserves existing custom connectors and resource-loading contracts.
+    fn prepare_source(
+        &self,
+        options: &Options,
+        _model: &ModelInspection,
+        _source: &str,
+    ) -> Result<Options> {
+        Ok(options.clone())
+    }
+
     fn validate_connection(&self, options: &Options) -> Result<()>;
     fn validate_source(&self, options: &Options) -> Result<()>;
     fn connect<'a>(
@@ -101,12 +113,23 @@ impl Registry {
         Self::default()
     }
 
-    /// CSV plus connectors enabled by the `github`, `clickhouse`, and `postgres` features.
+    /// Local file readers plus connectors enabled by the database/example features.
     pub fn standard() -> Self {
         let mut registry = Self::new();
         registry
             .register("csv", CsvConnector)
             .expect("unique builtin");
+        for (name, format) in [
+            ("file", None),
+            ("parquet", Some(FileFormat::Parquet)),
+            ("json", Some(FileFormat::Json)),
+            ("avro", Some(FileFormat::Avro)),
+            ("arrow", Some(FileFormat::Arrow)),
+        ] {
+            registry
+                .register(name, FileConnector::new(format))
+                .expect("unique builtin");
+        }
         #[cfg(feature = "postgres")]
         registry
             .register("postgres", PostgresConnector)
@@ -387,6 +410,19 @@ impl Project {
                 ));
             }
         }
+        for source in inspection
+            .datasets
+            .iter()
+            .map(|d| &d.source)
+            .collect::<BTreeSet<_>>()
+        {
+            let binding = &self.config.sources[source];
+            let connection = &self.config.connections[&binding.connection];
+            registry
+                .factory(&connection.connector, "/connections")?
+                .prepare_source(&binding.options, &inspection, source)
+                .map_err(|error| error.context(format!("/sources/{}", pointer(source))))?;
+        }
         let views = self.inspect_views(&inspection)?;
         Ok(ProjectInspection {
             model: inspection,
@@ -492,11 +528,16 @@ impl Project {
                     .factory(&config.connector, &path)?
                     .connect(&config.options, secrets)
                     .await
-                    .map_err(|e| e.context(path))?;
+                    .map_err(|e| e.context(path.clone()))?;
                 connections.insert(&binding.connection, connection);
             }
+            let options = registry.factory(&config.connector, &path)?.prepare_source(
+                &binding.options,
+                &inspection.model,
+                source,
+            )?;
             let provider = connections[binding.connection.as_str()]
-                .table(&binding.options, &self.base_dir)
+                .table(&options, &self.base_dir)
                 .await
                 .map_err(|e| e.context(format!("/sources/{}", pointer(source))))?;
             scopes.insert(

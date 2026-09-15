@@ -2,7 +2,7 @@
 ossie: model.ossie.yaml
 connections:
   local:
-    connector: csv
+    connector: file
 sources:
   local.items:
     connection: local

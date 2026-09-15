@@ -88,7 +88,11 @@ pub fn run(root: &Path) -> super::Result<()> {
     );
     println!("  semantic-db --config semantic-db.yaml");
     println!("\nEdit the model, source bindings, and SQL views to use your own data.");
-    println!("For natural-language queries, copy .env.example to .env and fill in OPENAI_API_KEY.");
+    println!("For Ask, copy .env.example to .env and set OPENAI_API_KEY and OPENAI_MODEL.");
+    println!("  semantic-db --config semantic-db.yaml --ask-views 'List active items' --dry-run");
+    println!("  semantic-db --config semantic-db.yaml --ask-views 'List active items'");
+    println!("For applications, start the same project with:");
+    println!("  semantic-server --config semantic-db.yaml");
     Ok(())
 }
 

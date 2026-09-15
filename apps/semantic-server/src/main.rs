@@ -17,6 +17,10 @@ use std::{
     sync::Arc,
 };
 #[derive(Parser)]
+#[command(
+    version,
+    about = "Serve Semantic DB over PostgreSQL and HTTP Ask compilation"
+)]
 struct Args {
     #[arg(long)]
     config: PathBuf,

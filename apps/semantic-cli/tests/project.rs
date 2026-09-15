@@ -117,6 +117,7 @@ fn project_views_inspect_and_reload_from_another_working_directory() {
 }
 
 #[test]
+#[cfg(feature = "github")]
 fn github_offline_commands_do_not_read_credentials_or_dotenv() {
     let temp = Temp::new();
     std::fs::write(temp.0.join(".env"), "not a valid env file\n").unwrap();
@@ -184,6 +185,7 @@ fn invalid_configurations_fail_before_execution_with_actionable_diagnostics() {
 }
 
 #[test]
+#[cfg(feature = "github")]
 fn configured_github_and_csv_federate_through_the_standard_cli() {
     use serde_json::{Value, json};
     use std::{

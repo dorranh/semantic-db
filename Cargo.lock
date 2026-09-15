@@ -211,6 +211,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-avro"
+version = "59.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9145b685d586482102e4fe3d40349fe00086c0b219d51cae9daaead4698849ea"
+dependencies = [
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-schema",
+ "bytes",
+ "bzip2",
+ "crc",
+ "flate2",
+ "indexmap 2.14.2",
+ "liblzma",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "snap",
+ "strum_macros",
+ "uuid",
+ "zstd 0.13.3",
+]
+
+[[package]]
 name = "arrow-buffer"
 version = "59.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -361,6 +385,7 @@ version = "59.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10fab8d4563491417ba801fab29d205104d20d4bdf37bda6cd1cf425cff598cd"
 dependencies = [
+ "serde",
  "serde_core",
  "serde_json",
 ]
@@ -1102,6 +1127,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eb8a2a1cd12ab0d987a5d5e825195d372001a4094a0376319d5a0ad71c1ba0d"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "217698eaf96b4a3f0bc4f3662aaa55bdf913cd54d7204591faa790070c6d0853"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1242,6 +1282,7 @@ dependencies = [
  "datafusion-common-runtime",
  "datafusion-datasource",
  "datafusion-datasource-arrow",
+ "datafusion-datasource-avro",
  "datafusion-datasource-csv",
  "datafusion-datasource-json",
  "datafusion-datasource-parquet",
@@ -1423,6 +1464,25 @@ dependencies = [
  "itertools 0.15.0",
  "object_store",
  "tokio",
+]
+
+[[package]]
+name = "datafusion-datasource-avro"
+version = "55.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1c9587cff8163f9bfcb186e8664ba85cb327031b8ff14330307f961ea2fc196"
+dependencies = [
+ "arrow",
+ "arrow-avro",
+ "async-trait",
+ "bytes",
+ "datafusion-common",
+ "datafusion-datasource",
+ "datafusion-physical-expr-adapter",
+ "datafusion-physical-plan",
+ "datafusion-session",
+ "futures",
+ "object_store",
 ]
 
 [[package]]
@@ -4527,10 +4587,12 @@ dependencies = [
 name = "semantic-cli"
 version = "0.1.0"
 dependencies = [
+ "arrow-avro",
  "clap",
  "datafusion",
  "directories",
  "dotenvy",
+ "flate2",
  "rustyline",
  "semantic-compiler",
  "semantic-engine",
@@ -4713,6 +4775,7 @@ dependencies = [
 name = "semantic-server"
 version = "0.1.0"
 dependencies = [
+ "arrow-avro",
  "async-stream",
  "async-trait",
  "axum",
@@ -4720,6 +4783,7 @@ dependencies = [
  "datafusion",
  "datafusion-postgres",
  "dotenvy",
+ "flate2",
  "futures",
  "reqwest 0.12.28",
  "semantic-catalog",
@@ -4734,8 +4798,11 @@ dependencies = [
 name = "semantic-sources"
 version = "0.1.0"
 dependencies = [
+ "arrow-avro",
+ "arrow-schema",
  "clickhouse",
  "datafusion",
+ "flate2",
  "futures",
  "semantic-catalog",
  "semantic-clickhouse",

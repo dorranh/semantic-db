@@ -1,5 +1,4 @@
 use super::*;
-use datafusion::prelude::{CsvReadOptions, SessionContext};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "postgres")]
 #[path = "postgres.rs"]
@@ -13,66 +12,9 @@ mod clickhouse;
 #[cfg(feature = "clickhouse")]
 pub use clickhouse::ClickHouseConnector;
 
-fn options<T: DeserializeOwned>(value: &Options) -> Result<T> {
+pub(super) fn options<T: DeserializeOwned>(value: &Options) -> Result<T> {
     serde_json::from_value(Value::Object(value.clone()))
         .map_err(|e| SourceError::configuration("options", "/", e.to_string()))
-}
-
-pub struct CsvConnector;
-struct CsvConnection;
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CsvConnectionOptions {}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CsvSourceOptions {
-    path: PathBuf,
-}
-
-impl ConnectorFactory for CsvConnector {
-    fn validate_connection(&self, value: &Options) -> Result<()> {
-        options::<CsvConnectionOptions>(value).map(|_| ())
-    }
-    fn validate_source(&self, value: &Options) -> Result<()> {
-        let config: CsvSourceOptions = options(value)?;
-        if config.path.as_os_str().is_empty() {
-            return Err(SourceError::configuration(
-                "options",
-                "/path",
-                "CSV path must be nonempty",
-            ));
-        }
-        Ok(())
-    }
-    fn connect<'a>(
-        &'a self,
-        _: &'a Options,
-        _: &'a SecretResolver<'_>,
-    ) -> BoxFuture<'a, Result<Arc<dyn SourceConnection>>> {
-        Box::pin(async { Ok(Arc::new(CsvConnection) as Arc<dyn SourceConnection>) })
-    }
-}
-impl SourceConnection for CsvConnection {
-    fn authorization_scope(&self) -> Option<String> {
-        Some("local-files".into())
-    }
-    fn table<'a>(
-        &'a self,
-        value: &'a Options,
-        base_dir: &'a Path,
-    ) -> BoxFuture<'a, Result<Arc<dyn TableProvider>>> {
-        Box::pin(async move {
-            let config: CsvSourceOptions = options(value)?;
-            let path = base_dir.join(config.path);
-            let path = path.to_str().ok_or_else(|| {
-                SourceError::configuration("path", "/path", "CSV path is not UTF-8")
-            })?;
-            let frame = SessionContext::new()
-                .read_csv(path, CsvReadOptions::new())
-                .await?;
-            Ok(frame.into_view())
-        })
-    }
 }
 
 #[cfg(feature = "github")]

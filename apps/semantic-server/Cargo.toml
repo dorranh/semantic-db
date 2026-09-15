@@ -7,8 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+github = ["semantic-db/github"]
+
 [dependencies]
-semantic-db = { workspace = true, features = ["sources", "postgres", "github", "clickhouse", "compiler"] }
+semantic-db = { workspace = true, features = ["sources", "postgres", "clickhouse", "compiler"] }
 datafusion-postgres.workspace = true
 datafusion.workspace = true
 axum.workspace = true
@@ -22,6 +26,8 @@ clap.workspace = true
 dotenvy.workspace = true
 
 [dev-dependencies]
+arrow-avro = { version = "59.2", default-features = false }
+flate2 = "1"
 reqwest.workspace = true
 tokio-postgres.workspace = true
 semantic-catalog.workspace = true

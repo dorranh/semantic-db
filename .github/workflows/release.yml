@@ -1,0 +1,74 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+      # Avoid a build-host liblzma dependency in the distributed executables.
+      LZMA_API_STATIC: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: Swatinem/rust-cache@v2
+      - name: Test the release connector set through both binaries
+        run: cargo test --release --locked --target ${{ matrix.target }} -p semantic-sources -p semantic-cli -p semantic-server --test files
+      - name: Build matching binaries without example features
+        run: cargo build --release --locked --target ${{ matrix.target }} -p semantic-cli -p semantic-server --bins
+      - name: Package binaries, guides, and skills
+        shell: bash
+        env:
+          RELEASE_REF: ${{ github.ref_name }}
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          if [ "$IS_TAG" = "true" ]; then version="$RELEASE_REF"; fi
+          python scripts/package-release.py --version "$version" --target '${{ matrix.target }}' --bin-dir 'target/${{ matrix.target }}/release'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: semantic-db-${{ matrix.target }}
+          path: target/dist/*
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create draft release for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --draft --generate-notes

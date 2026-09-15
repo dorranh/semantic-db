@@ -43,7 +43,7 @@ testcontainers = { version = "0.28", features = ["http_wait_plain"] }
 semantic-engine = { path = "crates/semantic-engine" }
 semantic-compiler = { path = "crates/semantic-compiler" }
 arrow-schema = "59.2.0"
-datafusion = { version = "55.0.0", default-features = false, features = ["sql", "recursive_protection"] }
+datafusion = { version = "55.0.0", default-features = false, features = ["sql", "recursive_protection", "parquet", "avro", "compression"] }
 clap = { version = "4.5", features = ["derive"] }
 rustyline = "17"
 serde = { version = "1", features = ["derive"] }

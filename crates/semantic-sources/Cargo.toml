@@ -14,6 +14,7 @@ clickhouse = ["dep:semantic-clickhouse"]
 postgres = ["dep:semantic-postgres"]
 
 [dependencies]
+tokio.workspace = true
 semantic-runtime.workspace = true
 semantic-engine.workspace = true
 semantic-ossie.workspace = true
@@ -21,6 +22,7 @@ semantic-github = { workspace = true, optional = true }
 semantic-clickhouse = { workspace = true, optional = true }
 semantic-postgres = { workspace = true, optional = true }
 datafusion.workspace = true
+arrow-schema = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true
@@ -28,6 +30,8 @@ futures.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+arrow-avro = { version = "59.2", default-features = false }
+flate2 = "1"
 tokio-postgres.workspace = true
 semantic-catalog.workspace = true
 tokio.workspace = true

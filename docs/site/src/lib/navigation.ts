@@ -8,6 +8,9 @@ export const groups = [
     ['ossie-reference', 'Ossie reference'],
   ] },
   { title: 'Generated guides', entries: [
+    ['generated/release-quickstart', 'Start from a release'],
+    ['generated/file-connectors', 'Built-in connectors'],
+    ['generated/delivery', 'Delivery and integration'],
     ['generated/supported-types', 'Types and extensibility'],
     ['generated/database-comparison', 'Database comparison'],
     ['generated/performance', 'Performance and federation'],
