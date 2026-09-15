@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
+import { readFile } from "node:fs/promises";
 const base = "http://127.0.0.1:3001/api";
 async function json(path: string, options: RequestInit = {}) {
   const r = await fetch(base + path, {
@@ -17,7 +18,7 @@ async function control(body: object) {
   });
   assert.ok(r.ok);
 }
-test("three-source reads, direct app writes, late failures, and pg interoperability", async () => {
+test("three-source reads, Semantic DB writes, reconciliation, and pg interoperability", async () => {
   await control({ reset: true });
   const initial = await json("/packages/requests");
   const snapshot = new pg.Client({
@@ -30,6 +31,7 @@ test("three-source reads, direct app writes, late failures, and pg interoperabil
       "I_requests_2",
     ])
   ).rows[0];
+  const originalSynced = (await snapshot.query("SELECT * FROM synced_issues")).rows;
   await snapshot.end();
   const expected = String(14 * 1200000 + 37000 * ((13 * 14) / 2) + 17);
   assert.equal(initial.package.downloads, expected);
@@ -101,6 +103,21 @@ test("three-source reads, direct app writes, late failures, and pg interoperabil
     });
     await client.connect();
     try {
+      const reconcile = await readFile(new URL("../../writes/reconcile_issues.sql", import.meta.url), "utf8");
+      await client.query(reconcile);
+      const stored = (await client.query("SELECT * FROM synced_issues ORDER BY issue_id")).rows;
+      assert.ok(stored.length > 0);
+      assert.equal((await client.query(reconcile)).rowCount, 0);
+      assert.deepEqual((await client.query("SELECT * FROM synced_issues ORDER BY issue_id")).rows, stored);
+      await control({ closed_issue: "I_requests_2" });
+      await client.query(reconcile);
+      const changed = (await client.query("SELECT * FROM synced_issues ORDER BY issue_id")).rows;
+      assert.equal(changed.find((r: any) => r.issue_id === "I_requests_2").state, "CLOSED");
+      assert.equal((await client.query("SELECT notes FROM issue_triage WHERE issue_id = $1", ["I_requests_2"])).rows[0].notes, "A human-owned note");
+      await control({ fail_after_first_page: true });
+      await assert.rejects(client.query(reconcile));
+      assert.deepEqual((await client.query("SELECT * FROM synced_issues ORDER BY issue_id")).rows, changed);
+      await control({ reset: true });
       const text =
         "SELECT " +
         Array.from(
@@ -131,7 +148,7 @@ test("three-source reads, direct app writes, late failures, and pg interoperabil
       for (const sql of [
         "BEGIN",
         "COMMIT",
-        "DELETE FROM packages",
+        "DELETE FROM issues",
         "SELECT 1; SELECT 2",
       ]) {
         await assert.rejects(client.query(sql));
@@ -170,6 +187,11 @@ test("three-source reads, direct app writes, late failures, and pg interoperabil
     });
     await direct.connect();
     try {
+      await direct.query("DELETE FROM synced_issues");
+      for (const row of originalSynced) await direct.query(
+        "INSERT INTO synced_issues(issue_id,repository,number,title,state,url) VALUES($1,$2,$3,$4,$5,$6)",
+        [row.issue_id,row.repository,row.number,row.title,row.state,row.url],
+      );
       if (originalTriage) {
         await direct.query(
           "UPDATE issue_triage SET assignee_id=$2, priority=$3, notes=$4 WHERE issue_id=$1",

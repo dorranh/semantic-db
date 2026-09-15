@@ -60,6 +60,8 @@ pub struct Manifest {
     pub generation: String,
     pub schema_revision: String,
     pub acquired_at_ms: u64,
+    #[serde(default)]
+    pub published_at_ms: u64,
     pub rows: usize,
     pub decoded_bytes: usize,
     pub disk_bytes: u64,
@@ -149,7 +151,10 @@ impl MaterializationManager {
         let file = File::open(entry.join(&generation).join("manifest.json")).map_err(io)?;
         let manifest: Manifest = serde_json::from_reader(std::io::Read::take(file, 65536))
             .map_err(|_| failure("invalid cache manifest"))?;
-        if manifest.version != 1 || manifest.key != key || manifest.generation != generation {
+        if manifest.version == 1 {
+            return Ok(None);
+        }
+        if manifest.version != 2 || manifest.key != key || manifest.generation != generation {
             return Err(failure("incompatible cache manifest"));
         }
         Ok(Some(manifest))
@@ -286,11 +291,12 @@ impl MaterializationManager {
         }
         query.check()?;
         let manifest = Manifest {
-            version: 1,
+            version: 2,
             key: key.clone(),
             generation,
             schema_revision: schema_revision(&schema),
             acquired_at_ms: acquired,
+            published_at_ms: now_ms(),
             rows,
             decoded_bytes: decoded,
             disk_bytes: disk,
@@ -341,7 +347,7 @@ impl MaterializationManager {
         let _catalog = self
             .lock(&self.options.directory.join("catalog.lock"), query)
             .await?;
-        self.fresh(key, policy, schema)?
+        self.fresh(key, policy, schema, query.options.max_cache_age_ms)?
             .map(|manifest| self.provider(manifest, schema.clone()))
             .transpose()
     }
@@ -370,13 +376,17 @@ impl MaterializationManager {
         key: &str,
         policy: &MaterializationPolicy,
         schema: &SchemaRef,
+        max_age_ms: Option<u64>,
     ) -> Result<Option<Manifest>> {
         Ok(self.current(key)?.filter(|m| {
             m.decoded_bytes <= policy.max_fill_bytes
                 && m.disk_bytes <= policy.max_fill_bytes as u64
                 && m.schema_revision == schema_revision(schema)
-                && m.acquired_at_ms <= now_ms()
-                && now_ms() - m.acquired_at_ms <= policy.max_age_seconds.saturating_mul(1000)
+                && m.published_at_ms <= now_ms()
+                && now_ms() - m.published_at_ms
+                    <= max_age_ms
+                        .unwrap_or(u64::MAX)
+                        .min(policy.max_age_seconds.saturating_mul(1000))
         }))
     }
     fn provider(&self, manifest: Manifest, schema: SchemaRef) -> Result<Materialized> {

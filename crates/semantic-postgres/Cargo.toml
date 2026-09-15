@@ -8,6 +8,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+semantic-engine.workspace = true
+semantic-catalog.workspace = true
 datafusion.workspace = true
 semantic-runtime.workspace = true
 tokio-postgres.workspace = true
@@ -19,8 +21,6 @@ futures.workspace = true
 chrono.workspace = true
 
 [dev-dependencies]
-semantic-engine.workspace = true
-semantic-catalog.workspace = true
 testcontainers.workspace = true
 
 [lints]

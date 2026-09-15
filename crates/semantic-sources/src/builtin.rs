@@ -30,6 +30,9 @@ struct CsvSourceOptions {
 }
 
 impl ConnectorFactory for CsvConnector {
+    fn resource_namespace(&self) -> Option<&'static str> {
+        Some("csv")
+    }
     fn validate_connection(&self, value: &Options) -> Result<()> {
         options::<CsvConnectionOptions>(value).map(|_| ())
     }
@@ -134,6 +137,9 @@ mod github {
     }
 
     impl ConnectorFactory for GitHubConnector {
+        fn resource_namespace(&self) -> Option<&'static str> {
+            Some("github")
+        }
         fn validate_connection(&self, value: &Options) -> Result<()> {
             let options: GitHubOptions = options(value)?;
             if options.token_env.trim().is_empty() {

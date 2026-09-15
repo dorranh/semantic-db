@@ -9,6 +9,8 @@ struct ConnectionOptions {
     connection_string_env: String,
     pool_size: Option<usize>,
     batch_size: Option<usize>,
+    #[serde(default)]
+    write_enabled: bool,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -17,6 +19,9 @@ struct SourceOptions {
     table: String,
 }
 impl ConnectorFactory for PostgresConnector {
+    fn resource_namespace(&self) -> Option<&'static str> {
+        Some("postgres")
+    }
     fn validate_connection(&self, value: &Options) -> Result<()> {
         let c: ConnectionOptions = options(value)?;
         if c.connection_string_env.trim().is_empty()
@@ -59,15 +64,40 @@ impl ConnectorFactory for PostgresConnector {
                     "provide the named Postgres connection secret",
                 )
             })?;
-            Ok(Arc::new(Connection(Postgres::new(
-                &url,
-                c.pool_size.unwrap_or(8),
-                c.batch_size.unwrap_or(1024),
-            )?)) as Arc<dyn SourceConnection>)
+            let postgres =
+                Postgres::new(&url, c.pool_size.unwrap_or(8), c.batch_size.unwrap_or(1024))?;
+            Ok(Arc::new(Connection(if c.write_enabled {
+                postgres.with_writes()
+            } else {
+                postgres
+            })) as Arc<dyn SourceConnection>)
         })
     }
 }
 impl SourceConnection for Connection {
+    fn read_connection(&self) -> Option<Arc<dyn semantic_engine::ReadConnection>> {
+        Some(Arc::new(self.0.clone()))
+    }
+    fn write_connection(&self) -> Option<Arc<dyn semantic_engine::WriteConnection>> {
+        self.0
+            .writes_enabled()
+            .then(|| Arc::new(self.0.clone()) as Arc<dyn semantic_engine::WriteConnection>)
+    }
+    fn resource<'a>(
+        &'a self,
+        value: &'a Options,
+        _: &'a Path,
+    ) -> BoxFuture<'a, Result<SourceResource>> {
+        Box::pin(async move {
+            let c: SourceOptions = options(value)?;
+            let (provider, read, write) = self.0.bindings(&c.schema, &c.table).await?;
+            Ok(SourceResource {
+                provider,
+                read: Some(read),
+                write,
+            })
+        })
+    }
     fn table<'a>(
         &'a self,
         value: &'a Options,

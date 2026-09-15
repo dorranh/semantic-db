@@ -200,9 +200,12 @@ impl Engine {
             if let Some(policy) = self
                 .materialization_policies
                 .get(&name)
-                .filter(|_| needed.contains(&name))
+                .filter(|_| needed.contains(&name) && !self.cache_excluded(&name))
             {
                 let mut policy = policy.clone();
+                if let Some(age) = query.options.max_cache_age_ms {
+                    policy.max_age_seconds = policy.max_age_seconds.min(age.div_ceil(1000).max(1));
+                }
                 if let Some(age) = allowed_ages.get(&name) {
                     policy.max_age_seconds = policy.max_age_seconds.min(*age);
                 }
@@ -231,6 +234,13 @@ impl Engine {
                         },
                     )
                     .await?;
+                query.record_cache(semantic_runtime::CacheObservation {
+                    relation: name.clone(),
+                    generation: materialized.manifest.generation.clone(),
+                    published_at_ms: materialized.manifest.published_at_ms,
+                    age_ms: semantic_materialization::now_ms()
+                        .saturating_sub(materialized.manifest.published_at_ms),
+                });
                 session.deregister_table(name.as_str())?;
                 session.register_table(name.as_str(), materialized.provider)?;
                 acquired.insert(name.clone(), materialized.manifest.acquired_at_ms);

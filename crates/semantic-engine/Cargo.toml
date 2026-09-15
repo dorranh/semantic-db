@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+tokio.workspace = true
 semantic-materialization.workspace = true
 serde.workspace = true
 semantic-runtime.workspace = true
@@ -20,7 +21,6 @@ futures.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
 
 [lints]
 workspace = true

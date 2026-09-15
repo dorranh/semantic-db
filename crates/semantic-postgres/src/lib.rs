@@ -1,5 +1,5 @@
-//! Read-only PostgreSQL scans with bounded native cursor fetches. A scan owns a
-//! connection; separate scans make independent observations, not a shared snapshot.
+mod write;
+// PostgreSQL scans with bounded native cursor fetches. Ordinary scans observe independently.
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -25,6 +25,10 @@ use tokio_postgres::{NoTls, Row, types::Type};
 pub struct Postgres {
     pool: Pool,
     batch_size: usize,
+    domain: String,
+    write_enabled: bool,
+    resources: Arc<std::sync::Mutex<std::collections::BTreeMap<String, String>>>,
+    receipts: Arc<std::sync::Mutex<std::collections::BTreeSet<String>>>,
 }
 impl fmt::Debug for Postgres {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -55,7 +59,14 @@ impl Postgres {
             .max_size(pool_size)
             .build()
             .map_err(|_| failure("could not configure Postgres pool"))?;
-        Ok(Self { pool, batch_size })
+        Ok(Self {
+            pool,
+            batch_size,
+            domain: semantic_runtime::unique_id(),
+            write_enabled: false,
+            resources: Default::default(),
+            receipts: Default::default(),
+        })
     }
     pub async fn table(&self, namespace: &str, table: &str) -> Result<Arc<dyn TableProvider>> {
         let target = format!("{}.{}", identifier(namespace)?, identifier(table)?);

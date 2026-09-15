@@ -79,7 +79,16 @@ pub(super) async fn run(
                 let result = if trimmed.starts_with('.') {
                     command::run(engine, &mut compiler, trimmed, color).await
                 } else {
-                    run_query(engine, trimmed).await
+                    if semantic_engine::is_write_statement(trimmed) {
+                        crate::run_write(
+                            engine,
+                            trimmed,
+                            semantic_engine::is_write_explanation(trimmed),
+                        )
+                        .await
+                    } else {
+                        run_query(engine, trimmed).await
+                    }
                 };
                 let elapsed = started.elapsed();
                 match result {

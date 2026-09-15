@@ -158,9 +158,9 @@ async fn stricter_view_freshness_refreshes_cached_ancestors() {
         .join(&manifest.generation)
         .join("manifest.json");
     let text = std::fs::read_to_string(&file).unwrap().replace(
-        &format!("\"acquired_at_ms\":{}", manifest.acquired_at_ms),
+        &format!("\"published_at_ms\":{}", manifest.published_at_ms),
         &format!(
-            "\"acquired_at_ms\":{}",
+            "\"published_at_ms\":{}",
             semantic_materialization::now_ms() - 120000
         ),
     );

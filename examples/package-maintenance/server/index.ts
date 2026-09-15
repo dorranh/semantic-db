@@ -1,6 +1,6 @@
 import express, { type ErrorRequestHandler } from "express";
 import { semantic, httpUrl, queries } from "./db";
-import { db, updatePackage, updateTriage, InputError } from "./mutations";
+import { updatePackage, updateTriage, InputError, MissingRecordError } from "./mutations";
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
@@ -81,10 +81,12 @@ app.post("/api/ask", async (req, res) => {
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof InputError)
     return res.status(400).json({ error: error.message });
-  if (error?.code === "P2025")
+  if (error instanceof MissingRecordError)
     return res.status(404).json({ error: "Record not found" });
-  if (error?.code === "P2003")
+  if (error?.code === "23503")
     return res.status(400).json({ error: "Choose an existing assignee" });
+  if (error?.code === "08007")
+    return res.status(502).json({ error: "The save may have committed, but acknowledgement was lost. Refresh to inspect the saved values before retrying.", outcome: "OutcomeUnknown" });
   if (error?.type === "entity.parse.failed")
     return res.status(400).json({ error: "Invalid JSON body" });
   console.error("Request failed:", error?.code ?? error?.name ?? "unknown");
@@ -101,7 +103,7 @@ const server = app.listen(3001, "127.0.0.1", () =>
 );
 async function close() {
   server.close();
-  await Promise.all([semantic.end(), db.$disconnect()]);
+  await semantic.end();
   process.exit(0);
 }
 process.on("SIGTERM", close);

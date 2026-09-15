@@ -20,7 +20,8 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
-    "test:e2e": "node tests/browser.mjs"
+    "test:e2e": "node tests/browser.mjs",
+    "reconcile": "node scripts/reconcile.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.2",

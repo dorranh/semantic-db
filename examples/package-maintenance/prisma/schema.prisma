@@ -26,3 +26,13 @@ model IssueTriage {
   notes String @default("")
   @@map("issue_triage")
 }
+
+model SyncedIssue {
+  issueId String @id @map("issue_id")
+  repository String
+  number BigInt
+  title String
+  state String
+  url String
+  @@map("synced_issues")
+}

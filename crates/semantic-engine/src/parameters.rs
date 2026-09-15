@@ -86,6 +86,15 @@ impl Engine {
         parameters: Vec<ScalarValue>,
         options: QueryOptions,
     ) -> Result<QueryExecution> {
+        self.execute_parameters_context(sql, parameters, QueryContext::new(options)?)
+            .await
+    }
+    pub(crate) async fn execute_parameters_context(
+        &self,
+        sql: &str,
+        parameters: Vec<ScalarValue>,
+        context: Arc<QueryContext>,
+    ) -> Result<QueryExecution> {
         let hints = parameters
             .iter()
             .map(|v| Some(v.data_type()))
@@ -95,7 +104,7 @@ impl Engine {
         if description.parameters.len() != parameters.len() {
             return Err(failure("parameter count does not match SQL").into());
         }
-        let context = QueryContext::new(options)?;
+        context.check()?;
         let frame = context
             .run(async {
                 self.execution_frame(&sql, &context)
@@ -107,7 +116,7 @@ impl Engine {
         execute_frame(frame, context).await
     }
 
-    fn parameter_sql(&self, sql: &str, hints: &[Option<DataType>]) -> Result<String> {
+    pub(crate) fn parameter_sql(&self, sql: &str, hints: &[Option<DataType>]) -> Result<String> {
         let state = self.context.state();
         // This parser accepts exactly one statement. Do not split on semicolons.
         let mut statement =
@@ -145,14 +154,14 @@ impl Engine {
     }
 }
 
-fn position(id: &str) -> datafusion::error::Result<usize> {
+pub(crate) fn position(id: &str) -> datafusion::error::Result<usize> {
     id.strip_prefix('$')
         .and_then(|s| s.parse::<usize>().ok())
         .filter(|n| *n > 0 && *n <= 65535)
         .ok_or_else(|| failure("parameters must be numbered $1 through $65535"))
 }
 
-fn sql_type(ty: &DataType) -> datafusion::error::Result<ast::DataType> {
+pub(crate) fn sql_type(ty: &DataType) -> datafusion::error::Result<ast::DataType> {
     use ast::DataType as T;
     Ok(match ty {
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => T::Text,

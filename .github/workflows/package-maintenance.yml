@@ -31,6 +31,7 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:5173/ > /dev/null
+          npm run reconcile
           npm run test:integration
           npm run test:e2e
       - uses: actions/upload-artifact@v4

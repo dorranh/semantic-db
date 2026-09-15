@@ -12,6 +12,7 @@ name = "semantic-db"
 path = "src/main.rs"
 
 [dependencies]
+serde_json.workspace = true
 semantic-sources = { workspace = true, features = ["github", "clickhouse", "postgres"] }
 semantic-engine.workspace = true
 semantic-compiler.workspace = true
@@ -24,7 +25,6 @@ datafusion.workspace = true
 directories = "6"
 
 [dev-dependencies]
-serde_json.workspace = true
 
 [lints]
 workspace = true

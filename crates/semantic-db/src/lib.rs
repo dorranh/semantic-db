@@ -38,3 +38,14 @@ pub use semantic_engine::{
     CacheOptions, MaterializationManager, MaterializationPolicy, PreparedQuery, QueryContext,
     QueryExecution, QueryOptions, ReadDescription, SourceDescriptor,
 };
+
+pub use semantic_engine::{
+    Atomicity, CommitReceipt, ConnectorSession, CreatedTable, ExternalReads, Isolation, Mutation,
+    MutationPlan, PreparedWrite, ReadBinding, ReadCache, ReadCompletion, ReadConnection,
+    ReadConsistency, ReadExecution, ReadExplanation, ReadOptions, ReadReport, ReadResult,
+    ReadSession, ReadSessionOptions, ResourceIdentity, TableDefinition, TargetInspection,
+    Transaction, TransactionOptions, ValueExpr, WriteBinding, WriteConnection, WriteDescription,
+    WriteExplanation, WriteOptions, WriteOutcome, WriteResult, is_write_explanation,
+    is_write_statement,
+};
+pub use semantic_engine::{StagedInput, StagingOptions};
