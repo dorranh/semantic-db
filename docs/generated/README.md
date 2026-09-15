@@ -24,6 +24,8 @@ the supported type and execution contracts.
 3. [Grounding and federation](grounding-and-federation.md): semantic compilation, validation, and backend execution.
 4. [Implementation roadmap](roadmap.md): what runs today, what remains, and acceptance criteria.
 5. [Grounding with authored views](authored-view-grounding.md): checked view binding, typed query lowering, and the remaining interpretation boundary.
+6. [Reads, writes, and reconciliation strategy](writes-and-reconciliation-strategy.md): proposed read/commit boundaries, snapshot and visibility guarantees, and eventual convergence.
+7. [Reads, writes, and reconciliation technical design](writes-and-reconciliation-design.md): proposed read/write APIs, snapshot sessions, checked merges, connector contracts, and implementation stages.
 
 The examples use synthetic wells, subsurface intervals, and survey documents.
 These are example datasets, not assumptions embedded in the core abstractions.
