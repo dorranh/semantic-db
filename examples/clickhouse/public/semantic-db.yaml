@@ -1,0 +1,17 @@
+ossie: hackernews.ossie.yaml
+connections:
+  public:
+    connector: clickhouse
+    endpoint: https://sql-clickhouse.clickhouse.com:443
+    database: hackernews
+    user: demo
+    federation: true
+    query_timeout_seconds: 10
+    max_block_size: 10000
+    max_response_bytes: 16777216
+    max_decoded_bytes: 67108864
+sources:
+  hackernews.items:
+    connection: public
+    table: hackernews
+    columns: [id, title, type]

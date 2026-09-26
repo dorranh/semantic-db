@@ -1,0 +1,21 @@
+version: "0.2.0.dev0"
+semantic_model:
+  - name: hackernews
+    description: Public Hacker News items hosted by ClickHouse.
+    ai_context:
+      instructions: >-
+        Each row is a Hacker News item. The type field distinguishes stories,
+        comments, jobs, polls, and poll options; not every item has a title.
+        For quickstart questions, restrict id to >= 0 and < 1000 and return at
+        most 10 rows unless explicitly asked otherwise.
+    datasets:
+      - name: stories
+        source: hackernews.items
+        description: Hacker News items, including stories and comments; one row per id.
+        fields:
+          - name: id
+            expression: {dialects: [{dialect: ANSI_SQL, expression: id}]}
+          - name: title
+            expression: {dialects: [{dialect: ANSI_SQL, expression: title}]}
+          - name: type
+            expression: {dialects: [{dialect: ANSI_SQL, expression: type}]}

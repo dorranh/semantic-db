@@ -1,5 +1,5 @@
 // Standalone Ask check: scripted model, real Semantic DB and application, local CSVs.
-// Requires a built semantic-server, npm dependencies and agent-browser; port 3001 must be free.
+// Requires a built sdb, npm dependencies and agent-browser; port 3001 must be free.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -13,7 +13,7 @@ import { createServer as createViteServer } from "vite";
 import react from "@vitejs/plugin-react";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const binary = process.env.SEMANTIC_SERVER_BIN ?? resolve(root, "../../target/debug/semantic-server");
+const binary = process.env.SEMANTIC_SERVER_BIN ?? resolve(root, "../../target/debug/sdb");
 const session = `maintenance-ask-${process.pid}`;
 const browser = async (...args) => (await promisify(execFile)("agent-browser", ["--session", session, ...args], { timeout: 35000 })).stdout;
 const directory = await mkdtemp(join(tmpdir(), "maintenance-ask-"));
@@ -131,7 +131,7 @@ try {
   const pgPort = await freePort();
   let httpPort = await freePort();
   while (httpPort === pgPort) httpPort = await freePort();
-  const semantic = start(binary, ["--config", "semantic-db.json", "--port", String(pgPort), "--http-port", String(httpPort)], {
+  const semantic = start(binary, ["server", "--config", "semantic-db.json", "--port", String(pgPort), "--http-port", String(httpPort)], {
     cwd: directory,
     env: { ...process.env, OPENAI_API_KEY: "fixture", OPENAI_MODEL: "fixture", OPENAI_BASE_URL: `http://127.0.0.1:${modelPort}` },
   });
