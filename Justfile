@@ -67,10 +67,9 @@ package-maintenance-test:
 docs-install:
     npm --prefix docs/site ci --no-audit --no-fund
 
-# Launch the Astro documentation site (requires Node >=22.12 and npm).
 [positional-arguments]
 docs *args: docs-install
-    npm --prefix docs/site run dev -- "$@"
+    npm --prefix docs/site run start -- "$@"
 
 # Build the GitHub Pages site and check internal links.
 docs-build: docs-install

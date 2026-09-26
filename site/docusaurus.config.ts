@@ -6,8 +6,8 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
   title: "SemanticDB",
-  tagline: "Dinosaurs are dope",
-  favicon: "../assets/favicon.svg",
+  tagline: "Dinosaurs are cool",
+  favicon: "img/favicon.ico",
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -41,6 +41,25 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
+          // Please change this to your repo.
+          // Remove this to remove the "edit this page" links.
+          editUrl:
+            "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+        },
+        blog: {
+          showReadingTime: true,
+          feedOptions: {
+            type: ["rss", "atom"],
+            xslt: true,
+          },
+          // Please change this to your repo.
+          // Remove this to remove the "edit this page" links.
+          editUrl:
+            "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+          // Useful options to enforce blogging best practices
+          onInlineTags: "warn",
+          onInlineAuthors: "warn",
+          onUntruncatedBlogPosts: "warn",
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -59,17 +78,18 @@ const config: Config = {
       title: "SemanticDB",
       logo: {
         alt: "SemanticDB Logo",
-        src: "img/semanticdb-mark-currentcolor.svg",
+        src: "../assets/semanticdb-app-icon-dark.svg",
       },
       items: [
         {
           type: "docSidebar",
           sidebarId: "tutorialSidebar",
           position: "left",
-          label: "User Guide",
+          label: "Tutorial",
         },
+        { to: "/blog", label: "Blog", position: "left" },
         {
-          href: "https://github.com/dorranh/semantic-db",
+          href: "https://github.com/facebook/docusaurus",
           label: "GitHub",
           position: "right",
         },
@@ -82,7 +102,7 @@ const config: Config = {
           title: "Docs",
           items: [
             {
-              label: "User Guide",
+              label: "Tutorial",
               to: "/docs/intro",
             },
           ],
@@ -108,13 +128,17 @@ const config: Config = {
           title: "More",
           items: [
             {
+              label: "Blog",
+              to: "/blog",
+            },
+            {
               label: "GitHub",
               href: "https://github.com/facebook/docusaurus",
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Dorran Howell. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,
