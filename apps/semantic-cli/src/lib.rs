@@ -17,16 +17,23 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Parser)]
 #[command(
-    name = "semantic-db",
+    name = "sdb",
     version,
-    about = "Query registered data with SQL or natural language",
-    args_conflicts_with_subcommands = true,
-    group(ArgGroup::new("model_input").args(["config", "ossie"])),
-    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views", "write", "explain_write"]))
+    propagate_version = true,
+    about = "Query and serve registered data with SQL or natural language",
+    arg_required_else_help = true
 )]
 struct Args {
     #[command(subcommand)]
-    command: Option<Command>,
+    command: Command,
+}
+
+#[derive(clap::Args)]
+#[command(
+    group(ArgGroup::new("model_input").args(["config", "ossie"])),
+    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views", "write", "explain_write"]))
+)]
+struct ReplArgs {
     /// Disable colors in the interactive REPL.
     #[arg(long)]
     no_color: bool,
@@ -115,6 +122,10 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Open the interactive REPL or execute a query, validation, or cache operation.
+    Repl(Box<ReplArgs>),
+    /// Serve Semantic DB over PostgreSQL and HTTP Ask compilation.
+    Server(semantic_server::ServerArgs),
     /// Create a runnable project with a CSV source, semantic model, and SQL view.
     Init {
         /// Project directory; defaults to the current directory.
@@ -135,9 +146,14 @@ fn parse_assignment(value: &str) -> std::result::Result<(String, String), String
 /// Custom binaries can register connectors and reuse all commands and the REPL.
 pub async fn run_with_registry(registry: Registry) -> Result<()> {
     let args = Args::parse();
-    if let Some(Command::Init { path }) = args.command {
-        return init::run(&path);
+    match args.command {
+        Command::Init { path } => init::run(&path),
+        Command::Server(args) => semantic_server::run_with_registry(args, registry).await,
+        Command::Repl(args) => run_repl(*args, registry).await,
     }
+}
+
+async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
     let mut engine = if let Some(path) = args.config {
         let project = Project::from_path(path)?;
         if (args.cache_status || args.cache_invalidate.is_some()) && args.cache_refresh.is_none() {

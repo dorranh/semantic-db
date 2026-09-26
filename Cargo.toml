@@ -70,3 +70,7 @@ debug = 1
 
 [profile.test]
 debug = 1
+
+[profile.dist]
+inherits = "release"
+debug = 0

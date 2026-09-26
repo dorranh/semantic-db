@@ -21,7 +21,7 @@ impl Temp {
     }
 
     fn run(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+        Command::new(env!("CARGO_BIN_EXE_sdb"))
             .current_dir(&self.0)
             .env_remove("OPENAI_API_KEY")
             .args(args)
@@ -48,17 +48,18 @@ fn success(output: Output) -> String {
 fn assert_runnable(temp: &Temp, project: &Path) {
     let config = project.join("semantic-db.yaml");
     let config = config.to_str().unwrap();
-    let inspected = success(temp.run(&["--config", config, "--inspect"]));
+    let inspected = success(temp.run(&["repl", "--config", config, "--inspect"]));
     assert!(inspected.contains("starter") && inspected.contains("View active_items"));
     assert!(
-        success(temp.run(&["--config", config, "--validate"]))
+        success(temp.run(&["repl", "--config", config, "--validate"]))
             .contains("Offline validation passed")
     );
     assert!(
-        success(temp.run(&["--config", config, "--validate", "--connect"]))
+        success(temp.run(&["repl", "--config", config, "--validate", "--connect"]))
             .contains("Connected schema validation passed")
     );
     let rows = success(temp.run(&[
+        "repl",
         "--config",
         config,
         "--query",

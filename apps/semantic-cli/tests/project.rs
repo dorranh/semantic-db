@@ -17,7 +17,8 @@ impl Temp {
         Self(path)
     }
     fn run(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+        Command::new(env!("CARGO_BIN_EXE_sdb"))
+            .arg("repl")
             .current_dir(&self.0)
             .env_remove("GITHUB_TOKEN")
             .env_remove("OPENAI_API_KEY")
@@ -262,7 +263,8 @@ fn configured_github_and_csv_federate_through_the_standard_cli() {
             "github.scoped.issue_labels":{"connection":"github","collection":"issue_labels"},
             "local.repository_teams":{"connection":"local","path":"teams.csv"}}
     }).to_string()).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
         .current_dir(&temp.0)
         .env("GITHUB_TOKEN", "fixture-token")
         .env_remove("OPENAI_API_KEY")

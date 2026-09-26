@@ -31,9 +31,10 @@ async fn release_server_loads_every_file_format_and_exposes_catalog() {
             http = port();
         }
         let mut process = Process(
-            Command::new(env!("CARGO_BIN_EXE_semantic-server"))
+            Command::new(env!("CARGO_BIN_EXE_sdb"))
                 .current_dir(&files.0)
                 .args([
+                    "server",
                     "--config",
                     config.to_str().unwrap(),
                     "--port",

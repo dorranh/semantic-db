@@ -10,7 +10,9 @@ use std::{
 use serde_json::json;
 
 fn cli() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sdb"));
+    command.arg("repl");
+    command
 }
 
 fn fixture() -> String {

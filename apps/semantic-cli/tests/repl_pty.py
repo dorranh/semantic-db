@@ -18,7 +18,7 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
-BINARY = Path(os.environ.get("SEMANTIC_DB_TEST_BINARY", ROOT / "target/debug/semantic-db"))
+BINARY = Path(os.environ.get("SEMANTIC_DB_TEST_BINARY", ROOT / "target/debug/sdb"))
 CSV = ROOT / "examples/geospatial/wells.csv"
 SGR = re.compile(rb"\x1b\[[0-9;]*m")
 
@@ -32,7 +32,7 @@ class Session:
             environment.pop("NO_COLOR", None)
             environment.pop("OPENAI_API_KEY", None)
             environment.update(env or {})
-            os.execve(BINARY, [str(BINARY), "--csv", f"wells={CSV}", *flags], environment)
+            os.execve(BINARY, [str(BINARY), "repl", "--csv", f"wells={CSV}", *flags], environment)
         self.dumb = (env or {}).get("TERM", "").lower() in {"dumb", "cons25", "emacs"}
         self.pending = b""
         self.transcript = b""

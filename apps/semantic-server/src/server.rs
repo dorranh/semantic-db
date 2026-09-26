@@ -1,4 +1,8 @@
-use clap::Parser;
+use crate::{
+    http::{StateData, router},
+    protocol::Handlers,
+};
+use clap::Args;
 use semantic_db::{
     compiler::{
         Compiler,
@@ -6,35 +10,30 @@ use semantic_db::{
     },
     sources::{Project, Registry},
 };
-use semantic_server::{
-    http::{StateData, router},
-    protocol::Handlers,
-};
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
     path::PathBuf,
     sync::Arc,
 };
-#[derive(Parser)]
-#[command(
-    version,
-    about = "Serve Semantic DB over PostgreSQL and HTTP Ask compilation"
-)]
-struct Args {
+/// Options for the local PostgreSQL and HTTP server.
+#[derive(Args)]
+pub struct ServerArgs {
     #[arg(long)]
-    config: PathBuf,
+    pub config: PathBuf,
     #[arg(long, default_value_t = 5544)]
-    port: u16,
+    pub port: u16,
     #[arg(long, default_value_t = 5545)]
-    http_port: u16,
+    pub http_port: u16,
     /// Deadline for each query, including all remote pages and local processing.
     #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
-    query_timeout_seconds: u64,
+    pub query_timeout_seconds: u64,
 }
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+/// Serve a project with an application-owned connector registry.
+pub async fn run_with_registry(
+    args: ServerArgs,
+    registry: Registry,
+) -> Result<(), Box<dyn std::error::Error>> {
     let file: HashMap<String, String> = match dotenvy::from_path_iter(".env") {
         Ok(values) => values
             .collect::<Result<_, _>>()
@@ -44,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let secret = |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned());
     let mut imported = Project::from_path(&args.config)?
-        .load(&Registry::standard(), &secret)
+        .load(&registry, &secret)
         .await?;
     imported
         .engine

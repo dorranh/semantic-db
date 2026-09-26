@@ -4,7 +4,8 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 #[test]
 fn loads_wells_from_ossie_and_runs_the_existing_query() {
-    let output = Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
         .current_dir(ROOT)
         .args([
             "--ossie",
@@ -56,7 +57,8 @@ fn fails_for_missing_bindings_or_invalid_cli_combinations() {
             "SELECT 1",
         ],
     ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+        let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
+            .arg("repl")
             .current_dir(ROOT)
             .args(args)
             .output()

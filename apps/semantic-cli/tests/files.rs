@@ -7,7 +7,8 @@ fn release_cli_loads_every_file_format_without_custom_code() {
     let files = Files::new();
     for name in Files::FORMATS {
         let config = files.config(json!({"path":name}));
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_sdb"))
+            .arg("repl")
             .current_dir(&files.0)
             .args([
                 "--config",
@@ -35,7 +36,8 @@ fn release_cli_loads_every_file_format_without_custom_code() {
 fn default_cli_excludes_the_example_github_connector() {
     let files = Files::new();
     let config = files.config_connector("github", json!({"path":"items.csv"}));
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
         .current_dir(&files.0)
         .args(["--config", config.to_str().unwrap(), "--validate"])
         .output()

@@ -4593,13 +4593,16 @@ dependencies = [
  "directories",
  "dotenvy",
  "flate2",
+ "reqwest 0.12.28",
  "rustyline",
  "semantic-compiler",
  "semantic-engine",
  "semantic-ossie",
+ "semantic-server",
  "semantic-sources",
  "serde_json",
  "tokio",
+ "tokio-postgres",
 ]
 
 [[package]]
@@ -4775,7 +4778,6 @@ dependencies = [
 name = "semantic-server"
 version = "0.1.0"
 dependencies = [
- "arrow-avro",
  "async-stream",
  "async-trait",
  "axum",
@@ -4783,7 +4785,6 @@ dependencies = [
  "datafusion",
  "datafusion-postgres",
  "dotenvy",
- "flate2",
  "futures",
  "reqwest 0.12.28",
  "semantic-catalog",

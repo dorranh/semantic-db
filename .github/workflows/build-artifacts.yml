@@ -1,0 +1,63 @@
+name: Development builds
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Avoid a build-host liblzma dependency in the distributed executable.
+      LZMA_API_STATIC: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-dist
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.0/cargo-dist-installer.sh | sh
+      - name: Test the connector set and both commands
+        run: cargo test --profile dist --locked --target ${{ matrix.target }} -p semantic-sources -p semantic-cli -p semantic-server
+      - name: Build and package sdb
+        run: dist build --artifacts=local --target ${{ matrix.target }} --output-format=json > target/dist-manifest.json
+      - name: Verify packaged executable and checksum
+        working-directory: target/distrib
+        run: |
+          shasum -a 256 -c semantic-cli-${{ matrix.target }}.tar.gz.sha256
+          mkdir smoke
+          tar -xzf semantic-cli-${{ matrix.target }}.tar.gz -C smoke --strip-components=1
+          test -x smoke/sdb
+          test -f smoke/LICENSE
+          version=$(jq -r '.releases[] | select(.app_name == "semantic-cli") | .app_version' ../dist-manifest.json)
+          test "$(smoke/sdb --version)" = "sdb $version"
+          smoke/sdb repl --query 'SELECT 42 AS answer'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdb-${{ matrix.target }}-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/distrib/*.tar.gz
+            target/distrib/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: true

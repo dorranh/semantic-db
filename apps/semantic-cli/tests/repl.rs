@@ -6,7 +6,8 @@ use std::{
 #[test]
 fn repl_flags_do_not_change_batch_or_piped_output() {
     let run = |flags: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+        Command::new(env!("CARGO_BIN_EXE_sdb"))
+            .arg("repl")
             .args(flags)
             .args(["--query", "SELECT 42 AS answer"])
             .output()
@@ -19,7 +20,8 @@ fn repl_flags_do_not_change_batch_or_piped_output() {
     assert_eq!(plain.stderr, flagged.stderr);
     assert!(!flagged.stdout.contains(&0x1b));
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
         .args(["--no-history", "--no-color"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -40,7 +42,8 @@ fn repl_flags_do_not_change_batch_or_piped_output() {
 
 #[test]
 fn history_flags_conflict() {
-    let output = Command::new(env!("CARGO_BIN_EXE_semantic-db"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
         .args([
             "--no-history",
             "--history-file",
@@ -59,7 +62,7 @@ fn history_flags_conflict() {
 fn terminal_editor_behaviors() {
     let output = Command::new("python3")
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/repl_pty.py"))
-        .env("SEMANTIC_DB_TEST_BINARY", env!("CARGO_BIN_EXE_semantic-db"))
+        .env("SEMANTIC_DB_TEST_BINARY", env!("CARGO_BIN_EXE_sdb"))
         .output()
         .expect("the Unix PTY smoke tests require python3 (standard library only)");
     assert!(
