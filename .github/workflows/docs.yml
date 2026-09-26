@@ -3,9 +3,9 @@ name: Documentation
 on:
   push:
     branches: [main]
-    paths: ['docs/**', '.github/workflows/docs.yml', 'Justfile']
+    paths: ["docs/**", ".github/workflows/docs.yml", "Justfile"]
   pull_request:
-    paths: ['docs/**', '.github/workflows/docs.yml', 'Justfile']
+    paths: ["docs/**", ".github/workflows/docs.yml", "Justfile"]
   workflow_dispatch:
 
 permissions:
@@ -31,7 +31,7 @@ jobs:
         working-directory: docs/site
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site/dist
+          path: docs/site/build
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
