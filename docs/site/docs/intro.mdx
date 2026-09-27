@@ -4,4 +4,33 @@ sidebar_position: 1
 
 # Overview
 
-TODO: Under construction
+SemanticDB is an engine empowering rich, semantics-aware queries.
+
+It was developed with the following philosophies in mind:
+
+1. Users (and agents) should be able to easily discover the business meaning of their datasets
+2. Data should be easily queryable via natural language and query languages people already are familiar with (e.g. SQL)
+3. Data should be able to exist in different backends. You shouldn't have to migrate your data into one solution to be able to query across it unless required for performance, etc.
+4. Anything that can be expressed as a relation should be queryable, no matter whether it lives - in a file, a database, or even behind an API.
+
+The combination of the above yields a simple, unified interface for retrieving data that empowers both human users and agentic processes. Someone with minimal context should be able to quickly explore the database and retrieve the information they are looking for.
+
+## Usage
+
+SemanticDB ships with both a CLI and server. The intention is that you first bootstrap your SemanticDB (optionally with the help of agent skills provided by this project). You can then either use it for ad-hoc exploration via the CLI or even integrate it in an application via the Postgres-compatible DB adapter.
+
+See the quickstart or dedicated CLI and server guides for more details.
+
+## High-level Architecture
+
+Each SemanticDB consists of two key ingredients: A semantic definition mapping out the meaning of available tables and columns and a configuration linking these definitions to backing databases. Currently Ossie is used for the former and a SemanticDB config file is used for the latter.
+
+A minimal project would consist of a single Ossie file and corresponding SemanticDB config file pointing the Ossie definitions at a compatible file or DB backend.
+
+The highest level entrypoint is the natural language interface. This uses a user-supplied LLM API (e.g. an OpenAI API key) to compile natural language queries into structured SQL queries based on the available semantic context.
+
+You can also directly write SQL if you prefer, in which case no LLM-powered features are required. In this case the SQL query gets evaluated directly by the query engine (using Apache DataFusion) using the available connectors. Queries spanning multiple backends are evaluated as federated queries, delegating as much of the work to underlying backends as possible.
+
+Note that SemanticDB supports a handful of backends out of the box including the file-based backends supported by Apache DataFusion as well as ClickHouse. Other backends can be implemented as new connectors without needing to touch the top-level natural language and SQL interfaces.
+
+SemanticDB leverages DataFusion's SQL dialect along with some custom constructs on top. See SQL for more details on the dialect and additional features.
