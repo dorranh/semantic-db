@@ -48,7 +48,7 @@ def main():
             "writes-and-reconciliation-design.md",
         ):
             shutil.copy2(root / "docs/generated" / file, guides / file)
-        shutil.copytree(root / "docs/generated/skills", stage / "skills")
+        shutil.copytree(root / "skills", stage / "skills")
         if suffix:
             archive = output / f"{name}.zip"
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as handle:
