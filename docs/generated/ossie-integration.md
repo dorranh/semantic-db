@@ -125,9 +125,8 @@ without presenting it as an executable catalog.
 ## Implemented import profile
 
 `semantic-ossie` is exposed through the facade's opt-in `ossie` feature. The CLI
-uses the same library with `--ossie PATH`, optional `--ossie-model NAME`, and
-repeatable `--source-csv SOURCE=PATH` bindings. See the
-[wells instructions](../examples/geospatial/README.md) and
+loads models and source bindings from `--project-config PATH`; the Rust library
+also supports direct bindings. See the [dataset guide](adding-datasets.md) and
 [embedding guide](embedding.md#ossie-models) for runnable commands.
 
 Supported: one selected core model, explicit nonempty field lists with identity

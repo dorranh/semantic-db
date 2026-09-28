@@ -1,10 +1,9 @@
 # Interactive SQL REPL
 
-Start an interactive session with a project or a CSV source:
+Start an interactive session with a project:
 
 ```sh
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml
 ```
 
 The REPL uses normal terminal scrollback. SQL input is highlighted; result cells
@@ -26,7 +25,7 @@ and any execution.
 - Dot commands occupy one line; use `.help` for the command list.
 
 Autocomplete covers dot commands, `.schema` relation names, SQL keywords, and
-catalog tables, views, and columns. It also works inside `.view NAME=SQL`.
+catalog tables, views, and columns.
 Natural-language arguments to `.ask`, `.plan`, `.ask-views`, and `.plan-views`
 are not treated as SQL.
 
@@ -40,8 +39,8 @@ CTE and derived-table columns come from explicit column lists, named projections
 direct column references, and resolvable stars. Expressions without a declared
 name are not guessed. Completion is best effort while SQL is unfinished:
 unresolved scopes fall back to keywords and known relation names. It does not
-plan SQL, read rows, or contact providers. New `.view` definitions become available
-immediately after registration.
+plan SQL, read rows, or contact providers. Views authored in the project are
+available when the session starts.
 
 ## History and colors
 
@@ -76,7 +75,7 @@ a pager, a full-screen UI, progress indicators, or cancellation during execution
 statement framing, history persistence, batch compatibility, and terminal behavior.
 The terminal smoke tests use Python 3's standard-library PTY support on Unix;
 they exercise completion, multiline editing/recall, reverse search, resizing,
-interrupt/EOF handling, view refresh, restart persistence, and color controls.
+interrupt/EOF handling, project views, restart persistence, and color controls.
 
 They can also run directly after `cargo build -p semantic-cli --locked`:
 

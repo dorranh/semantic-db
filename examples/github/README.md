@@ -2,8 +2,8 @@
 
 This dataset exposes live repository-scoped GitHub issues and issue-label
 associations through Ossie, and joins them to an authored local team CSV.
-Use the standard CLI; edit scope and execution limits in
-[semantic-db.yaml](semantic-db.yaml).
+Use this example's `sdb-github` CLI; the standard `sdb` binary does not register
+GitHub. Edit scope and execution limits in [semantic-db.yaml](semantic-db.yaml).
 
 ## Run
 
@@ -14,25 +14,31 @@ to use another set. Credentials stay out of the Ossie model and project file.
 
 ```sh
 # Offline: no token, provider construction, or API requests.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml --inspect
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml --inspect
 
 # Count open issues by local team; unmapped repositories remain visible.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml \
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml \
   --file examples/github/open_issues_by_team.sql
 
 # Interactive SQL and natural language.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml
 
 # Many-to-many label aggregation; can require substantially more requests.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml \
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml \
   --file examples/github/open_issues_by_label.sql
 
 # Plan SQL without GitHub row requests.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml \
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml \
   --query "SELECT number FROM issues WHERE state = 'OPEN' LIMIT 10" --dry-run
 
 # Uses OPENAI_* configuration as well as GITHUB_TOKEN.
-cargo run -p semantic-cli -- --config examples/github/semantic-db.yaml \
+cargo run -p example-github --bin sdb-github -- repl \
+  --project-config examples/github/semantic-db.yaml \
   --ask "Count open issues by team and repository, including unmapped repositories"
 ```
 
@@ -68,17 +74,19 @@ need explicit definitions. Clarification is model-driven, not deterministic.
 
 ## Execution and limits
 
-See the [connector reference](../../docs/connectors.md#github) for every option
+See the [connector reference](../../docs/generated/connectors.md#github) for every option
 and the execution contract. Exact `issues.state` equality to `'OPEN'` or
-`'CLOSED'` can reduce remote pages. Other filters, ordering, aggregation, and joins
-execute locally. GraphQL field selection is fixed. `issue_labels` independently
-enumerates issues and pages their labels; joins do not share scans or push issue
-filters into label scans. This can cause N+1 requests, even for unlabeled issues.
+`'CLOSED'` can reduce remote pages. Exact repository equality can prune a scoped
+repository after resolving its canonical name. Other filters, ordering,
+aggregation, and joins execute locally. GraphQL field selection is fixed.
+`issue_labels` independently enumerates issues and pages their labels; joins do
+not share scans or push issue filters into label scans. This can cause N+1
+requests, even for unlabeled issues.
 
 Defaults are 100 items/page, 100 requests per scan, 30 seconds/request, and 4 MiB
 per response. Exhaustion and partial GraphQL responses fail rather than returning
-successful partial results. There is no shared query budget, retry policy, or
-transactional snapshot. `LIMIT` is not a promise about remote request count.
+successful partial results. Shared query budgets also apply; there is no automatic
+retry or transactional snapshot. `LIMIT` is not a promise about remote request count.
 
 "Stale", "urgent", and "healthy" deliberately have no executable definition.
 The model should request clarification; this is not a deterministic guarantee.
@@ -92,7 +100,7 @@ variables only; export `GITHUB_TOKEN` before running it:
 
 ```sh
 cargo run -p example-github
-cargo test -p semantic-github --locked
+cargo test -p example-github --locked
 ```
 
 The offline tests compare API fixture rows with independent local SQL tables
@@ -103,5 +111,5 @@ without. Live row counts change and are not correctness fixtures.
 
 The former standalone GitHub example's `--repo`, `--teams`, `--page-size`,
 `--max-requests`, and `--repl` workflow is replaced by project configuration and
-the standard CLI. See [CLI reference](../../docs/cli.md) for batch/REPL modes and
-[experiment findings](../../docs/github-experiment.md) for remaining architecture work.
+the example CLI. See [CLI reference](../../docs/generated/cli.md) for batch/REPL modes and
+[experiment findings](../../docs/generated/github-experiment.md) for remaining architecture work.

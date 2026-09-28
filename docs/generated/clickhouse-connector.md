@@ -54,7 +54,7 @@ docker run -d --rm --name semantic-db-clickhouse -p 127.0.0.1:8123:8123 \
 # Wait until http://localhost:8123/ping responds, then:
 docker exec -i semantic-db-clickhouse clickhouse-client --user fixture \
   --password fixture-password --database drilling --multiquery < examples/clickhouse/drilling.sql
-CLICKHOUSE_PASSWORD=fixture-password just cli --config examples/clickhouse/semantic-db.yaml \
+CLICKHOUSE_PASSWORD=fixture-password just cli repl --project-config examples/clickhouse/semantic-db.yaml \
   --file examples/clickhouse/query.sql
 docker stop semantic-db-clickhouse
 ```

@@ -3,15 +3,13 @@ use std::process::Command;
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 #[test]
-fn loads_wells_from_ossie_and_runs_the_existing_query() {
+fn loads_wells_from_project_and_runs_the_existing_query() {
     let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
         .arg("repl")
         .current_dir(ROOT)
         .args([
-            "--ossie",
-            "examples/geospatial/wells.ossie.yaml",
-            "--source-csv",
-            "fixtures.geospatial.wells=examples/geospatial/wells.csv",
+            "--project-config",
+            "examples/geospatial/semantic-db.yaml",
             "--file",
             "examples/geospatial/query.sql",
         ])
@@ -33,29 +31,14 @@ fn loads_wells_from_ossie_and_runs_the_existing_query() {
 }
 
 #[test]
-fn fails_for_missing_bindings_or_invalid_cli_combinations() {
+fn removed_direct_configuration_flags_are_rejected() {
     for args in [
-        vec![
-            "--ossie",
-            "examples/geospatial/wells.ossie.yaml",
-            "--query",
-            "SELECT * FROM wells",
-        ],
-        vec![
-            "--source-csv",
-            "source=examples/geospatial/wells.csv",
-            "--query",
-            "SELECT 1",
-        ],
-        vec!["--ossie-model", "geospatial_wells", "--query", "SELECT 1"],
-        vec![
-            "--ossie",
-            "examples/geospatial/wells.ossie.yaml",
-            "--csv",
-            "wells=examples/geospatial/wells.csv",
-            "--query",
-            "SELECT 1",
-        ],
+        vec!["--ossie", "examples/geospatial/wells.ossie.yaml"],
+        vec!["--ossie-model", "geospatial_wells"],
+        vec!["--source-csv", "source=examples/geospatial/wells.csv"],
+        vec!["--csv", "wells=examples/geospatial/wells.csv"],
+        vec!["--view", "wells=SELECT 1"],
+        vec!["--config", "examples/geospatial/semantic-db.yaml"],
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
             .arg("repl")
@@ -65,5 +48,6 @@ fn fails_for_missing_bindings_or_invalid_cli_combinations() {
             .unwrap();
         assert!(!output.status.success());
         assert!(output.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("unexpected argument"));
     }
 }

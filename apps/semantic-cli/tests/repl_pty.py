@@ -19,7 +19,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 BINARY = Path(os.environ.get("SEMANTIC_DB_TEST_BINARY", ROOT / "target/debug/sdb"))
-CSV = ROOT / "examples/geospatial/wells.csv"
+PROJECT = ROOT / "examples/geospatial/semantic-db.yaml"
 SGR = re.compile(rb"\x1b\[[0-9;]*m")
 
 
@@ -32,7 +32,7 @@ class Session:
             environment.pop("NO_COLOR", None)
             environment.pop("OPENAI_API_KEY", None)
             environment.update(env or {})
-            os.execve(BINARY, [str(BINARY), "repl", "--csv", f"wells={CSV}", *flags], environment)
+            os.execve(BINARY, [str(BINARY), "repl", "--project-config", str(PROJECT), *flags], environment)
         self.dumb = (env or {}).get("TERM", "").lower() in {"dumb", "cons25", "emacs"}
         self.pending = b""
         self.transcript = b""
@@ -129,8 +129,8 @@ class ReplTests(unittest.TestCase):
                 session.resize(14, 50)
                 self.assertIn(b"123", session.executed("SELECT 123; -- trailing comment\r"))
                 session.executed("SELECT missing;\r", b"Failed after")
-                session.executed(".view added=SELECT 77 AS answer\r", b"Registered view")
-                self.assertIn(b"77", session.executed("SELECT a.ans FROM added a;\x01" + "\x1b[C" * len("SELECT a.ans") + "\t\x05\r"))
+                session.executed(".view added=SELECT 77 AS answer\r", b"unknown command: .view")
+                self.assertIn(b"77", session.executed("SELECT 77 AS answer;\r"))
                 self.assertTrue(SGR.search(session.transcript))
             finally:
                 session.close()

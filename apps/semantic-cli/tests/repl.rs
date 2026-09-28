@@ -38,6 +38,25 @@ fn repl_flags_do_not_change_batch_or_piped_output() {
     assert!(piped.status.success());
     assert_eq!(piped.stdout, plain.stdout);
     assert!(piped.stderr.is_empty());
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
+        .arg("--read-report")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"SELECT 42 AS answer")
+        .unwrap();
+    let piped = child.wait_with_output().unwrap();
+    assert!(piped.status.success());
+    assert_eq!(piped.stdout, plain.stdout);
+    assert!(String::from_utf8_lossy(&piped.stderr).contains("\"requested\""));
 }
 
 #[test]

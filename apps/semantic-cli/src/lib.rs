@@ -6,7 +6,7 @@ use std::{
 use clap::{ArgGroup, Parser, Subcommand};
 use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
-use semantic_ossie::{ModelInspection, OssieDocument, SourceBindings};
+use semantic_ossie::ModelInspection;
 use semantic_sources::{Project, Registry};
 
 mod config;
@@ -30,94 +30,160 @@ struct Args {
 
 #[derive(clap::Args)]
 #[command(
-    group(ArgGroup::new("model_input").args(["config", "ossie"])),
-    group(ArgGroup::new("batch").args(["query", "file", "ask", "ask_views", "write", "explain_write"]))
+    group(ArgGroup::new("action").args(["validate", "inspect", "query", "file", "ask", "ask_views", "write", "explain_write", "cache_status", "cache_invalidate", "cache_refresh"])),
+    group(ArgGroup::new("plannable").args(["query", "file", "ask", "ask_views", "write"]))
 )]
 struct ReplArgs {
-    /// Disable colors in the interactive REPL.
-    #[arg(long)]
-    no_color: bool,
-    /// Keep interactive command history in memory only.
-    #[arg(long, conflicts_with = "history_file")]
-    no_history: bool,
-    /// Override the interactive history file (shared across projects by default).
-    #[arg(long, value_name = "PATH")]
-    history_file: Option<std::path::PathBuf>,
-    /// Load an Ossie model and source connections from a YAML/JSON project file.
-    #[arg(long, value_name = "PATH", conflicts_with_all = ["csv", "ossie", "ossie_model", "source_csv"])]
-    config: Option<std::path::PathBuf>,
-    /// Check the model, bindings and connector options offline, without credentials.
-    #[arg(long, requires = "model_input", conflicts_with_all = ["inspect", "query", "file", "ask", "ask_views", "view", "dry_run"])]
-    validate: bool,
-    /// Also construct providers and validate physical schemas; requires --validate.
-    #[arg(long, requires = "validate")]
-    connect: bool,
-    /// Show model fields, source requirements and configured connector names offline.
-    #[arg(long, requires = "model_input", conflicts_with_all = ["validate", "query", "file", "ask", "ask_views", "view", "dry_run"])]
-    inspect: bool,
-    /// Register a CSV with a header row; repeat for multiple sources.
-    #[arg(long, value_name = "NAME=PATH", value_parser = parse_assignment)]
-    csv: Vec<(String, String)>,
-    /// Load a pinned Ossie YAML/JSON semantic model with explicit source bindings.
-    #[arg(long, value_name = "PATH", conflicts_with = "csv")]
-    ossie: Option<std::path::PathBuf>,
-    /// Select a model (required when the Ossie document contains multiple models).
-    #[arg(long, value_name = "NAME", requires = "ossie")]
-    ossie_model: Option<String>,
-    /// Bind an Ossie source identifier to a CSV; repeat for multiple sources.
-    #[arg(long, value_name = "SOURCE=PATH", requires = "ossie", value_parser = parse_assignment)]
-    source_csv: Vec<(String, String)>,
-    /// Register a view before querying; repeat in dependency order.
-    #[arg(long, value_name = "NAME=SQL", value_parser = parse_assignment)]
-    view: Vec<(String, String)>,
-    /// Execute one SQL statement and exit.
-    #[arg(short, long, conflicts_with_all = ["file", "ask"])]
-    query: Option<String>,
-    /// Execute one explicitly authored mutation through the write dispatcher.
-    #[arg(long, value_name = "SQL")]
-    write: Option<String>,
-    /// Explain a mutation without executing its source or destination changes.
-    #[arg(long, value_name = "SQL")]
-    explain_write: Option<String>,
-    #[arg(long, default_value = "observed", value_parser = ["observed", "snapshot"])]
-    read_consistency: String,
+    /// Load a Semantic DB project (YAML or JSON), including its model and sources.
     #[arg(
         long,
-        default_value = "configured",
-        value_name = "configured|bypass|MAX_AGE_SECONDS"
+        value_name = "PATH",
+        help_heading = "Project and validation",
+        conflicts_with = "no_project"
     )]
-    read_cache: String,
-    #[arg(long)]
-    explain_read: bool,
-    #[arg(long)]
-    read_report: bool,
+    project_config: Option<std::path::PathBuf>,
+    /// Start without a project, even when semantic-db.yaml is in the current directory.
+    #[arg(long, help_heading = "Project and validation")]
+    no_project: bool,
+    /// Check the model, bindings and connector options offline, without credentials.
+    #[arg(long, help_heading = "Project and validation")]
+    validate: bool,
+    /// Also construct providers and validate physical schemas; requires --validate.
+    #[arg(long, help_heading = "Project and validation", requires = "validate")]
+    connect: bool,
+    /// Show model fields, source requirements and configured connector names offline.
+    #[arg(long, help_heading = "Project and validation")]
+    inspect: bool,
+    /// Execute one SQL statement and exit.
+    #[arg(short, long, help_heading = "Queries and writes")]
+    query: Option<String>,
     /// Read one SQL statement from a file and exit.
-    #[arg(short, long, conflicts_with = "ask")]
+    #[arg(short, long, help_heading = "Queries and writes")]
     file: Option<std::path::PathBuf>,
     /// Compile a natural-language request, show SQL/evidence, and execute it.
-    #[arg(long, value_name = "REQUEST")]
+    #[arg(long, value_name = "REQUEST", help_heading = "Queries and writes")]
     ask: Option<String>,
     /// Select an authored view and compile a bounded query without model-written SQL.
-    #[arg(long, value_name = "REQUEST")]
+    #[arg(long, value_name = "REQUEST", help_heading = "Queries and writes")]
     ask_views: Option<String>,
+    /// Execute one explicitly authored mutation through the write dispatcher.
+    #[arg(long, value_name = "SQL", help_heading = "Queries and writes")]
+    write: Option<String>,
+    /// Explain a mutation without executing its source or destination changes.
+    #[arg(long, value_name = "SQL", help_heading = "Queries and writes")]
+    explain_write: Option<String>,
     /// Plan SQL or compile natural language without executing query rows.
-    #[arg(long, requires = "batch")]
+    #[arg(long, help_heading = "Queries and writes", requires = "plannable")]
     dry_run: bool,
-    /// Bypass configured materializations for this invocation.
-    #[arg(long)]
-    bypass_cache: bool,
+    /// Request an observed read or a single-domain snapshot (which bypasses cache).
+    #[arg(long, help_heading = "Read options", value_parser = ["observed", "snapshot"], conflicts_with_all = ["validate", "inspect", "write", "explain_write", "cache_status", "cache_invalidate", "cache_refresh", "dry_run"])]
+    read_consistency: Option<String>,
+    /// Use configured cache policy, bypass it, or set a maximum age in seconds.
+    #[arg(
+        long,
+        help_heading = "Read options",
+        value_name = "configured|bypass|max-age=SECONDS",
+        value_parser = parse_read_cache,
+        conflicts_with_all = ["validate", "inspect", "write", "explain_write", "cache_status", "cache_invalidate", "cache_refresh", "dry_run"]
+    )]
+    read_cache: Option<ReadCacheArg>,
+    /// Show read dependencies and consistency checks without executing rows.
+    #[arg(long, help_heading = "Read options", conflicts_with_all = ["validate", "inspect", "write", "explain_write", "cache_status", "cache_invalidate", "cache_refresh", "dry_run", "read_report"])]
+    explain_read: bool,
+    /// Print a JSON report after executing a read.
+    #[arg(long, help_heading = "Read options", conflicts_with_all = ["validate", "inspect", "write", "explain_write", "cache_status", "cache_invalidate", "cache_refresh", "dry_run", "explain_read"])]
+    read_report: bool,
     /// Query-wide deadline, including cache fills and local operators.
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, help_heading = "Execution limits", default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
     query_timeout_seconds: u64,
     /// List published materialization generations and exit.
-    #[arg(long, requires = "config")]
+    #[arg(long, help_heading = "Cache maintenance")]
     cache_status: bool,
     /// Invalidate a materialization key reported by --cache-status.
-    #[arg(long, requires = "config")]
+    #[arg(long, help_heading = "Cache maintenance")]
     cache_invalidate: Option<String>,
     /// Refresh one configured relation and exit.
-    #[arg(long, requires = "config")]
+    #[arg(long, help_heading = "Cache maintenance")]
     cache_refresh: Option<String>,
+    /// Disable colors in the interactive REPL.
+    #[arg(long, help_heading = "Interactive preferences")]
+    no_color: bool,
+    /// Keep interactive command history in memory only.
+    #[arg(
+        long,
+        help_heading = "Interactive preferences",
+        conflicts_with = "history_file"
+    )]
+    no_history: bool,
+    /// Override the interactive history file (shared across projects by default).
+    #[arg(long, value_name = "PATH", help_heading = "Interactive preferences")]
+    history_file: Option<std::path::PathBuf>,
+}
+
+#[derive(Clone, Debug)]
+enum ReadCacheArg {
+    Configured,
+    Bypass,
+    MaxAge(u64),
+}
+
+fn parse_read_cache(value: &str) -> std::result::Result<ReadCacheArg, String> {
+    match value {
+        "configured" => Ok(ReadCacheArg::Configured),
+        "bypass" => Ok(ReadCacheArg::Bypass),
+        _ => {
+            let seconds = value
+                .strip_prefix("max-age=")
+                .ok_or("expected configured, bypass, or max-age=SECONDS")?;
+            let seconds = seconds
+                .parse::<u64>()
+                .map_err(|_| "max-age must be a nonnegative integer number of seconds")?;
+            Ok(ReadCacheArg::MaxAge(seconds))
+        }
+    }
+}
+
+#[derive(Clone)]
+struct ReadMode {
+    consistency: semantic_engine::ReadConsistency,
+    cache: semantic_engine::ReadCache,
+    explain: bool,
+    report: bool,
+    custom: bool,
+}
+
+impl ReadMode {
+    fn from_args(args: &ReplArgs) -> Self {
+        Self {
+            consistency: if args.read_consistency.as_deref() == Some("snapshot") {
+                semantic_engine::ReadConsistency::Snapshot
+            } else {
+                semantic_engine::ReadConsistency::Observed
+            },
+            cache: match args.read_cache.as_ref() {
+                None | Some(ReadCacheArg::Configured) => semantic_engine::ReadCache::Configured,
+                Some(ReadCacheArg::Bypass) => semantic_engine::ReadCache::Bypass,
+                Some(ReadCacheArg::MaxAge(seconds)) => {
+                    semantic_engine::ReadCache::MaxAge(std::time::Duration::from_secs(*seconds))
+                }
+            },
+            explain: args.explain_read,
+            report: args.read_report,
+            custom: args.read_consistency.is_some()
+                || args.read_cache.is_some()
+                || args.explain_read
+                || args.read_report,
+        }
+    }
+
+    fn options(&self, engine: &Engine) -> semantic_engine::ReadOptions {
+        semantic_engine::ReadOptions {
+            query: engine.query_options().clone(),
+            consistency: self.consistency,
+            cache: self.cache.clone(),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -134,14 +200,6 @@ enum Command {
     },
 }
 
-fn parse_assignment(value: &str) -> std::result::Result<(String, String), String> {
-    let (name, value) = value.split_once('=').ok_or("expected NAME=VALUE")?;
-    if name.is_empty() || value.is_empty() {
-        return Err("name and value must be nonempty".into());
-    }
-    Ok((name.into(), value.into()))
-}
-
 /// Run the standard CLI with an application-owned connector registry.
 /// Custom binaries can register connectors and reuse all commands and the REPL.
 pub async fn run_with_registry(registry: Registry) -> Result<()> {
@@ -154,7 +212,18 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
 }
 
 async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
-    let mut engine = if let Some(path) = args.config {
+    let project_path = project_path(&args)?;
+    if project_path.is_none()
+        && (args.validate
+            || args.inspect
+            || args.cache_status
+            || args.cache_invalidate.is_some()
+            || args.cache_refresh.is_some())
+    {
+        return Err("this action requires a project; pass --project-config PATH or run from a directory with semantic-db.yaml".into());
+    }
+    let read_mode = ReadMode::from_args(&args);
+    let mut engine = if let Some(path) = project_path {
         let project = Project::from_path(path)?;
         if (args.cache_status || args.cache_invalidate.is_some()) && args.cache_refresh.is_none() {
             let manager = semantic_engine::MaterializationManager::new(
@@ -216,27 +285,6 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
             eprintln!("Warning: {warning}");
         }
         imported.engine
-    } else if let Some(path) = args.ossie {
-        let document = OssieDocument::parse(&std::fs::read_to_string(path)?)?;
-        if args.inspect || args.validate {
-            let inspection = document.inspect(args.ossie_model.as_deref())?;
-            show_inspection(&inspection, args.inspect, |_| None);
-            if !args.connect {
-                println!(
-                    "Offline model validation passed; source bindings and physical schemas have not been checked."
-                );
-                return Ok(());
-            }
-        }
-        let mut bindings = SourceBindings::new();
-        for (source, path) in args.source_csv {
-            bindings.bind_csv(source, &path).await?;
-        }
-        let imported = document.load(args.ossie_model.as_deref(), &bindings)?;
-        for warning in imported.warnings {
-            eprintln!("Warning: {warning}");
-        }
-        imported.engine
     } else {
         Engine::new()
     };
@@ -247,15 +295,8 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
         );
         return Ok(());
     }
-    for (name, path) in args.csv {
-        engine.register_csv(&name, &path).await?;
-    }
-    for (name, sql) in args.view {
-        engine.create_view(&name, &sql).await?;
-    }
     engine.set_query_options(semantic_engine::QueryOptions {
         timeout_seconds: args.query_timeout_seconds,
-        bypass_materialization: args.bypass_cache,
         ..Default::default()
     })?;
     if args.cache_status || args.cache_invalidate.is_some() || args.cache_refresh.is_some() {
@@ -295,76 +336,64 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
     }
     if let Some(request) = args.ask {
         let compiler = Compiler::new(config::provider()?);
-        return run_ask(&engine, &compiler, &request, args.dry_run, false).await;
+        return run_ask(
+            &engine,
+            &compiler,
+            &request,
+            args.dry_run,
+            false,
+            &read_mode,
+        )
+        .await;
     }
     if let Some(request) = args.ask_views {
         let compiler = Compiler::new(config::provider()?);
-        return run_ask(&engine, &compiler, &request, args.dry_run, true).await;
+        return run_ask(&engine, &compiler, &request, args.dry_run, true, &read_mode).await;
     }
     if let Some(query) = args.query {
-        if args.read_consistency == "observed"
-            && args.read_cache == "configured"
-            && !args.read_report
-            && !args.explain_read
-        {
-            return run_sql(&engine, &query, args.dry_run).await;
-        }
-        if args.dry_run {
-            return run_sql(&engine, &query, true).await;
-        }
-        let options = semantic_engine::ReadOptions {
-            query: engine.query_options().clone(),
-            consistency: if args.read_consistency == "snapshot" {
-                semantic_engine::ReadConsistency::Snapshot
-            } else {
-                semantic_engine::ReadConsistency::Observed
-            },
-            cache: match args.read_cache.as_str() {
-                "configured" => semantic_engine::ReadCache::Configured,
-                "bypass" => semantic_engine::ReadCache::Bypass,
-                age => {
-                    semantic_engine::ReadCache::MaxAge(std::time::Duration::from_secs(age.parse()?))
-                }
-            },
-            ..Default::default()
-        };
-        if args.explain_read {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&engine.explain_read(&query, options).await?)?
-            );
-            return Ok(());
-        }
-        let result = engine
-            .execute_read(&query, vec![], options)
-            .await?
-            .collect()
-            .await?;
-        println!("{}", pretty_format_batches(&result.batches)?);
-        println!(
-            "{} row(s)",
-            result.batches.iter().map(|b| b.num_rows()).sum::<usize>()
-        );
-        if args.read_report {
-            eprintln!("{}", serde_json::to_string_pretty(&result.report)?);
-        }
-        return Ok(());
+        return run_sql(&engine, &query, args.dry_run, &read_mode).await;
     }
     if let Some(path) = args.file {
-        return run_sql(&engine, &std::fs::read_to_string(path)?, args.dry_run).await;
+        return run_sql(
+            &engine,
+            &std::fs::read_to_string(path)?,
+            args.dry_run,
+            &read_mode,
+        )
+        .await;
     }
     if !io::stdin().is_terminal() {
         let mut query = String::new();
         io::stdin().read_to_string(&mut query)?;
-        return run_query(&engine, &query).await;
+        return run_query(&engine, &query, &read_mode).await;
     }
     repl::run(
         &mut engine,
         args.no_color,
         args.no_history,
         args.history_file,
+        read_mode,
     )
     .await
+}
+
+fn project_path(args: &ReplArgs) -> Result<Option<std::path::PathBuf>> {
+    if args.no_project {
+        return Ok(None);
+    }
+    if let Some(path) = &args.project_config {
+        return Ok(Some(path.clone()));
+    }
+    let path = std::path::PathBuf::from("semantic-db.yaml");
+    match std::fs::metadata(&path) {
+        Ok(metadata) if metadata.is_file() => {
+            eprintln!("Using project: {}", path.display());
+            Ok(Some(path))
+        }
+        Ok(_) => Err("semantic-db.yaml exists but is not a regular file".into()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn show_inspection(
@@ -398,24 +427,45 @@ fn show_inspection(
     }
 }
 
-async fn run_sql(engine: &Engine, sql: &str, dry_run: bool) -> Result<()> {
+async fn run_sql(engine: &Engine, sql: &str, dry_run: bool, read_mode: &ReadMode) -> Result<()> {
     if dry_run {
         let frame = engine.plan_sql(sql).await?;
         println!("{}", frame.logical_plan().display_indent());
         Ok(())
     } else {
-        run_query(engine, sql).await
+        run_query(engine, sql, read_mode).await
     }
 }
 
-async fn run_query(engine: &Engine, sql: &str) -> Result<()> {
+async fn run_query(engine: &Engine, sql: &str, read_mode: &ReadMode) -> Result<()> {
     if sql.trim().is_empty() {
         return Ok(());
     }
-    let batches = engine.query(sql).await?;
+    if read_mode.explain {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(
+                &engine.explain_read(sql, read_mode.options(engine)).await?
+            )?
+        );
+        return Ok(());
+    }
+    let (batches, report) = if read_mode.custom {
+        let result = engine
+            .execute_read(sql, vec![], read_mode.options(engine))
+            .await?
+            .collect()
+            .await?;
+        (result.batches, read_mode.report.then_some(result.report))
+    } else {
+        (engine.query(sql).await?, None)
+    };
     println!("{}", pretty_format_batches(&batches)?);
     let rows: usize = batches.iter().map(|batch| batch.num_rows()).sum();
     println!("{rows} row(s)");
+    if let Some(report) = report {
+        eprintln!("{}", serde_json::to_string_pretty(&report)?);
+    }
     Ok(())
 }
 
@@ -425,6 +475,7 @@ async fn run_ask(
     request: &str,
     dry_run: bool,
     views_only: bool,
+    read_mode: &ReadMode,
 ) -> Result<()> {
     let compilation = if views_only {
         compiler.compile_views(engine, request).await?
@@ -445,10 +496,7 @@ async fn run_ask(
             }
             if !dry_run {
                 engine.plan_generated_sql(&query.sql).await?;
-                let batches = engine.query(&query.sql).await?;
-                println!("{}", pretty_format_batches(&batches)?);
-                let rows: usize = batches.iter().map(|batch| batch.num_rows()).sum();
-                println!("{rows} row(s)");
+                run_query(engine, &query.sql, read_mode).await?;
             }
         }
         GroundingOutcome::NeedsClarification { question, .. } => {

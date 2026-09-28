@@ -23,8 +23,6 @@ use thiserror::Error;
 
 #[cfg(feature = "clickhouse")]
 pub use builtin::ClickHouseConnector;
-#[cfg(feature = "github")]
-pub use builtin::GitHubConnector;
 #[cfg(feature = "postgres")]
 pub use builtin::PostgresConnector;
 pub use files::{CsvConnector, FileConnector, FileFormat};
@@ -162,10 +160,6 @@ impl Registry {
         #[cfg(feature = "postgres")]
         registry
             .register("postgres", PostgresConnector)
-            .expect("unique builtin");
-        #[cfg(feature = "github")]
-        registry
-            .register("github", GitHubConnector)
             .expect("unique builtin");
         #[cfg(feature = "clickhouse")]
         registry

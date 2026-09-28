@@ -117,7 +117,7 @@ mod tests {
     fn statement_framing() {
         for sql in [
             "",
-            ".view v=SELECT 1",
+            ".ask show wells",
             "SELECT 1; -- trailing",
             "SELECT 'it''s;'; /* hi */",
             "SELECT $$;$$;",

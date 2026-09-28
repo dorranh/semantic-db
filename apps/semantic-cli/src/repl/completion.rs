@@ -16,7 +16,6 @@ pub(super) const COMMANDS: &[&str] = &[
     ".help",
     ".tables",
     ".schema",
-    ".view",
     ".ask",
     ".plan",
     ".ask-views",
@@ -133,15 +132,6 @@ impl Catalog {
                         start,
                         filter(["on".to_owned(), "off".to_owned()], &input[start..pos]),
                     );
-                }
-                ".view" => {
-                    if let Some(equal) = input[end..].find('=') {
-                        let start = end + equal + 1;
-                        if pos >= start {
-                            let (offset, items) = self.sql(&input[start..], pos - start);
-                            return (start + offset, items);
-                        }
-                    }
                 }
                 _ => {}
             }
@@ -822,7 +812,7 @@ mod tests {
         assert!(suggestions("SELECT 'unfinished |").is_empty());
         assert!(suggestions(".ask show we|").is_empty());
         assert_eq!(suggestions(".schema we|"), ["wells"]);
-        assert_eq!(suggestions(".view v=SELECT w.de| FROM wells w"), ["depth"]);
+        assert!(suggestions(".view|").is_empty());
         assert!(!suggestions("SELECT de| FROM missing").contains(&"depth".into()));
     }
 
@@ -870,7 +860,7 @@ mod tests {
             " WITH x(a) AS (SELECT id FROM wells) SELECT x.a FROM x",
             "SELECT 'hi' /* comment */",
             "SELECT ( SELECT w.id FROM wells w",
-            ".view v=SELECT w.café FROM wells w",
+            ".ask show wells",
             "  .schema wells",
             "SELECT \"unfinished",
         ] {

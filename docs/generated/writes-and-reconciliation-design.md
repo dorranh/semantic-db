@@ -83,7 +83,7 @@ Preserve Engine::query, plan_sql, execute, and generated-SQL validation as read-
 The stronger read contract is available through execute_read and the session APIs;
 low-level DataFrame access via plan_sql does not certify those guarantees. No new
 read SQL modifier in v1: use ReadOptions, and CLI --read-consistency observed|snapshot
-plus --read-cache configured|bypass|MAX_AGE_SECONDS for --query. --explain-read plans
+plus --read-cache configured|bypass|max-age=SECONDS for reads. --explain-read plans
 without fetching rows or acquiring snapshots, and --read-report prints the terminal
 report to stderr. Snapshot sessions and commit-receipt requirements are library APIs.
 Add CLI --write and --explain-write; retain --query semantics. In the REPL, route

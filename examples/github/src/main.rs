@@ -1,15 +1,14 @@
-//! Embed the same GitHub + local CSV project used by the CLI.
-//! Reads process environment only. For .env, custom queries, or the REPL, use semantic-cli.
-use semantic_db::{
-    engine::pretty_format_batches,
-    sources::{Project, Registry},
-};
+//! Embed the example GitHub + local CSV project.
+//! Reads process environment only. For .env, custom queries, or the REPL, use sdb-github.
+use semantic_db::{engine::pretty_format_batches, sources::Project};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let project = Project::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/semantic-db.yaml"))?;
     let imported = project
-        .load(&Registry::standard(), &|name| std::env::var(name).ok())
+        .load(&example_github::registry()?, &|name| {
+            std::env::var(name).ok()
+        })
         .await?;
     for warning in imported.warnings {
         eprintln!("Warning: {warning}");

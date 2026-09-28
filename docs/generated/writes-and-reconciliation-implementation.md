@@ -128,8 +128,8 @@ successful partial result. There is no transparent whole-query retry.
 ## Frontends and example
 
 The CLI supports `--write SQL`, `--explain-write SQL`, `--explain-read`,
-`--read-consistency observed|snapshot`, `--read-cache configured|bypass|SECONDS`, and
-`--read-report` for `--query`. Authored REPL writes use the same dispatcher. PostgreSQL
+`--read-consistency observed|snapshot`, `--read-cache configured|bypass|max-age=SECONDS`, and
+`--read-report` for CLI reads. Authored REPL writes use the same dispatcher. PostgreSQL
 simple and prepared query paths return mutation command tags; Parse/Describe and
 EXPLAIN never apply writes. Snapshot sessions and receipts are library interfaces.
 

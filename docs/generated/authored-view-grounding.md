@@ -15,8 +15,8 @@ From the repository root, with the usual model configuration for natural-languag
 queries:
 
 ```sh
-cargo run -p semantic-cli --locked -- \
-  --config examples/geospatial/semantic-db.views.yaml \
+cargo run -p semantic-cli --locked -- repl \
+  --project-config examples/geospatial/semantic-db.views.yaml \
   --ask-views "List well IDs for active deep wells in North Basin, ordered by well_id" \
   --dry-run
 ```
@@ -26,8 +26,8 @@ This project authors an example convention; the underlying Ossie model explicitl
 does not define a universal meaning of “deep.” Views over Ossie datasets use the
 importer's logical fields and projections as usual.
 
-The REPL offers `.ask-views REQUEST` and `.plan-views REQUEST` over loaded views or
-definitions registered with `.view`. Existing `--ask`, `.ask`, and `.plan` retain the general
+The REPL offers `.ask-views REQUEST` and `.plan-views REQUEST` over project views.
+Existing `--ask`, `.ask`, and `.plan` retain the general
 SQL-proposal mode. The view mode never falls back to that mode on failure.
 
 An offline Rust example loads the same Ossie model and directly lowers a supplied
@@ -92,8 +92,8 @@ under `.model` and ordered view definitions under `.views`.
 Keep the YAML and SQL files in version control. Each new Project or CLI startup
 reloads their definitions. An existing Project retains the SQL it read, so editing
 a file between inspection and load does not change that Project's definition.
-There is no file watching or write-back: `.view` and `--view` still add session-only
-definitions, and duplicate names are rejected instead of replacing loaded views.
+There is no file watching or write-back. Author view definitions in the project;
+duplicate names are rejected when the project loads.
 Persistent revision tracking, transactions, and materialization remain future work.
 
 ## Contract and execution

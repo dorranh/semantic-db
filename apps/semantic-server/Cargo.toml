@@ -9,7 +9,6 @@ publish.workspace = true
 
 [features]
 default = []
-github = ["semantic-db/github"]
 
 [dependencies]
 semantic-db = { workspace = true, features = ["sources", "postgres", "clickhouse", "compiler"] }

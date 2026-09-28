@@ -1,10 +1,20 @@
-//! Experimental, read-only GitHub GraphQL tables over an explicit repository set.
+//! Example-only, read-only GitHub GraphQL tables over an explicit repository set.
 //!
 //! Rows are fetched only when polled. Issue state equality is pushed to GitHub;
 //! repository equality prunes pagination after resolving canonical names on the
 //! first page. Other filters, joins, aggregates, and column selection stay local.
 //! Each scan has its own request budget and cursor state. There is no snapshot
 //! isolation or automatic retry. Engine execution supplies shared query budgets.
+
+mod connector;
+pub use connector::GitHubConnector;
+
+/// Register the example connector alongside the standard connectors.
+pub fn registry() -> semantic_sources::Result<semantic_sources::Registry> {
+    let mut registry = semantic_sources::Registry::standard();
+    registry.register("github", GitHubConnector)?;
+    Ok(registry)
+}
 
 use std::{
     collections::{BTreeSet, VecDeque},

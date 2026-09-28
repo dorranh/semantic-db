@@ -2,19 +2,19 @@
 
 Download the archive matching your OS and architecture from the project's
 GitHub release assets. Verify its SHA-256 against the adjacent `.sha256` file,
-extract it, and add the directory containing both executables to `PATH`.
+extract it, and add the directory containing `sdb` to `PATH`.
 On Unix use `shasum -a 256 ARCHIVE`; on Windows use
-`Get-FileHash ARCHIVE -Algorithm SHA256`. Confirm `semantic-db --version` and
-`semantic-server --version` report the same release.
+`Get-FileHash ARCHIVE -Algorithm SHA256`. Confirm `sdb --version` reports the
+expected release.
 
 ## Start without credentials
 
 ```sh
-semantic-db init my-project
+sdb init my-project
 cd my-project
-semantic-db --config semantic-db.yaml --validate --connect
-semantic-db --config semantic-db.yaml --query 'SELECT * FROM active_items ORDER BY id'
-semantic-db --config semantic-db.yaml
+sdb repl --validate --connect
+sdb repl --query 'SELECT * FROM active_items ORDER BY id'
+sdb repl
 ```
 
 The sample has three items and an `active_items` view containing the two active
@@ -24,11 +24,11 @@ items. No source service, model API key, or Rust compiler is required.
 
 Copy `.env.example` to `.env`, then set `OPENAI_API_KEY` and `OPENAI_MODEL`.
 Set `OPENAI_BASE_URL` for another OpenAI-compatible API. Run from the project
-directory so both binaries find `.env`; process environment takes precedence.
+directory so `sdb` finds `.env`; process environment takes precedence.
 
 ```sh
-semantic-db --config semantic-db.yaml --ask-views 'List active items' --dry-run
-semantic-db --config semantic-db.yaml --ask-views 'List active items'
+sdb repl --ask-views 'List active items' --dry-run
+sdb repl --ask-views 'List active items'
 ```
 
 The first command shows generated SQL and binding evidence without executing
@@ -58,7 +58,7 @@ Use [the connector guide](file-connectors.md) for manual setup without an agent.
 ## Use the same project in an application
 
 ```sh
-semantic-server --config semantic-db.yaml
+sdb server --project-config semantic-db.yaml
 ```
 
 The PostgreSQL listener is `127.0.0.1:5544`; HTTP is `127.0.0.1:5545`. Use a

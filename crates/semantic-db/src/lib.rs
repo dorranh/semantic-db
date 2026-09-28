@@ -19,8 +19,6 @@ pub use semantic_clickhouse as clickhouse;
 #[cfg(feature = "compiler")]
 pub use semantic_compiler as compiler;
 pub use semantic_engine as engine;
-#[cfg(feature = "github")]
-pub use semantic_github as github;
 #[cfg(feature = "ossie")]
 pub use semantic_ossie as ossie;
 pub use semantic_plan as plan;

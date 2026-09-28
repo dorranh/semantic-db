@@ -2290,7 +2290,20 @@ dependencies = [
 name = "example-github"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "chrono",
+ "datafusion",
+ "futures",
+ "reqwest 0.12.28",
+ "semantic-cli",
+ "semantic-compiler",
  "semantic-db",
+ "semantic-engine",
+ "semantic-ossie",
+ "semantic-runtime",
+ "semantic-sources",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -4645,7 +4658,6 @@ dependencies = [
  "semantic-clickhouse",
  "semantic-compiler",
  "semantic-engine",
- "semantic-github",
  "semantic-ossie",
  "semantic-plan",
  "semantic-postgres",
@@ -4667,24 +4679,6 @@ dependencies = [
  "semantic-runtime",
  "serde",
  "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "semantic-github"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "datafusion",
- "futures",
- "reqwest 0.12.28",
- "semantic-compiler",
- "semantic-engine",
- "semantic-ossie",
- "semantic-runtime",
- "serde",
- "serde_json",
  "tokio",
 ]
 
@@ -4808,7 +4802,6 @@ dependencies = [
  "semantic-catalog",
  "semantic-clickhouse",
  "semantic-engine",
- "semantic-github",
  "semantic-ossie",
  "semantic-postgres",
  "semantic-runtime",

@@ -1,68 +1,51 @@
 # CLI reference
 
-Use the [dataset guide](adding-datasets.md) for the configured onboarding path.
-All commands below run from the repository root unless a different directory is
-specified. Install locally with `cargo install --path apps/semantic-cli --locked`
-to use `semantic-db` directly instead of `cargo run -p semantic-cli --`.
-Packages and prebuilt binaries are not published yet.
+Use the [dataset guide](adding-datasets.md) to create a project configuration.
+The `sdb` executable has explicit `repl`, `server`, and `init` commands. The
+examples below run from the repository root with `cargo run -p semantic-cli --`;
+replace that prefix with `sdb` after installation.
 
 ## Project configuration and checks
 
 ```sh
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --inspect
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate --connect
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --query 'SELECT * FROM wells' --dry-run
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --inspect
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --validate
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --validate --connect
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --query 'SELECT * FROM wells' --dry-run
 ```
 
-`--config` selects a YAML/JSON project; see the [configuration reference](connectors.md).
-Model and CSV paths inside it resolve relative to the project file. `--file`
-paths and `.env` resolve relative to the working directory. Configured loading
-cannot be mixed with `--csv`, `--ossie`, `--ossie-model`, or `--source-csv`.
-It supports the same SQL, file, ask, view, piped-stdin, and interactive modes.
+`--project-config PATH` loads a YAML or JSON Semantic DB project, including its
+Ossie model, source bindings, views, and cache settings. Model, CSV, and view
+paths in the project resolve relative to the project file. `--file` and `.env`
+resolve relative to the working directory. For a project with multiple models,
+select one in the project configuration. See the [configuration reference](connectors.md).
+When `--project-config` is omitted, `sdb repl` loads `semantic-db.yaml` from the
+current directory if present and reports the path on stderr. Use `--no-project`
+to open an empty session; it conflicts with `--project-config`.
 
-`--inspect` lists fields, physical mappings, source IDs and connector names.
-`--validate` checks the model's executable profile, required bindings and all
-configured connector options offline. Neither reads credentials or constructs
-providers. They reject query/view options so a check cannot accidentally execute
-rows. `--validate --connect` additionally constructs required providers and checks
+`--inspect` lists fields, physical mappings, source IDs, connector names, and
+configured views. `--validate` checks the model, bindings, connector options,
+view syntax, and view dependencies offline. Neither reads credentials or
+constructs providers. `--validate --connect` also constructs providers and checks
 physical schemas. CSV inference reads a sample; other connectors may request
-metadata. GitHub uses fixed schemas, so this does not prove token permissions or
-row access. No query rows are executed by the check.
+metadata. No query rows are executed by validation.
 
-`--ossie PATH --inspect` and `--ossie PATH --validate` work without project config,
-but check only the model and report required providers; they do not verify bindings.
-Add `--validate --connect --source-csv SOURCE=PATH` for a connected direct CSV check.
+`--dry-run` requires a query, file, natural-language request, or write. SQL mode
+prints a logical plan without executing query rows. Natural-language mode still
+calls the model. Loading sources may infer schemas before planning.
 
-`--dry-run` requires `--query`, `--file`, or `--ask`. SQL mode prints a logical
-plan without executing it. Natural-language mode still calls the model. Neither
-estimates remote cost or proves permissions. Schema inference may happen while
-loading sources, before planning.
-
-## Direct source flags
-
-The original `--csv`, `--ossie` and `--source-csv` flags remain available for
-one-off use. Prefer project files when sharing or repeating dataset setup.
-
-### Direct CSV examples
-
-Install [rustup](https://rustup.rs/). The repository pins Rust 1.94.0, matching
-DataFusion 55's compiler requirement. The first build downloads and compiles a
-substantial dependency graph.
-
-From the repository root:
+## SQL and interactive use
 
 ```sh
 # Interactive SQL
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml
 
-# Run the example query: returns W-001 and W-004
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv \
+# Execute one statement from a file
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml \
   --file examples/geospatial/query.sql
 
-# Define a view and query it in one session
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv \
-  --view 'deep_wells=SELECT * FROM wells WHERE total_depth_m >= 2500' \
+# Query a view authored in the project configuration
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.views.yaml \
   --query 'SELECT well_id FROM deep_wells ORDER BY well_id'
 ```
 
@@ -71,23 +54,26 @@ In the interactive session:
 ```text
 .tables
 .schema wells
-.view deep_wells=SELECT * FROM wells WHERE total_depth_m >= 2500
-SELECT well_id, basin FROM deep_wells ORDER BY well_id;
-EXPLAIN SELECT * FROM deep_wells WHERE basin = 'North Basin';
+SELECT well_id, basin FROM wells ORDER BY well_id;
+EXPLAIN SELECT * FROM wells WHERE basin = 'North Basin';
 .quit
 ```
 
 SQL can span lines; submit one statement at a time, ending the last line with `;`.
-Dot commands occupy one line. Ctrl-C clears pending SQL; Ctrl-D exits. History is
-session-local. `--query`, `--file`, and piped stdin accept one SQL statement;
-multi-statement scripts are not supported. Use `--view` or `.view` to create views;
-SQL DDL and DML are disabled to keep the metadata catalog in sync.
+Dot commands occupy one line. Ctrl-C clears pending SQL; Ctrl-D exits. Author
+views as SQL files referenced by the project configuration. `--query`, `--file`,
+and piped stdin accept one SQL statement; multi-statement scripts are not supported.
+CLI results are collected in memory, so use `LIMIT` for exploratory queries.
+Library consumers can stream results.
 
-CSV files require headers; schema inference uses DataFusion's defaults. Relations
-and views last only for the current process. Names currently use lowercase,
-unqualified SQL identifiers. CLI results are collected in memory, so use `LIMIT`
-for exploratory queries over large inputs. Library consumers can stream results.
-
+Read options apply to direct SQL, file input, piped SQL, interactive SQL, and
+executed Ask queries. `--read-consistency snapshot` requests a single-domain
+snapshot and bypasses materializations. `--read-cache bypass` skips configured
+materializations; `--read-cache max-age=300` accepts generations no older than
+300 seconds. `--explain-read` reports dependencies and consistency checks without
+query rows; `--read-report` prints execution evidence to stderr. These read
+controls cannot accompany validation, cache maintenance, writes, or `--dry-run`.
+`--query-timeout-seconds` applies to execution and accepts 1 through 86,400.
 
 ## Natural-language queries
 
@@ -99,11 +85,11 @@ version prefix (for example, `https://api.openai.com/v1`). The adapter appends
 precedence over `.env`; SQL-only sessions do not require provider configuration.
 
 ```sh
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv \
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml \
   --ask "Return well_id for active wells in 'North Basin' with total_depth_m >= 2500, ordered by well_id"
 
 # Inspect SQL and model-proposed evidence without executing rows
-cargo run -p semantic-cli -- --csv wells=examples/geospatial/wells.csv \
+cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml \
   --ask "Count wells by basin" --dry-run
 ```
 
@@ -134,4 +120,3 @@ does not prove domain correctness. The prompt asks for clarification when units,
 thresholds, or meanings are missing, but deterministic semantic enforcement,
 retrieval over large catalogs, and richer typed intent lowering remain future
 work. Use a view with an explicit definition or put definitions in the request.
-

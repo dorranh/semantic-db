@@ -82,17 +82,15 @@ pub fn run(root: &Path) -> super::Result<()> {
     );
     println!("Prepared .env.example and .gitignore (existing environment templates are kept).");
     println!("\nFrom the project directory, run:");
-    println!("  sdb repl --config semantic-db.yaml --validate --connect");
-    println!(
-        "  sdb repl --config semantic-db.yaml --query 'SELECT * FROM active_items ORDER BY id'"
-    );
-    println!("  sdb repl --config semantic-db.yaml");
+    println!("  sdb repl --validate --connect");
+    println!("  sdb repl --query 'SELECT * FROM active_items ORDER BY id'");
+    println!("  sdb repl");
     println!("\nEdit the model, source bindings, and SQL views to use your own data.");
     println!("For Ask, copy .env.example to .env and set OPENAI_API_KEY and OPENAI_MODEL.");
-    println!("  sdb repl --config semantic-db.yaml --ask-views 'List active items' --dry-run");
-    println!("  sdb repl --config semantic-db.yaml --ask-views 'List active items'");
+    println!("  sdb repl --ask-views 'List active items' --dry-run");
+    println!("  sdb repl --ask-views 'List active items'");
     println!("For applications, start the same project with:");
-    println!("  sdb server --config semantic-db.yaml");
+    println!("  sdb server --project-config semantic-db.yaml");
     Ok(())
 }
 

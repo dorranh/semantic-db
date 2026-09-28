@@ -45,7 +45,7 @@ retrieval are still outstanding.
 - Identity-field projections with logical/physical type checks and hidden raw columns.
 - Model/field annotations and declared keys preserved separately from Arrow schemas
   and supplied to the compiler; keys are explicitly not enforced.
-- CLI `--ossie`, `--ossie-model`, and `--source-csv` support.
+- CLI project configuration support for Ossie models and source bindings.
 - Wells query equivalence, compiler metadata, rejection, and CLI integration tests.
 
 See the [Ossie reference](../ossie-reference.md) for the supported profile.

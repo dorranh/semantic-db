@@ -8,7 +8,7 @@ containing those rows. Nested custom SQL types are unnecessary until an actual
 use case requires them.
 
 ```sql
--- Target SQL authoring form; the initial CLI uses .view or --view instead.
+-- Target SQL authoring form; the CLI loads reusable views from project configuration.
 CREATE VIEW deep_wells AS
 SELECT well_id, well_name, basin, total_depth_m
 FROM wells

@@ -48,19 +48,25 @@ fn success(output: Output) -> String {
 fn assert_runnable(temp: &Temp, project: &Path) {
     let config = project.join("semantic-db.yaml");
     let config = config.to_str().unwrap();
-    let inspected = success(temp.run(&["repl", "--config", config, "--inspect"]));
+    let inspected = success(temp.run(&["repl", "--project-config", config, "--inspect"]));
     assert!(inspected.contains("starter") && inspected.contains("View active_items"));
     assert!(
-        success(temp.run(&["repl", "--config", config, "--validate"]))
+        success(temp.run(&["repl", "--project-config", config, "--validate"]))
             .contains("Offline validation passed")
     );
     assert!(
-        success(temp.run(&["repl", "--config", config, "--validate", "--connect"]))
-            .contains("Connected schema validation passed")
+        success(temp.run(&[
+            "repl",
+            "--project-config",
+            config,
+            "--validate",
+            "--connect"
+        ]))
+        .contains("Connected schema validation passed")
     );
     let rows = success(temp.run(&[
         "repl",
-        "--config",
+        "--project-config",
         config,
         "--query",
         "SELECT * FROM active_items ORDER BY id",
@@ -68,6 +74,32 @@ fn assert_runnable(temp: &Temp, project: &Path) {
     assert!(rows.contains("First item") && rows.contains("Third item"));
     assert!(!rows.contains("Second item"));
     assert!(rows.contains("2 row(s)"));
+    let discovered = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .current_dir(project)
+        .args(["repl", "--query", "SELECT * FROM active_items ORDER BY id"])
+        .output()
+        .unwrap();
+    assert!(
+        discovered.status.success(),
+        "{}",
+        String::from_utf8_lossy(&discovered.stderr)
+    );
+    assert!(String::from_utf8_lossy(&discovered.stdout).contains("2 row(s)"));
+    assert!(
+        String::from_utf8_lossy(&discovered.stderr).contains("Using project: semantic-db.yaml")
+    );
+    let empty = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .current_dir(project)
+        .args([
+            "repl",
+            "--no-project",
+            "--query",
+            "SELECT * FROM active_items",
+        ])
+        .output()
+        .unwrap();
+    assert!(!empty.status.success());
+    assert!(!String::from_utf8_lossy(&empty.stderr).contains("Using project:"));
     assert!(project.join(".env.example").is_file());
     assert!(
         fs::read_to_string(project.join(".gitignore"))
@@ -86,7 +118,7 @@ fn initializes_current_directory_and_nested_destination_with_runnable_views() {
             None => vec!["init"],
         };
         let output = success(temp.run(&args));
-        assert!(output.contains("--config semantic-db.yaml --validate --connect"));
+        assert!(output.contains("sdb repl --validate --connect"));
         assert_runnable(&temp, &temp.0.join(destination.unwrap_or(".")));
     }
 }
@@ -185,7 +217,7 @@ fn init_help_and_argument_conflicts_do_not_create_files() {
     assert!(success(temp.run(&["init", "--help"])).contains("[PATH]"));
     for args in [
         vec!["--query", "SELECT 1", "init"],
-        vec!["--config", "missing.yaml", "init"],
+        vec!["--project-config", "missing.yaml", "init"],
         vec!["init", "--query", "SELECT 1"],
         vec!["init", "one", "two"],
     ] {

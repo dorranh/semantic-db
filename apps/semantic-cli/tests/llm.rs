@@ -15,9 +15,9 @@ fn cli() -> Command {
     command
 }
 
-fn fixture() -> String {
+fn project() -> String {
     format!(
-        "wells={}/../../examples/geospatial/wells.csv",
+        "{}/../../examples/geospatial/semantic-db.yaml",
         env!("CARGO_MANIFEST_DIR")
     )
 }
@@ -51,14 +51,19 @@ fn sql_needs_no_key_and_llm_reports_missing_configuration() {
     let output = cli()
         .current_dir(&dir.0)
         .env_remove("OPENAI_API_KEY")
-        .args(["--csv", &fixture(), "--query", "SELECT count(*) FROM wells"])
+        .args([
+            "--project-config",
+            &project(),
+            "--query",
+            "SELECT count(*) FROM wells",
+        ])
         .output()
         .unwrap();
     assert!(stdout(output).contains("1 row(s)"));
     let output = cli()
         .current_dir(&dir.0)
         .env_remove("OPENAI_API_KEY")
-        .args(["--csv", &fixture(), "--ask", "List wells"])
+        .args(["--project-config", &project(), "--ask", "List wells"])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -73,7 +78,13 @@ fn rejects_conflicting_modes() {
         vec!["--ask-views", "wells", "--ask", "wells"],
         vec!["--ask-views", "wells", "--query", "SELECT 1"],
         vec!["--ask-views", "wells", "--file", "x.sql"],
-        vec!["--ask-views", "wells", "--inspect", "--config", "x.yaml"],
+        vec![
+            "--ask-views",
+            "wells",
+            "--inspect",
+            "--project-config",
+            "x.yaml",
+        ],
         vec!["--dry-run"],
     ] {
         assert!(!cli().args(args).output().unwrap().status.success());
@@ -166,7 +177,7 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
             .env("OPENAI_MODEL", "environment-model");
         if views_only {
             command.args([
-                "--config",
+                "--project-config",
                 &format!(
                     "{}/../../examples/geospatial/semantic-db.views.yaml",
                     env!("CARGO_MANIFEST_DIR")
@@ -176,16 +187,22 @@ fn dotenv_to_http_to_validated_execution_and_dry_run() {
             ]);
         } else {
             command.args([
-                "--csv",
-                &fixture(),
+                "--project-config",
+                &project(),
                 "--ask",
                 "List well IDs in North Basin with total_depth_m >= 2500",
             ]);
         }
         if dry_run {
             command.arg("--dry-run");
+        } else {
+            command.arg("--read-report");
         }
-        let text = stdout(command.output().unwrap());
+        let output = command.output().unwrap();
+        if !dry_run {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("\"requested\""));
+        }
+        let text = stdout(output);
         assert!(text.contains("SQL (validated"));
         assert_eq!(text.contains("W-001"), !dry_run);
         assert_eq!(text.contains("W-004"), !dry_run);
@@ -219,7 +236,7 @@ fn live_semantic_evaluation() {
         let text = stdout(
             cli()
                 .current_dir(&root)
-                .args(["--csv", &fixture(), "--ask", request])
+                .args(["--project-config", &project(), "--ask", request])
                 .output()
                 .unwrap(),
         );

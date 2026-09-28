@@ -35,7 +35,7 @@ async fn release_server_loads_every_file_format_and_exposes_catalog() {
                 .current_dir(&files.0)
                 .args([
                     "server",
-                    "--config",
+                    "--project-config",
                     config.to_str().unwrap(),
                     "--port",
                     &pg.to_string(),

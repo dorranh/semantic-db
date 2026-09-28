@@ -60,11 +60,11 @@ Cache status and invalidation work without source connections or credential reso
 CLI controls:
 
 ```sh
-semantic-db --config project.yaml --cache-status
-semantic-db --config project.yaml --cache-refresh drilling_summary
-semantic-db --config project.yaml --cache-invalidate KEY_FROM_STATUS
-semantic-db --config project.yaml --bypass-cache --query 'SELECT * FROM drilling_summary'
-semantic-db --config project.yaml --query-timeout-seconds 60 --query 'SELECT COUNT(*) FROM drilling_summary'
+sdb repl --project-config project.yaml --cache-status
+sdb repl --project-config project.yaml --cache-refresh drilling_summary
+sdb repl --project-config project.yaml --cache-invalidate KEY_FROM_STATUS
+sdb repl --project-config project.yaml --read-cache bypass --query 'SELECT * FROM drilling_summary'
+sdb repl --project-config project.yaml --query-timeout-seconds 60 --query 'SELECT COUNT(*) FROM drilling_summary'
 ```
 
 The REPL equivalents are `.cache-status`, `.cache-refresh NAME`, `.cache-invalidate KEY`, and `.cache-bypass on|off`. Natural-language execution also uses the engine execution path after generated-SQL validation.

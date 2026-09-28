@@ -131,7 +131,7 @@ try {
   const pgPort = await freePort();
   let httpPort = await freePort();
   while (httpPort === pgPort) httpPort = await freePort();
-  const semantic = start(binary, ["server", "--config", "semantic-db.json", "--port", String(pgPort), "--http-port", String(httpPort)], {
+  const semantic = start(binary, ["server", "--project-config", "semantic-db.json", "--port", String(pgPort), "--http-port", String(httpPort)], {
     cwd: directory,
     env: { ...process.env, OPENAI_API_KEY: "fixture", OPENAI_MODEL: "fixture", OPENAI_BASE_URL: `http://127.0.0.1:${modelPort}` },
   });

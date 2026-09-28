@@ -102,7 +102,7 @@ provide a shared transaction across sources. A live query can also observe
 different upstream moments across scans or paginated requests.
 
 The CLI supports `--cache-status`, `--cache-refresh <relation>`, and
-`--bypass-cache`. Compare a cold fill, a warm hit, and a bypassed query separately.
+`--read-cache bypass`. Compare a cold fill, a warm hit, and a bypassed query separately.
 Inspect [materialization policies](../../crates/semantic-materialization/src/lib.rs)
 and [engine cache execution](../../crates/semantic-engine/src/materialization.rs)
 before tuning them. Plain `EXPLAIN` neither fills nor accurately predicts the
@@ -128,9 +128,9 @@ eventual cache-hit path.
 For the local example:
 
 ```sh
-just cli --config examples/geospatial/semantic-db.yaml \
+just cli repl --project-config examples/geospatial/semantic-db.yaml \
   --query 'EXPLAIN SELECT basin, COUNT(*) FROM wells GROUP BY basin'
-just cli --config examples/geospatial/semantic-db.yaml \
+just cli repl --project-config examples/geospatial/semantic-db.yaml \
   --query 'EXPLAIN ANALYZE SELECT basin, COUNT(*) FROM wells GROUP BY basin'
 ```
 

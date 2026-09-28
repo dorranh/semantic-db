@@ -28,7 +28,6 @@ async-trait = "0.1"
 semantic-catalog = { path = "crates/semantic-catalog" }
 semantic-plan = { path = "crates/semantic-plan" }
 semantic-ossie = { path = "crates/semantic-ossie" }
-semantic-github = { path = "crates/semantic-github" }
 semantic-clickhouse = { path = "crates/semantic-clickhouse" }
 semantic-postgres = { path = "crates/semantic-postgres" }
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }

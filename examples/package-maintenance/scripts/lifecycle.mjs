@@ -108,7 +108,7 @@ if (mode === "setup" || mode === "reset") {
     }
     launch(path.join(root, "target/debug/sdb"), [
       "server",
-      "--config",
+      "--project-config",
       process.env.SEMANTIC_LIVE ? "semantic-db.live.yaml" : "semantic-db.yaml",
       "--query-timeout-seconds",
       process.env.SEMANTIC_LIVE ? "120" : "30",

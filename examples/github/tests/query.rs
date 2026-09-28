@@ -10,13 +10,13 @@ use std::{
 };
 
 use datafusion::{catalog::TableProvider, prelude::SessionContext};
+use example_github::{GitHub, GitHubConfig};
 use futures::StreamExt;
 use semantic_compiler::{
     Compiler, GroundingOutcome,
     provider::{Message, ModelProvider, ProviderError},
 };
 use semantic_engine::{Engine, pretty_format_batches};
-use semantic_github::{GitHub, GitHubConfig};
 use semantic_ossie::{OssieDocument, SourceBindings};
 use serde_json::{Value, json};
 
@@ -190,8 +190,7 @@ async fn engine(issues: Arc<dyn TableProvider>, labels: Arc<dyn TableProvider>) 
             view("SELECT 'acme/widget' AS repository, 'Platform' AS team").await,
         )
         .unwrap();
-    let document =
-        OssieDocument::parse(include_str!("../../../examples/github/github.ossie.yaml")).unwrap();
+    let document = OssieDocument::parse(include_str!("../github.ossie.yaml")).unwrap();
     let imported = document.load(Some("github_maintenance"), &sources).unwrap();
     assert_eq!(imported.warnings.len(), 3);
     imported.engine
@@ -248,14 +247,8 @@ async fn ossie_queries_match_local_reference_across_pages_nulls_timestamps_and_j
         ("SELECT number FROM issues WHERE title LIKE '%3' LIMIT 1", 2),
         ("SELECT number FROM issues ORDER BY number DESC LIMIT 1", 2),
         ("SELECT * FROM issue_labels ORDER BY issue_id, label_id", 6),
-        (
-            include_str!("../../../examples/github/open_issues_by_team.sql"),
-            2,
-        ),
-        (
-            include_str!("../../../examples/github/open_issues_by_label.sql"),
-            8,
-        ),
+        (include_str!("../open_issues_by_team.sql"), 2),
+        (include_str!("../open_issues_by_label.sql"), 8),
     ] {
         let before = github.request_count();
         assert_eq!(
@@ -588,7 +581,7 @@ async fn compiler_receives_semantics_and_clarification_does_not_execute_github()
                     "question":"Which time field, age cutoff, and reference time define stale?"})
             } else {
                 json!({"status":"grounded", "query":{
-                    "sql":include_str!("../../../examples/github/open_issues_by_team.sql"),
+                    "sql":include_str!("../open_issues_by_team.sql"),
                     "evidence":[
                         {"phrase":"open issues", "catalog_reference":"issues.state", "interpretation":"OPEN state"},
                         {"phrase":"teams", "catalog_reference":"repository_teams", "interpretation":"Authored repository ownership"}
@@ -673,7 +666,7 @@ async fn exact_state_pushdown_matches_local_results_and_reduces_pages_through_os
         "SELECT number FROM issues WHERE state IS NULL",
         "SELECT number FROM issues WHERE state = CAST(NULL AS VARCHAR)",
         "SELECT number FROM issues WHERE state = 'OPEN' LIMIT 0",
-        include_str!("../../../examples/github/open_issues_by_team.sql"),
+        include_str!("../open_issues_by_team.sql"),
     ];
     optimized.plan_sql(queries[0]).await.unwrap();
     assert_eq!(github.request_count(), 0);
@@ -728,7 +721,7 @@ async fn exact_state_pushdown_matches_local_results_and_reduces_pages_through_os
 }
 
 fn github_model() -> Value {
-    OssieDocument::parse(include_str!("../../../examples/github/github.ossie.yaml"))
+    OssieDocument::parse(include_str!("../github.ossie.yaml"))
         .unwrap()
         .json()
         .clone()

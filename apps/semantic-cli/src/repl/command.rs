@@ -4,7 +4,7 @@ pub(super) async fn run(
     engine: &mut Engine,
     compiler: &mut Option<Compiler<OpenAiProvider>>,
     line: &str,
-    color: bool,
+    read_mode: &ReadMode,
 ) -> Result<()> {
     let (command, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
     let rest = rest.trim();
@@ -12,7 +12,6 @@ pub(super) async fn run(
         ".help" => println!(
             ".tables                 List registered relations\n\
              .schema NAME            Show schema and definition\n\
-             .view NAME=SELECT ...   Register an in-memory view (one line)\n\
              .ask REQUEST           Compile and execute natural language\n\
              .plan REQUEST          Compile and show SQL without execution\n\
              .ask-views REQUEST     Select a view and execute a bounded query\n\
@@ -87,11 +86,6 @@ pub(super) async fn run(
                 );
             }
         }
-        ".view" => {
-            let (name, sql) = parse_assignment(rest)?;
-            engine.create_view(&name, &sql).await?;
-            println!("{} {name}", paint("Registered view", "32", color));
-        }
         ".ask" | ".plan" | ".ask-views" | ".plan-views" => {
             if rest.is_empty() {
                 return Err("provide a natural-language request".into());
@@ -105,6 +99,7 @@ pub(super) async fn run(
                 rest,
                 matches!(command, ".plan" | ".plan-views"),
                 matches!(command, ".ask-views" | ".plan-views"),
+                read_mode,
             )
             .await?;
         }
@@ -127,22 +122,34 @@ mod tests {
             })
             .unwrap();
         let mut compiler = None;
-        run(&mut engine, &mut compiler, ".cache-bypass on", false)
+        let read_mode = ReadMode {
+            consistency: semantic_engine::ReadConsistency::Observed,
+            cache: semantic_engine::ReadCache::Configured,
+            explain: false,
+            report: false,
+            custom: false,
+        };
+        run(&mut engine, &mut compiler, ".cache-bypass on", &read_mode)
             .await
             .unwrap();
         assert!(engine.query_options().bypass_materialization);
         assert_eq!(engine.query_options().timeout_seconds, 60);
         assert!(
-            run(&mut engine, &mut compiler, ".cache-bypass invalid", false)
-                .await
-                .is_err()
+            run(
+                &mut engine,
+                &mut compiler,
+                ".cache-bypass invalid",
+                &read_mode
+            )
+            .await
+            .is_err()
         );
         assert!(engine.query_options().bypass_materialization);
-        run(&mut engine, &mut compiler, ".cache-bypass off", false)
+        run(&mut engine, &mut compiler, ".cache-bypass off", &read_mode)
             .await
             .unwrap();
         assert!(!engine.query_options().bypass_materialization);
-        let error = run(&mut engine, &mut compiler, ".cache-status", false)
+        let error = run(&mut engine, &mut compiler, ".cache-status", &read_mode)
             .await
             .unwrap_err();
         assert_eq!(error.to_string(), "project has no cache configuration");

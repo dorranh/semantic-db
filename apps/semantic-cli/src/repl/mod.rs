@@ -11,9 +11,7 @@ use rustyline::{
     validate::{ValidationContext, ValidationResult, Validator},
 };
 
-use crate::{
-    Compiler, Engine, OpenAiProvider, Result, config, parse_assignment, run_ask, run_query,
-};
+use crate::{Compiler, Engine, OpenAiProvider, ReadMode, Result, config, run_ask, run_query};
 
 mod command;
 mod completion;
@@ -27,6 +25,7 @@ pub(super) async fn run(
     no_color: bool,
     no_history: bool,
     history_file: Option<PathBuf>,
+    read_mode: ReadMode,
 ) -> Result<()> {
     let color = colors_enabled(
         no_color,
@@ -77,7 +76,7 @@ pub(super) async fn run(
                 }
                 let started = Instant::now();
                 let result = if trimmed.starts_with('.') {
-                    command::run(engine, &mut compiler, trimmed, color).await
+                    command::run(engine, &mut compiler, trimmed, &read_mode).await
                 } else {
                     if semantic_engine::is_write_statement(trimmed) {
                         crate::run_write(
@@ -87,18 +86,15 @@ pub(super) async fn run(
                         )
                         .await
                     } else {
-                        run_query(engine, trimmed).await
+                        run_query(engine, trimmed, &read_mode).await
                     }
                 };
                 let elapsed = started.elapsed();
                 match result {
                     Ok(()) => {
-                        if trimmed.starts_with(".view") {
-                            editor.helper_mut().unwrap().catalog.refresh(engine);
-                        }
                         // Metadata/help commands don't need execution summaries.
                         if !trimmed.starts_with('.')
-                            || [".view", ".ask", ".plan", ".ask-views", ".plan-views"]
+                            || [".ask", ".plan", ".ask-views", ".plan-views"]
                                 .contains(&trimmed.split_whitespace().next().unwrap_or(""))
                         {
                             println!(
@@ -161,14 +157,6 @@ impl EditorHelper {
                 .map_or(input.len(), |i| leading + i);
             let mut result = input[..leading].to_owned();
             result.push_str(&paint(&input[leading..end], "1;36", true));
-            if &input[leading..end] == ".view"
-                && let Some(eq) = input[end..].find('=')
-            {
-                let sql = end + eq + 1;
-                result.push_str(&input[end..sql]);
-                result.push_str(&self.highlight_sql(&input[sql..]));
-                return result;
-            }
             result.push_str(&input[end..]);
             return result;
         }
@@ -307,7 +295,7 @@ mod tests {
         for input in [
             "SELECT \"café\", 'it''s fine', 42; -- hi",
             ".ask SELECT isn't SQL",
-            ".view v=SELECT 1;",
+            ".ask show wells",
             "SELECT 'unfinished",
             "SELECT 1\r\nFROM wells;",
         ] {
@@ -331,7 +319,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn views_refresh_completion() {
+    async fn configured_views_are_available_to_completion() {
         let mut engine = Engine::new();
         let mut catalog = completion::Catalog::default();
         engine

@@ -14,10 +14,6 @@ dist = true
 name = "sdb"
 path = "src/main.rs"
 
-[features]
-default = []
-github = ["semantic-sources/github", "semantic-server/github"]
-
 [dependencies]
 semantic-server = { path = "../semantic-server" }
 serde_json.workspace = true

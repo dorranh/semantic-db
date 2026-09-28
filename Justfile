@@ -34,7 +34,7 @@ cli *args:
 # Open an example REPL: geospatial (default), or github (requires GITHUB_TOKEN).
 [positional-arguments]
 repl example="geospatial":
-    if [ "$1" = "github" ]; then cargo run -p semantic-cli --features github --locked -- repl --config "examples/$1/semantic-db.yaml"; else cargo run -p semantic-cli --locked -- repl --config "examples/$1/semantic-db.yaml"; fi
+    if [ "$1" = "github" ]; then cargo run -p example-github --bin sdb-github --locked -- repl --project-config "examples/$1/semantic-db.yaml"; else cargo run -p semantic-cli --locked -- repl --project-config "examples/$1/semantic-db.yaml"; fi
 
 # Set up and launch the package-maintenance dashboard, preserving application edits.
 package-maintenance: package-maintenance-setup

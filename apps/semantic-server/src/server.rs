@@ -19,7 +19,8 @@ use std::{
 /// Options for the local PostgreSQL and HTTP server.
 #[derive(Args)]
 pub struct ServerArgs {
-    #[arg(long)]
+    /// Load a Semantic DB project (YAML or JSON), including its model and sources.
+    #[arg(long = "project-config", value_name = "PATH")]
     pub config: PathBuf,
     #[arg(long, default_value_t = 5544)]
     pub port: u16,

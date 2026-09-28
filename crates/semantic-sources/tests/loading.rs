@@ -189,38 +189,3 @@ async fn csv_paths_are_relative_to_project_not_working_directory() {
         .unwrap();
     assert_eq!(rows.iter().map(|b| b.num_rows()).sum::<usize>(), 2);
 }
-
-#[cfg(feature = "github")]
-#[tokio::test]
-async fn github_project_inspects_without_secrets_and_schema_load_needs_no_http() {
-    let project = Project::from_path(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/github/semantic-db.yaml"
-    ))
-    .unwrap();
-    assert_eq!(
-        project
-            .inspect(&Registry::standard())
-            .unwrap()
-            .datasets
-            .len(),
-        3
-    );
-    let error = project
-        .load(&Registry::standard(), &|_| None)
-        .await
-        .err()
-        .unwrap()
-        .to_string();
-    assert!(error.contains("GITHUB_TOKEN") && error.contains("/connections/github"));
-    // Construction uses fixed GitHub schemas, so this token is never sent.
-    let imported = project
-        .load(&Registry::standard(), &|_| Some("not-a-real-token".into()))
-        .await
-        .unwrap();
-    imported
-        .engine
-        .plan_sql("SELECT * FROM issues WHERE state = 'OPEN'")
-        .await
-        .unwrap();
-}
