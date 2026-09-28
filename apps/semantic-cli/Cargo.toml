@@ -1,6 +1,6 @@
 [package]
 name = "semantic-cli"
-description = "Interactive SQL frontend for Semantic DB"
+description = "Command-line frontend for Semantic DB"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -50,7 +50,7 @@ uses the same checks, then validates bindings and physical schemas and construct
 a fresh engine. No partial engine is returned. Provider I/O already performed
 cannot be rolled back.
 
-`sdb repl --project-config PATH --validate` adds offline binding and connector
+`sdb validate --project-config PATH` adds offline binding and connector
 option checks. Add `--connect` for physical checks. Diagnostics carry codes and
 document/configuration paths; common
 remedies are in the [dataset guide](adding-datasets.md#fix-common-onboarding-errors).

@@ -71,10 +71,10 @@ There are two main ways to use semantic DB - either directly via its CLI or embe
 Use the CLI to query a configured dataset:
 
 ```bash
-just cli --config examples/geospatial/semantic-db.yaml --query "SELECT * FROM wells LIMIT 10"
+just cli sql --project-config examples/geospatial/semantic-db.yaml "SELECT * FROM wells LIMIT 10"
 ```
 
-Leave out `--query` to open the repl.
+Use `just cli repl` to open the REPL.
 
 To bootstrap a new project directory use:
 

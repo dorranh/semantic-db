@@ -50,7 +50,7 @@ jobs:
           test -f "$smoke_dir/LICENSE"
           version=$(jq -r '.releases[] | select(.app_name == "semantic-cli") | .app_version' ../dist-manifest.json)
           test "$("$smoke_dir/sdb" --version)" = "sdb $version"
-          "$smoke_dir/sdb" repl --query 'SELECT 42 AS answer'
+          "$smoke_dir/sdb" sql 'SELECT 42 AS answer'
       - uses: actions/upload-artifact@v4
         with:
           name: sdb-${{ matrix.target }}-${{ github.run_number }}-${{ github.sha }}

@@ -14,11 +14,11 @@ to use another set. Credentials stay out of the Ossie model and project file.
 
 ```sh
 # Offline: no token, provider construction, or API requests.
-cargo run -p example-github --bin sdb-github -- repl \
-  --project-config examples/github/semantic-db.yaml --inspect
+cargo run -p example-github --bin sdb-github -- inspect \
+  --project-config examples/github/semantic-db.yaml
 
 # Count open issues by local team; unmapped repositories remain visible.
-cargo run -p example-github --bin sdb-github -- repl \
+cargo run -p example-github --bin sdb-github -- sql \
   --project-config examples/github/semantic-db.yaml \
   --file examples/github/open_issues_by_team.sql
 
@@ -27,25 +27,25 @@ cargo run -p example-github --bin sdb-github -- repl \
   --project-config examples/github/semantic-db.yaml
 
 # Many-to-many label aggregation; can require substantially more requests.
-cargo run -p example-github --bin sdb-github -- repl \
+cargo run -p example-github --bin sdb-github -- sql \
   --project-config examples/github/semantic-db.yaml \
   --file examples/github/open_issues_by_label.sql
 
 # Plan SQL without GitHub row requests.
-cargo run -p example-github --bin sdb-github -- repl \
+cargo run -p example-github --bin sdb-github -- sql \
   --project-config examples/github/semantic-db.yaml \
-  --query "SELECT number FROM issues WHERE state = 'OPEN' LIMIT 10" --dry-run
+  --plan "SELECT number FROM issues WHERE state = 'OPEN' LIMIT 10"
 
 # Uses OPENAI_* configuration as well as GITHUB_TOKEN.
-cargo run -p example-github --bin sdb-github -- repl \
+cargo run -p example-github --bin sdb-github -- ask \
   --project-config examples/github/semantic-db.yaml \
-  --ask "Count open issues by team and repository, including unmapped repositories"
+  "Count open issues by team and repository, including unmapped repositories"
 ```
 
-The REPL supports `.tables`, `.schema issues`, `.view`, `.ask`, `.plan`, and `.quit`.
-End SQL with a semicolon. `--validate --connect` checks provider/model schema
+The REPL supports `.tables`, `.schema issues`, `.ask`, `.plan`, and `.quit`.
+End SQL with a semicolon. `sdb-github validate --connect` checks provider/model schema
 compatibility but makes no GitHub requests and does not verify row permissions.
-SQL-only use needs no model key. `--ask ... --dry-run` still calls the model.
+SQL-only use needs no model key. `ask --compile-only ...` still calls the model.
 
 Source paths inside the project resolve relative to its directory. To replace
 the local mapping, change `sources.local.repository_teams.path`. Keep one row

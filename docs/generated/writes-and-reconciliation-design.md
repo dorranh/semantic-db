@@ -82,11 +82,13 @@ a transaction-level idempotency assertion in this version.
 Preserve Engine::query, plan_sql, execute, and generated-SQL validation as read-only.
 The stronger read contract is available through execute_read and the session APIs;
 low-level DataFrame access via plan_sql does not certify those guarantees. No new
-read SQL modifier in v1: use ReadOptions, and CLI --read-consistency observed|snapshot
-plus --read-cache configured|bypass|max-age=SECONDS for reads. --explain-read plans
-without fetching rows or acquiring snapshots, and --read-report prints the terminal
+read SQL modifier in v1: use ReadOptions, and CLI `sdb sql --read-consistency
+observed|snapshot` plus `--read-cache configured|bypass|max-age=SECONDS` for
+reads. `sdb sql --explain` reports dependencies and consistency checks without
+fetching rows or acquiring snapshots, and `--read-report` prints the terminal
 report to stderr. Snapshot sessions and commit-receipt requirements are library APIs.
-Add CLI --write and --explain-write; retain --query semantics. In the REPL, route
+The implemented CLI uses `sdb sql` with statement-based write dispatch and
+`--explain` for safe write explanations. In the REPL, route
 explicitly authored DML/REQUIRE statements through the write dispatcher. Initial
 multi-statement transaction control is a library API; reject raw BEGIN/COMMIT and
 multi-statement SQL with a targeted message. Do not add natural-language writes.

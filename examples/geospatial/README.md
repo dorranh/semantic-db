@@ -50,8 +50,8 @@ The model documents these interpretations without creating extra columns:
 The complete query remains in [query.sql](query.sql). From the repository root:
 
 ```sh
-cargo run -p semantic-cli -- \
-  --config examples/geospatial/semantic-db.yaml \
+cargo run -p semantic-cli -- sql \
+  --project-config examples/geospatial/semantic-db.yaml \
   --file examples/geospatial/query.sql
 ```
 
@@ -86,10 +86,11 @@ fields. Integration tests compare the imported query result and schema with the
 direct CSV path, compose a view over the import, and verify metadata reaches an
 offline compiler stub without source paths or row samples.
 
-To query in natural language, replace `--file examples/geospatial/query.sql` with:
+To query in natural language, run:
 
 ```sh
---ask "List active wells in North Basin with total depth at least 2500 metres, ordered by well ID"
+cargo run -p semantic-cli -- ask --project-config examples/geospatial/semantic-db.yaml \
+  "List active wells in North Basin with total depth at least 2500 metres, ordered by well ID"
 ```
 
 This uses the model-provider configuration described in the root README. The
@@ -102,9 +103,9 @@ cargo run -p example-ossie-wells
 Validate and inspect without Python or an upstream checkout:
 
 ```sh
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --inspect
-cargo run -p semantic-cli -- --config examples/geospatial/semantic-db.yaml --validate --connect
+cargo run -p semantic-cli -- validate --project-config examples/geospatial/semantic-db.yaml
+cargo run -p semantic-cli -- inspect --project-config examples/geospatial/semantic-db.yaml
+cargo run -p semantic-cli -- validate --project-config examples/geospatial/semantic-db.yaml --connect
 ```
 
 Use [Add a dataset](../../docs/adding-datasets.md) to adapt this project. See the

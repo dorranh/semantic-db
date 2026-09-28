@@ -101,7 +101,7 @@ update them when those semantics change. A snapshot of one relation does not
 provide a shared transaction across sources. A live query can also observe
 different upstream moments across scans or paginated requests.
 
-The CLI supports `--cache-status`, `--cache-refresh <relation>`, and
+The CLI supports `sdb cache status`, `sdb cache refresh <relation>`, and
 `--read-cache bypass`. Compare a cold fill, a warm hit, and a bypassed query separately.
 Inspect [materialization policies](../../crates/semantic-materialization/src/lib.rs)
 and [engine cache execution](../../crates/semantic-engine/src/materialization.rs)
@@ -113,7 +113,7 @@ eventual cache-hit path.
 1. Establish correct output on a small fixture, including NULLs, duplicates,
    unmatched joins, and empty aggregates.
 2. Inspect the optimized plan with `EXPLAIN`; the CLI can also plan without
-   reading query rows using `--dry-run`. Source binding may still fetch metadata.
+   reading query rows using `sdb sql --plan`. Source binding may still fetch metadata.
 3. Execute a bounded workload and inspect `EXPLAIN ANALYZE` when actual operator
    timings/counters are needed. It executes the query and can read remote data.
 4. Record elapsed time, time to first batch, source requests, bytes, decoded bytes,
@@ -128,10 +128,10 @@ eventual cache-hit path.
 For the local example:
 
 ```sh
-just cli repl --project-config examples/geospatial/semantic-db.yaml \
-  --query 'EXPLAIN SELECT basin, COUNT(*) FROM wells GROUP BY basin'
-just cli repl --project-config examples/geospatial/semantic-db.yaml \
-  --query 'EXPLAIN ANALYZE SELECT basin, COUNT(*) FROM wells GROUP BY basin'
+just cli sql --project-config examples/geospatial/semantic-db.yaml \
+  'EXPLAIN SELECT basin, COUNT(*) FROM wells GROUP BY basin'
+just cli sql --project-config examples/geospatial/semantic-db.yaml \
+  'EXPLAIN ANALYZE SELECT basin, COUNT(*) FROM wells GROUP BY basin'
 ```
 
 The [controlled ClickHouse results](clickhouse-controlled-benchmark.json) and

@@ -57,7 +57,7 @@ your actual schema. See [transport normalization](../../crates/semantic-clickhou
 SQL functions depend on the workspace's enabled DataFusion features; the
 dependency disables default Cargo features. A function existing upstream does
 not establish that it is available here. Plan a representative query using
-`Engine::plan_sql` or the CLI's `--dry-run` before relying on it. Planning checks
+`Engine::plan_sql` or the CLI's `sdb sql --plan` before relying on it. Planning checks
 types and names, but execution tests are still needed for edge cases.
 
 The authored-view natural-language mode has a narrower literal filter contract

@@ -5,8 +5,8 @@ Run `sdb init` in an existing directory, or give it a destination:
 ```sh
 sdb init my-project
 cd my-project
-sdb repl --validate --connect
-sdb repl --query 'SELECT * FROM active_items ORDER BY id'
+sdb validate --connect
+sdb sql 'SELECT * FROM active_items ORDER BY id'
 ```
 
 For development, invoke the command from this repository with
@@ -33,7 +33,7 @@ To use natural-language queries, copy `.env.example` to `.env`, fill in
 `OPENAI_API_KEY`, and run from the project directory so the CLI can find `.env`:
 
 ```sh
-sdb repl --ask 'List the active items ordered by id'
+sdb ask 'List the active items ordered by id'
 ```
 
 Initialization creates missing destination directories. It refuses existing

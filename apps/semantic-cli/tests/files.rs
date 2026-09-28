@@ -8,12 +8,11 @@ fn release_cli_loads_every_file_format_without_custom_code() {
     for name in Files::FORMATS {
         let config = files.config(json!({"path":name}));
         let output = std::process::Command::new(env!("CARGO_BIN_EXE_sdb"))
-            .arg("repl")
+            .arg("sql")
             .current_dir(&files.0)
             .args([
                 "--project-config",
                 config.to_str().unwrap(),
-                "--query",
                 "SELECT * FROM selected_products ORDER BY code",
             ])
             .output()
@@ -36,9 +35,9 @@ fn default_cli_excludes_the_example_github_connector() {
     let files = Files::new();
     let config = files.config_connector("github", json!({"path":"items.csv"}));
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_sdb"))
-        .arg("repl")
+        .arg("validate")
         .current_dir(&files.0)
-        .args(["--project-config", config.to_str().unwrap(), "--validate"])
+        .args(["--project-config", config.to_str().unwrap()])
         .output()
         .unwrap();
     assert!(!output.status.success());

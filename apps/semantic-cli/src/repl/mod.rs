@@ -94,7 +94,7 @@ pub(super) async fn run(
                     Ok(()) => {
                         // Metadata/help commands don't need execution summaries.
                         if !trimmed.starts_with('.')
-                            || [".ask", ".plan", ".ask-views", ".plan-views"]
+                            || [".ask", ".plan"]
                                 .contains(&trimmed.split_whitespace().next().unwrap_or(""))
                         {
                             println!(

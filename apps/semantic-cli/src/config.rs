@@ -28,7 +28,7 @@ pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + S
 fn parse_config(get: impl Fn(&str) -> Option<String>) -> super::Result<OpenAiConfig> {
     let api_key = get("OPENAI_API_KEY")
         .filter(|key| !key.trim().is_empty())
-        .ok_or("set OPENAI_API_KEY in the environment or .env to use --ask/.ask")?;
+        .ok_or("set OPENAI_API_KEY in the environment or .env to use sdb ask/.ask")?;
     let model = get("OPENAI_MODEL").unwrap_or_else(|| "gpt-4.1-mini".into());
     let mut config = OpenAiConfig::new(api_key, model);
     if let Some(url) = get("OPENAI_BASE_URL") {

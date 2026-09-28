@@ -127,9 +127,11 @@ successful partial result. There is no transparent whole-query retry.
 
 ## Frontends and example
 
-The CLI supports `--write SQL`, `--explain-write SQL`, `--explain-read`,
-`--read-consistency observed|snapshot`, `--read-cache configured|bypass|max-age=SECONDS`, and
-`--read-report` for CLI reads. Authored REPL writes use the same dispatcher. PostgreSQL
+The CLI uses `sdb sql` for reads and explicitly authored mutations.
+`sdb sql --explain` explains either statement type without executing it;
+`--plan` prints a read's logical plan. Reads also accept
+`--read-consistency observed|snapshot`,
+`--read-cache configured|bypass|max-age=SECONDS`, and `--read-report`. Authored REPL writes use the same dispatcher. PostgreSQL
 simple and prepared query paths return mutation command tags; Parse/Describe and
 EXPLAIN never apply writes. Snapshot sessions and receipts are library interfaces.
 

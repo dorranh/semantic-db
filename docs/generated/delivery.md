@@ -35,10 +35,9 @@ runtime plugins.
 
 ## Ask and applications
 
-The primary walkthrough uses authored-view Ask. Define business meaning in
-Ossie and SQL views, ask a question, inspect the SQL and binding evidence, and
-execute it. The general `.ask` mode remains available for SQL exploration but
-has different grounding guarantees from `.ask-views`.
+The primary walkthrough defines business meaning in Ossie and SQL views,
+asks a question through general Ask, inspects the SQL and grounding evidence,
+and executes it. The same Ask path is available in the CLI, REPL, and HTTP API.
 
 The server exposes `/health`, `/catalog`, and `/compile` over HTTP. `/compile`
 uses the general compiler over the full catalog, preferring authored views when

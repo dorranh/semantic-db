@@ -26,11 +26,11 @@ dependency versions as its host.
 From the repository root:
 
 ```sh
-cargo run -p example-custom-connector -- repl \
-  --project-config examples/connectors/semantic-db.yaml --inspect
-cargo run -p example-custom-connector -- repl \
+cargo run -p example-custom-connector -- inspect \
+  --project-config examples/connectors/semantic-db.yaml
+cargo run -p example-custom-connector -- sql \
   --project-config examples/connectors/semantic-db.yaml \
-  --query 'SELECT id FROM items WHERE id >= 4 LIMIT 1'
+  'SELECT id FROM items WHERE id >= 4 LIMIT 1'
 cargo test -p example-custom-connector --locked
 ```
 

@@ -48,27 +48,20 @@ fn success(output: Output) -> String {
 fn assert_runnable(temp: &Temp, project: &Path) {
     let config = project.join("semantic-db.yaml");
     let config = config.to_str().unwrap();
-    let inspected = success(temp.run(&["repl", "--project-config", config, "--inspect"]));
+    let inspected = success(temp.run(&["inspect", "--project-config", config]));
     assert!(inspected.contains("starter") && inspected.contains("View active_items"));
     assert!(
-        success(temp.run(&["repl", "--project-config", config, "--validate"]))
+        success(temp.run(&["validate", "--project-config", config]))
             .contains("Offline validation passed")
     );
     assert!(
-        success(temp.run(&[
-            "repl",
-            "--project-config",
-            config,
-            "--validate",
-            "--connect"
-        ]))
-        .contains("Connected schema validation passed")
+        success(temp.run(&["validate", "--project-config", config, "--connect"]))
+            .contains("Connected schema validation passed")
     );
     let rows = success(temp.run(&[
-        "repl",
+        "sql",
         "--project-config",
         config,
-        "--query",
         "SELECT * FROM active_items ORDER BY id",
     ]));
     assert!(rows.contains("First item") && rows.contains("Third item"));
@@ -76,7 +69,7 @@ fn assert_runnable(temp: &Temp, project: &Path) {
     assert!(rows.contains("2 row(s)"));
     let discovered = Command::new(env!("CARGO_BIN_EXE_sdb"))
         .current_dir(project)
-        .args(["repl", "--query", "SELECT * FROM active_items ORDER BY id"])
+        .args(["sql", "SELECT * FROM active_items ORDER BY id"])
         .output()
         .unwrap();
     assert!(
@@ -90,12 +83,7 @@ fn assert_runnable(temp: &Temp, project: &Path) {
     );
     let empty = Command::new(env!("CARGO_BIN_EXE_sdb"))
         .current_dir(project)
-        .args([
-            "repl",
-            "--no-project",
-            "--query",
-            "SELECT * FROM active_items",
-        ])
+        .args(["sql", "--no-project", "SELECT * FROM active_items"])
         .output()
         .unwrap();
     assert!(!empty.status.success());
@@ -118,7 +106,7 @@ fn initializes_current_directory_and_nested_destination_with_runnable_views() {
             None => vec!["init"],
         };
         let output = success(temp.run(&args));
-        assert!(output.contains("sdb repl --validate --connect"));
+        assert!(output.contains("sdb validate --connect"));
         assert_runnable(&temp, &temp.0.join(destination.unwrap_or(".")));
     }
 }
@@ -216,9 +204,9 @@ fn init_help_and_argument_conflicts_do_not_create_files() {
     assert!(success(temp.run(&["--help"])).contains("init"));
     assert!(success(temp.run(&["init", "--help"])).contains("[PATH]"));
     for args in [
-        vec!["--query", "SELECT 1", "init"],
+        vec!["sql", "SELECT 1", "init"],
         vec!["--project-config", "missing.yaml", "init"],
-        vec!["init", "--query", "SELECT 1"],
+        vec!["init", "sql", "SELECT 1"],
         vec!["init", "one", "two"],
     ] {
         assert!(!temp.run(&args).status.success(), "{args:?}");

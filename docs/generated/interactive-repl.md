@@ -26,8 +26,7 @@ and any execution.
 
 Autocomplete covers dot commands, `.schema` relation names, SQL keywords, and
 catalog tables, views, and columns.
-Natural-language arguments to `.ask`, `.plan`, `.ask-views`, and `.plan-views`
-are not treated as SQL.
+Natural-language arguments to `.ask` and `.plan` are not treated as SQL.
 
 Completion considers the entire editing buffer, including text after the cursor.
 For example, with `FROM wells w` already entered, `w.` in the SELECT list offers
@@ -62,8 +61,8 @@ LocalAppData). History storage failures warn once and retain session history.
 | `--no-color` | Disable REPL styling. |
 
 A nonempty `NO_COLOR` or `TERM=dumb` also disables styling. Styling is disabled
-when output is redirected. Batch queries, files, and piped input keep their existing
-plain output and do not initialize REPL history.
+when output is redirected. The `sql` command handles batch queries, files, and piped input with plain
+output and no REPL history.
 
 SQL still accepts one statement per submission, and execution still collects
 results in memory. Use `LIMIT` for exploratory queries. This change does not add
@@ -72,7 +71,7 @@ a pager, a full-screen UI, progress indicators, or cancellation during execution
 ## Verification
 
 `cargo test -p semantic-cli --locked` covers the editor helper, completion scopes,
-statement framing, history persistence, batch compatibility, and terminal behavior.
+statement framing, history persistence, and terminal behavior.
 The terminal smoke tests use Python 3's standard-library PTY support on Unix;
 they exercise completion, multiline editing/recall, reverse search, resizing,
 interrupt/EOF handling, project views, restart persistence, and color controls.

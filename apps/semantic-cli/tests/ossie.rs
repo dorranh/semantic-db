@@ -5,7 +5,7 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 #[test]
 fn loads_wells_from_project_and_runs_the_existing_query() {
     let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
-        .arg("repl")
+        .arg("sql")
         .current_dir(ROOT)
         .args([
             "--project-config",
@@ -41,7 +41,7 @@ fn removed_direct_configuration_flags_are_rejected() {
         vec!["--config", "examples/geospatial/semantic-db.yaml"],
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
-            .arg("repl")
+            .arg("sql")
             .current_dir(ROOT)
             .args(args)
             .output()

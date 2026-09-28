@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-semantic-db = { workspace = true, default-features = false, features = ["ossie", "compiler"] }
+semantic-db = { workspace = true, default-features = false, features = ["ossie"] }
 tokio.workspace = true
 
 [lints]

@@ -15,7 +15,7 @@ cargo run -p example-team-catalog --locked
 cargo run -p example-ossie-wells --locked
 cargo run -p example-authored-views --locked
 cargo run -p example-github --locked
-cargo run -p example-custom-connector --locked -- repl --project-config examples/connectors/semantic-db.yaml --query "SELECT id FROM items WHERE id >= 4 LIMIT 1"
+cargo run -p example-custom-connector --locked -- sql --project-config examples/connectors/semantic-db.yaml "SELECT id FROM items WHERE id >= 4 LIMIT 1"
 ```
 
 The GitHub example requires `GITHUB_TOKEN`. The other commands above run offline.

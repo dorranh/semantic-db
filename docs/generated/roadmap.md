@@ -19,7 +19,7 @@
   and row samples.
 - Strict grounding outcome decoding, evidence-reference checks, generated-SQL
   planning over registered relations, and bounded validation repair.
-- Batch `--ask`/`--dry-run`, interactive `.ask`/`.plan`, and lazy `.env` configuration.
+- `sdb ask` with `--compile-only`, interactive `.ask`/`.plan`, and lazy `.env` configuration.
 - Offline compiler/HTTP/CLI tests and an opt-in live semantic evaluation for exact,
   ambiguous, and unsupported requests.
 
@@ -71,23 +71,15 @@ budgets, and snapshot semantics are still open.
 - Exact GitHub issue-state equality pushdown, compared with local/reference scans.
 - Task-oriented [dataset](../adding-datasets.md) and [connector](../building-connectors.md) guides.
 
-## Authored-view grounding slice delivered
+## Authored SQL views
 
-- `Compiler::compile_views` and CLI/REPL view-query modes select existing authored
-  views without introducing a separate concept registry.
-- Typed selections lower to SQL with a fixed view source, checked columns,
-  request-literal comparisons, null tests and ordering.
-- Binding evidence comes from the applied view definition; selected intent remains
-  available in `Compilation.view_selection`.
-- Offline nested-view equivalence, invalid binding/literal, lowering and CLI tests,
-  plus a runnable Ossie-backed Rust example.
-- Project YAML `views` entries with descriptions and SQL files, resolved relative
-  to the project and loaded in dependency order. Offline inspection rejects name,
-  syntax and dependency errors; connected loading checks output schemas.
-
-This preserves the selected definition deterministically. Definition selection,
-natural-language coverage and units remain interpretation/validation gaps; see
-[the contract](authored-view-grounding.md).
+Project YAML `views` entries define reusable SQL relations in files, resolved
+relative to the project and loaded in dependency order. Offline inspection
+checks names, syntax, and dependencies; connected loading checks output schemas.
+General Ask can propose read-only SQL over these views or base relations.
+The former opt-in typed view-selection compiler path has been removed; choosing
+a fitting view and preserving request meaning remain model judgments. See
+[the authored-view guide](authored-view-grounding.md).
 
 ## Next increments
 

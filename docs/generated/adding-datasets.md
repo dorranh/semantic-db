@@ -10,9 +10,9 @@ configured the source bindings, only the Ossie model needs to change.
 From the repository root:
 
 ```sh
-cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --validate
-cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --validate --connect
-cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml --file examples/geospatial/query.sql
+cargo run -p semantic-cli -- validate --project-config examples/geospatial/semantic-db.yaml
+cargo run -p semantic-cli -- validate --project-config examples/geospatial/semantic-db.yaml --connect
+cargo run -p semantic-cli -- sql --project-config examples/geospatial/semantic-db.yaml --file examples/geospatial/query.sql
 ```
 
 The last command returns W-001 and W-004. Copy the `examples/geospatial` folder
@@ -85,10 +85,10 @@ that scope. The [configuration reference](connectors.md) lists the actual option
 Using the local binary installed with `cargo install --path apps/semantic-cli --locked`:
 
 ```sh
-sdb repl --project-config semantic-db.yaml --validate
-sdb repl --project-config semantic-db.yaml --inspect
-sdb repl --project-config semantic-db.yaml --validate --connect
-sdb repl --project-config semantic-db.yaml --query 'SELECT order_id FROM orders LIMIT 10'
+sdb validate --project-config semantic-db.yaml
+sdb inspect --project-config semantic-db.yaml
+sdb validate --project-config semantic-db.yaml --connect
+sdb sql --project-config semantic-db.yaml 'SELECT order_id FROM orders LIMIT 10'
 sdb repl --project-config semantic-db.yaml
 ```
 
@@ -100,8 +100,8 @@ metadata. Fixed-schema API providers can pass without making an API request,
 so run a bounded query to check actual row access.
 
 Start with explicit SQL before adding natural language. Set `OPENAI_API_KEY` in
-the environment or working directory's `.env` to use `--ask` or interactive `.ask`.
-Use `--ask 'Count orders' --dry-run` to inspect generated SQL without reading query
+the environment or working directory's `.env` to use `sdb ask` or interactive `.ask`.
+Use `sdb ask --compile-only 'Count orders'` to inspect generated SQL without reading query
 rows; this still calls the model. See [CLI reference](cli.md).
 
 ## Fix common onboarding errors

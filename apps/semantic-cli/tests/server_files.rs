@@ -25,6 +25,7 @@ async fn release_server_loads_every_file_format_and_exposes_catalog() {
     let files = Files::new();
     for name in Files::FORMATS {
         let config = files.config(json!({"path":name}));
+        std::fs::copy(&config, files.0.join("semantic-db.yaml")).unwrap();
         let pg = port();
         let mut http = port();
         while http == pg {
@@ -35,8 +36,6 @@ async fn release_server_loads_every_file_format_and_exposes_catalog() {
                 .current_dir(&files.0)
                 .args([
                     "server",
-                    "--project-config",
-                    config.to_str().unwrap(),
                     "--port",
                     &pg.to_string(),
                     "--http-port",

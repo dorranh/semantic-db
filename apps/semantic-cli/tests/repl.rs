@@ -3,26 +3,21 @@ use std::{
     process::{Command, Stdio},
 };
 
+fn run_sql(args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("sql")
+        .args(args)
+        .output()
+        .unwrap()
+}
+
 #[test]
-fn repl_flags_do_not_change_batch_or_piped_output() {
-    let run = |flags: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_sdb"))
-            .arg("repl")
-            .args(flags)
-            .args(["--query", "SELECT 42 AS answer"])
-            .output()
-            .unwrap()
-    };
-    let plain = run(&[]);
-    let flagged = run(&["--no-color", "--no-history"]);
-    assert!(plain.status.success() && flagged.status.success());
-    assert_eq!(plain.stdout, flagged.stdout);
-    assert_eq!(plain.stderr, flagged.stderr);
-    assert!(!flagged.stdout.contains(&0x1b));
+fn positional_file_and_stdin_sql_have_the_same_read_output() {
+    let plain = run_sql(&["SELECT 42 AS answer"]);
+    assert!(plain.status.success(), "{plain:?}");
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_sdb"))
-        .arg("repl")
-        .args(["--no-history", "--no-color"])
+        .args(["sql", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -35,13 +30,11 @@ fn repl_flags_do_not_change_batch_or_piped_output() {
         .write_all(b"SELECT 42 AS answer")
         .unwrap();
     let piped = child.wait_with_output().unwrap();
-    assert!(piped.status.success());
+    assert!(piped.status.success(), "{piped:?}");
     assert_eq!(piped.stdout, plain.stdout);
-    assert!(piped.stderr.is_empty());
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_sdb"))
-        .arg("repl")
-        .arg("--read-report")
+        .args(["sql", "--read-report", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -53,27 +46,30 @@ fn repl_flags_do_not_change_batch_or_piped_output() {
         .unwrap()
         .write_all(b"SELECT 42 AS answer")
         .unwrap();
-    let piped = child.wait_with_output().unwrap();
-    assert!(piped.status.success());
-    assert_eq!(piped.stdout, plain.stdout);
-    assert!(String::from_utf8_lossy(&piped.stderr).contains("\"requested\""));
+    let reported = child.wait_with_output().unwrap();
+    assert!(reported.status.success(), "{reported:?}");
+    assert_eq!(reported.stdout, plain.stdout);
+    assert!(String::from_utf8_lossy(&reported.stderr).contains("\"requested\""));
+}
+
+#[test]
+fn repl_is_reserved_for_terminal_sessions() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
+        .arg("repl")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("requires a terminal"));
 }
 
 #[test]
 fn history_flags_conflict() {
     let output = Command::new(env!("CARGO_BIN_EXE_sdb"))
-        .arg("repl")
-        .args([
-            "--no-history",
-            "--history-file",
-            "unused-history",
-            "--query",
-            "SELECT 1",
-        ])
+        .args(["repl", "--no-history", "--history-file", "unused-history"])
         .output()
         .unwrap();
-    assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("cannot be used with"));
+    assert_eq!(output.status.code(), Some(2));
 }
 
 #[cfg(unix)]

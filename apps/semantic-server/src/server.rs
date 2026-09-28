@@ -21,7 +21,7 @@ use std::{
 pub struct ServerArgs {
     /// Load a Semantic DB project (YAML or JSON), including its model and sources.
     #[arg(long = "project-config", value_name = "PATH")]
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
     #[arg(long, default_value_t = 5544)]
     pub port: u16,
     #[arg(long, default_value_t = 5545)]
@@ -35,6 +35,23 @@ pub async fn run_with_registry(
     args: ServerArgs,
     registry: Registry,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let project_path = match args.config {
+        Some(path) => path,
+        None => {
+            let path = PathBuf::from("semantic-db.yaml");
+            match std::fs::metadata(&path) {
+                Ok(metadata) if metadata.is_file() => {
+                    eprintln!("Using project: {}", path.display());
+                    path
+                }
+                Ok(_) => return Err("semantic-db.yaml exists but is not a regular file".into()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    return Err("sdb server requires a project; pass --project-config PATH or run from a directory with semantic-db.yaml".into());
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+    };
     let file: HashMap<String, String> = match dotenvy::from_path_iter(".env") {
         Ok(values) => values
             .collect::<Result<_, _>>()
@@ -43,7 +60,7 @@ pub async fn run_with_registry(
         Err(_) => return Err("could not read .env".into()),
     };
     let secret = |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned());
-    let mut imported = Project::from_path(&args.config)?
+    let mut imported = Project::from_path(&project_path)?
         .load(&registry, &secret)
         .await?;
     imported

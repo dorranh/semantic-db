@@ -18,7 +18,6 @@ impl Temp {
     }
     fn run(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_sdb-github"))
-            .arg("repl")
             .current_dir(&self.0)
             .env_remove("GITHUB_TOKEN")
             .env_remove("OPENAI_API_KEY")
@@ -46,8 +45,8 @@ fn github_offline_commands_do_not_read_credentials_or_dotenv() {
     let temp = Temp::new();
     std::fs::write(temp.0.join(".env"), "not a valid env file\n").unwrap();
     let config = format!("{ROOT}/examples/github/semantic-db.yaml");
-    for mode in ["--validate", "--inspect"] {
-        let result = success(temp.run(&["--project-config", &config, mode]));
+    for mode in ["validate", "inspect"] {
+        let result = success(temp.run(&[mode, "--project-config", &config]));
         assert!(result.contains("github_maintenance") && result.contains("github.scoped.issues"));
     }
 }
@@ -130,7 +129,7 @@ fn configured_github_and_csv_federate_through_the_example_cli() {
             "local.repository_teams":{"connection":"local","path":"teams.csv"}}
     }).to_string()).unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_sdb-github"))
-        .arg("repl")
+        .arg("sql")
         .current_dir(&temp.0)
         .env("GITHUB_TOKEN", "fixture-token")
         .env_remove("OPENAI_API_KEY")

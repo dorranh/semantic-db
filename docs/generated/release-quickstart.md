@@ -12,8 +12,8 @@ expected release.
 ```sh
 sdb init my-project
 cd my-project
-sdb repl --validate --connect
-sdb repl --query 'SELECT * FROM active_items ORDER BY id'
+sdb validate --connect
+sdb sql 'SELECT * FROM active_items ORDER BY id'
 sdb repl
 ```
 
@@ -27,20 +27,19 @@ Set `OPENAI_BASE_URL` for another OpenAI-compatible API. Run from the project
 directory so `sdb` finds `.env`; process environment takes precedence.
 
 ```sh
-sdb repl --ask-views 'List active items' --dry-run
-sdb repl --ask-views 'List active items'
+sdb ask --compile-only 'List active items'
+sdb ask 'List active items'
 ```
 
 The first command shows generated SQL and binding evidence without executing
 query rows; it still contacts the model. The second executes the query. In the
-REPL use `.plan-views List active items` and `.ask-views List active items`.
+REPL use `.plan List active items` and `.ask List active items`.
 Here “active” has a reusable executable definition in the authored view.
 
 Compilation may return clarification or unsupported instead of SQL. Clarifications
 are not a conversation session: resubmit a complete question with the missing
-definition. Unmet requests must not execute a fallback query. General `.ask`
-proposes SQL over catalog relations and has different guarantees; use the
-authored-view mode for this onboarding path.
+definition. Unmet requests must not execute a fallback query. Ask proposes read-only SQL over catalog relations and can use authored views
+when they fit the request. Review the generated SQL and evidence.
 
 ## Connect your data with skills
 
@@ -58,7 +57,7 @@ Use [the connector guide](file-connectors.md) for manual setup without an agent.
 ## Use the same project in an application
 
 ```sh
-sdb server --project-config semantic-db.yaml
+sdb server
 ```
 
 The PostgreSQL listener is `127.0.0.1:5544`; HTTP is `127.0.0.1:5545`. Use a

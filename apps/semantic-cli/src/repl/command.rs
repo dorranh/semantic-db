@@ -14,8 +14,6 @@ pub(super) async fn run(
              .schema NAME            Show schema and definition\n\
              .ask REQUEST           Compile and execute natural language\n\
              .plan REQUEST          Compile and show SQL without execution\n\
-             .ask-views REQUEST     Select a view and execute a bounded query\n\
-             .plan-views REQUEST    Select a view and show SQL without execution\n\
              .cache-status           List published cache generations\n\
              .cache-refresh NAME     Refresh a materialized relation\n\
              .cache-invalidate KEY   Invalidate a cache generation key\n\
@@ -86,7 +84,7 @@ pub(super) async fn run(
                 );
             }
         }
-        ".ask" | ".plan" | ".ask-views" | ".plan-views" => {
+        ".ask" | ".plan" => {
             if rest.is_empty() {
                 return Err("provide a natural-language request".into());
             }
@@ -97,8 +95,7 @@ pub(super) async fn run(
                 engine,
                 compiler.as_ref().expect("compiler initialized"),
                 rest,
-                matches!(command, ".plan" | ".plan-views"),
-                matches!(command, ".ask-views" | ".plan-views"),
+                command == ".plan",
                 read_mode,
             )
             .await?;

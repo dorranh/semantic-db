@@ -18,8 +18,6 @@ pub(super) const COMMANDS: &[&str] = &[
     ".schema",
     ".ask",
     ".plan",
-    ".ask-views",
-    ".plan-views",
     ".cache-status",
     ".cache-refresh",
     ".cache-invalidate",
@@ -853,7 +851,7 @@ mod tests {
         assert_eq!(replacement_end(sql, 9, 11), 14);
         let sql = "SELECT w.\"Display Name\" FROM wells w";
         assert_eq!(replacement_end(sql, 9, 13), 23);
-        assert_eq!(replacement_end(".ask-views hello", 0, 4), 10);
+        assert_eq!(replacement_end(".ask hello", 0, 4), 4);
         // Every character boundary is a valid editing position, even before or
         // inside incomplete CTEs, comments, and quoted names.
         for sql in [

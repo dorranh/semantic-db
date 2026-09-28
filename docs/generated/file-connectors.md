@@ -144,6 +144,6 @@ overrides select reader precision: Arrow may truncate extra decimal or timestamp
 digits to the chosen scale/unit, so choose sufficient precision for the source. Embedded-schema
 formats reject physical overrides and inapplicable parsing options.
 
-`--validate` checks configuration and model conflicts without source I/O.
-`--validate --connect` discovers schemas and checks mappings. Run a bounded
+`sdb validate` checks configuration and model conflicts without source I/O.
+`sdb validate --connect` discovers schemas and checks mappings. Run a bounded
 query as well: schema validation alone does not inspect every value in a file.
