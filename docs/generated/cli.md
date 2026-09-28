@@ -58,9 +58,14 @@ materializations. `--read-cache bypass` skips configured materializations;
 These read policies also apply to executed Ask queries and reads in the REPL.
 `--query-timeout-seconds` accepts 1 through 86,400 seconds.
 
-The REPL accepts SQL and dot commands such as `.tables`, `.schema NAME`,
-`.ask REQUEST`, and `.plan REQUEST`. End SQL with `;`; use `.quit` to exit.
-Run `sdb repl --help` for history, color, and read policy options.
+The REPL starts in SQL mode (`sdb sql> `), where statements end with `;`.
+Shift-Tab switches to Ask mode (`sdb ask> `), where Enter compiles and executes
+a natural-language request. `.mode sql|ask` is a terminal-independent switch.
+Dot commands such as `.tables`, `.schema NAME`, `.ask REQUEST`, and
+`.plan REQUEST` work in either mode; use `.quit` to exit. The startup banner
+shows project and history details. Run `sdb repl --help` for history, color,
+and read policy options; see [Interactive SQL REPL](interactive-repl.md) for
+editing, shared history, and progress display.
 
 ## Natural-language reads
 

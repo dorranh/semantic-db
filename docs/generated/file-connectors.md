@@ -9,7 +9,7 @@ upstream type, function, or operation is implemented.
 
 | Connector | Physical schema | Source optimization | Transport / limits |
 | --- | --- | --- | --- |
-| `postgres` | Database metadata; validate against Ossie | Column selection and limits; filters/joins/aggregates execute locally | Native pooled cursor reads; currently `sslmode=disable`, no TLS |
+| `postgres` | Database metadata; validate against Ossie | Column selection and limits; filters/joins/aggregates execute locally | Native pooled cursor reads; explicit `sslmode`, including verified TLS and optional client certificates |
 | `clickhouse` | Metadata / Arrow; validate against Ossie | Qualified projections, predicates, aggregates, sorting, limits, same-connection joins | HTTP(S), bounded Arrow streams; unsupported SQL falls back locally |
 | `csv` | Ossie-guided parsing plus inference | Scan projection; sequential parsing | Local files/directories; CSV/TSV and configurable delimiter |
 | `json` | Ossie-guided parsing plus inference | Scan/local execution | Local newline-delimited JSON (`.json`, `.jsonl`, `.ndjson`) |
@@ -41,6 +41,13 @@ PostgreSQL connections stay read-only unless `write_enabled: true`. Writable
 Ossie projections must be reversible and expose a supported target key; authored
 views remain read-only targets. See [writes and reconciliation](writes-and-reconciliation-implementation.md)
 for the precise API, supported statements, and checked-input restrictions.
+PostgreSQL requires an explicit `sslmode` in its connection string: `disable`,
+`allow`, `prefer`, `require`, `verify-ca`, or `verify-full`. `allow` and `prefer`
+may use plaintext; `require` encrypts but does not verify the server unless a
+custom CA is supplied. Use `verify-full` for production TLS. The optional
+connection options `ca_pem_env`, `client_cert_pem_env`, and `client_key_pem_env`
+name PEM secrets supplied by the host; client certificate and key must be paired.
+For verified modes, a supplied CA replaces the system trust roots.
 File readers use DataFusion batch execution; CLI/server result buffering still applies. File support does
 not imply filesystem snapshots, watched directories, or query-time refresh.
 

@@ -71,7 +71,7 @@ replace an existing table. Failure after physical creation reports the recoverab
 target instead of pretending DDL and registration were one atomic operation.
 
 The Postgres connector retains its existing builtin Arrow/native type support and
-`sslmode=disable` restriction. It uses temporary staging and native SQL in a pinned
+explicit `sslmode` requirement. It uses temporary staging and native SQL in a pinned
 transaction. Conservative destination locking protects live schema/key validation
 through commit and serializes writes to each target. Checked merges use Serializable
 isolation. Unknown defaults, generated/identity columns, unsupported collations,

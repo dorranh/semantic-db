@@ -32,6 +32,11 @@ semantic-clickhouse = { path = "crates/semantic-clickhouse" }
 semantic-postgres = { path = "crates/semantic-postgres" }
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 deadpool-postgres = "0.14.2"
+tokio-postgres-rustls = { version = "0.14", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "ring"] }
+rustls-native-certs = "0.8"
+rustls-pemfile = "2"
+url = "2"
 datafusion-postgres = { git = "https://github.com/datafusion-contrib/datafusion-postgres", rev = "ffb14a52b3d7c7489559812e1ec38096f225ce93" }
 axum = "0.8"
 datafusion-federation = { version = "=0.5.6", features = ["sql"] }

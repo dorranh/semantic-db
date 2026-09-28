@@ -3,8 +3,10 @@ use super::*;
 pub(super) async fn run(
     engine: &mut Engine,
     compiler: &mut Option<Compiler<OpenAiProvider>>,
+    mode: &mut ReplMode,
     line: &str,
     read_mode: &ReadMode,
+    progress: &ProgressReporter,
 ) -> Result<()> {
     let (command, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
     let rest = rest.trim();
@@ -14,18 +16,27 @@ pub(super) async fn run(
              .schema NAME            Show schema and definition\n\
              .ask REQUEST           Compile and execute natural language\n\
              .plan REQUEST          Compile and show SQL without execution\n\
+             .mode sql|ask          Switch input mode (Shift-Tab also switches)\n\
              .cache-status           List published cache generations\n\
              .cache-refresh NAME     Refresh a materialized relation\n\
              .cache-invalidate KEY   Invalidate a cache generation key\n\
              .cache-bypass on|off    Toggle materialization use\n\
              .quit                   Exit\n\
-             End SQL with ; (trailing comments are allowed). Edit earlier lines with arrows.\n\
+             SQL mode: end statements with ; (trailing comments are allowed).\n\
+             Ask mode: Enter submits a natural-language request.\n\
+             Edit earlier lines with arrows.\n\
              Tab completes; Tab again lists alternatives. Ctrl-R searches history.\n\
              Ctrl-C clears input. Ctrl-D exits when the buffer is empty.\n\
              History stores SQL and natural-language requests locally across projects.\n\
              --no-history keeps history in memory; --history-file PATH overrides storage.\n\
              --no-color or NO_COLOR disables styling."
         ),
+        ".mode" => match rest {
+            "sql" => *mode = ReplMode::Sql,
+            "ask" => *mode = ReplMode::Ask,
+            "" => println!("Current mode: {}", mode.name()),
+            _ => return Err("use .mode sql|ask".into()),
+        },
         ".cache-status" => {
             let manager = engine
                 .materialization_manager()
@@ -97,6 +108,7 @@ pub(super) async fn run(
                 rest,
                 command == ".plan",
                 read_mode,
+                Some(progress),
             )
             .await?;
         }
@@ -126,29 +138,88 @@ mod tests {
             report: false,
             custom: false,
         };
-        run(&mut engine, &mut compiler, ".cache-bypass on", &read_mode)
+        let progress = ProgressReporter::new(false);
+        let mut mode = ReplMode::Sql;
+        run(
+            &mut engine,
+            &mut compiler,
+            &mut mode,
+            ".mode ask",
+            &read_mode,
+            &progress,
+        )
+        .await
+        .unwrap();
+        assert_eq!(mode, ReplMode::Ask);
+        assert!(
+            run(
+                &mut engine,
+                &mut compiler,
+                &mut mode,
+                ".mode nope",
+                &read_mode,
+                &progress
+            )
             .await
-            .unwrap();
+            .is_err()
+        );
+        assert_eq!(mode, ReplMode::Ask);
+        run(
+            &mut engine,
+            &mut compiler,
+            &mut mode,
+            ".mode sql",
+            &read_mode,
+            &progress,
+        )
+        .await
+        .unwrap();
+        run(
+            &mut engine,
+            &mut compiler,
+            &mut mode,
+            ".cache-bypass on",
+            &read_mode,
+            &progress,
+        )
+        .await
+        .unwrap();
         assert!(engine.query_options().bypass_materialization);
         assert_eq!(engine.query_options().timeout_seconds, 60);
         assert!(
             run(
                 &mut engine,
                 &mut compiler,
+                &mut mode,
                 ".cache-bypass invalid",
-                &read_mode
+                &read_mode,
+                &progress,
             )
             .await
             .is_err()
         );
         assert!(engine.query_options().bypass_materialization);
-        run(&mut engine, &mut compiler, ".cache-bypass off", &read_mode)
-            .await
-            .unwrap();
+        run(
+            &mut engine,
+            &mut compiler,
+            &mut mode,
+            ".cache-bypass off",
+            &read_mode,
+            &progress,
+        )
+        .await
+        .unwrap();
         assert!(!engine.query_options().bypass_materialization);
-        let error = run(&mut engine, &mut compiler, ".cache-status", &read_mode)
-            .await
-            .unwrap_err();
+        let error = run(
+            &mut engine,
+            &mut compiler,
+            &mut mode,
+            ".cache-status",
+            &read_mode,
+            &progress,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(error.to_string(), "project has no cache configuration");
     }
 }

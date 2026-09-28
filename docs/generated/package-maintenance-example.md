@@ -183,8 +183,11 @@ sources:
     table: packages
 ```
 
-The connector uses `tokio-postgres` and `deadpool-postgres`. It currently requires
-`sslmode=disable`; TLS is not implemented. Use the local example deployment.
+The connector uses `tokio-postgres` and `deadpool-postgres`. The local example
+uses `sslmode=disable`. Remote deployments can use `sslmode=verify-full` and,
+if needed, `ca_pem_env` to name a custom CA PEM secret. Databases requiring
+client certificates can also set `client_cert_pem_env` and `client_key_pem_env`.
+An explicit mode is required; `allow` and `prefer` can fall back to plaintext.
 Native sessions default to read-only, with finite statement and idle-transaction
 timeouts. Every scan owns a transaction and cursor, fetching bounded batches.
 It rolls back after completion and discards the connection on cancellation/error.

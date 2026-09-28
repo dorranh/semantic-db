@@ -1,8 +1,15 @@
-use std::{borrow::Cow, io::IsTerminal, path::PathBuf, time::Instant};
+use std::{
+    borrow::Cow,
+    io::IsTerminal,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use datafusion::sql::sqlparser::{keywords::Keyword, tokenizer::Token};
 use rustyline::{
-    CompletionType, Config, Context, Editor, Helper,
+    Cmd, CompletionType, ConditionalEventHandler, Config, Context, Editor, Event, EventContext,
+    EventHandler, Helper, KeyCode, KeyEvent, Modifiers, RepeatCount,
     completion::{Completer, Pair},
     error::ReadlineError,
     highlight::{CmdKind, Highlighter},
@@ -17,25 +24,107 @@ mod command;
 mod completion;
 mod history;
 mod lex;
+mod progress;
+
+pub(crate) use progress::Reporter as ProgressReporter;
 
 type ReplEditor = Editor<EditorHelper, DefaultHistory>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReplMode {
+    Sql,
+    Ask,
+}
+
+impl ReplMode {
+    fn prompt(self) -> &'static str {
+        match self {
+            Self::Sql => "sdb sql> ",
+            Self::Ask => "sdb ask> ",
+        }
+    }
+
+    fn toggle(self) -> Self {
+        match self {
+            Self::Sql => Self::Ask,
+            Self::Ask => Self::Sql,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Sql => "SQL",
+            Self::Ask => "Ask",
+        }
+    }
+
+    fn complete(self, input: &str) -> bool {
+        self == Self::Ask || lex::complete(input)
+    }
+}
+
+struct Draft {
+    text: String,
+    cursor: usize,
+}
+
+struct SwitchMode {
+    draft: Arc<Mutex<Option<Draft>>>,
+}
+
+impl ConditionalEventHandler for SwitchMode {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        *self.draft.lock().expect("mode switch lock") = Some(Draft {
+            text: ctx.line().to_owned(),
+            cursor: ctx.pos(),
+        });
+        Some(Cmd::AcceptLine)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum InputKind {
+    Command,
+    Sql,
+    Ask,
+}
+
+fn input_kind(mode: ReplMode, input: &str) -> InputKind {
+    if input.starts_with('.') {
+        InputKind::Command
+    } else if mode == ReplMode::Ask {
+        InputKind::Ask
+    } else {
+        InputKind::Sql
+    }
+}
+
+fn history_entry(kind: InputKind, input: &str) -> String {
+    if kind == InputKind::Ask {
+        format!(".ask {input}")
+    } else {
+        input.to_owned()
+    }
+}
+
 pub(super) async fn run(
     engine: &mut Engine,
+    project_path: Option<PathBuf>,
     no_color: bool,
     no_history: bool,
     history_file: Option<PathBuf>,
     read_mode: ReadMode,
 ) -> Result<()> {
+    let dumb = std::env::var("TERM").is_ok_and(|term| {
+        ["dumb", "cons25", "emacs"]
+            .iter()
+            .any(|name| term.eq_ignore_ascii_case(name))
+    });
     let color = colors_enabled(
         no_color,
         std::io::stdout().is_terminal(),
         std::env::var_os("NO_COLOR").is_some_and(|s| !s.is_empty()),
-        std::env::var("TERM").is_ok_and(|term| {
-            ["dumb", "cons25", "emacs"]
-                .iter()
-                .any(|name| term.eq_ignore_ascii_case(name))
-        }),
+        dumb,
     );
     let config = Config::builder()
         .max_history_size(1_000)?
@@ -48,52 +137,109 @@ pub(super) async fn run(
         })
         .build();
     let mut editor = ReplEditor::with_config(config)?;
+    let draft = Arc::new(Mutex::new(None));
+    editor.bind_sequence(
+        KeyEvent(KeyCode::BackTab, Modifiers::NONE),
+        EventHandler::Conditional(Box::new(SwitchMode {
+            draft: Arc::clone(&draft),
+        })),
+    );
+    let mut mode = ReplMode::Sql;
     let mut helper = EditorHelper::new(color);
     helper.catalog.refresh(engine);
     editor.set_helper(Some(helper));
     let mut history = history::Storage::new(no_history, history_file);
     history.load(&mut editor);
-    println!(
-        "{} — {} relation(s)\nEnd SQL with ; · Tab completes · Ctrl-R searches · .help for commands",
-        paint("Semantic DB", "1;36", color),
-        engine.catalog().relations().count()
+    welcome(
+        project_path.as_deref(),
+        engine.catalog().relations().count(),
+        &history.description(),
+        color,
+        dumb,
     );
-    println!("History: {}", history.description());
+    let progress = ProgressReporter::new(color && std::io::stderr().is_terminal());
     let mut compiler = None;
+    let mut initial: Option<Draft> = None;
     loop {
-        match editor.readline("semantic> ") {
+        let prompt = mode.prompt();
+        let next = if let Some(draft) = initial.take() {
+            editor.readline_with_initial(
+                prompt,
+                (&draft.text[..draft.cursor], &draft.text[draft.cursor..]),
+            )
+        } else {
+            editor.readline(prompt)
+        };
+        if let Some(restored) = draft.lock().expect("mode switch lock").take() {
+            mode = mode.toggle();
+            editor.helper_mut().expect("REPL helper").mode = mode;
+            initial = Some(restored);
+            continue;
+        }
+        match next {
             Ok(line) => {
                 let trimmed = line.trim();
                 if trimmed.is_empty()
-                    || (!trimmed.starts_with('.')
+                    || (mode == ReplMode::Sql
+                        && !trimmed.starts_with('.')
                         && lex::lex(trimmed).tokens.iter().all(lex::Lexeme::whitespace))
                 {
                     continue;
                 }
-                history.record(&mut editor, trimmed);
+                let kind = input_kind(mode, trimmed);
+                history.record(&mut editor, &history_entry(kind, trimmed));
                 if matches!(trimmed, ".quit" | ".exit") {
                     break;
                 }
                 let started = Instant::now();
-                let result = if trimmed.starts_with('.') {
-                    command::run(engine, &mut compiler, trimmed, &read_mode).await
-                } else {
-                    if semantic_engine::is_write_statement(trimmed) {
-                        crate::run_write(
+                let result = match kind {
+                    InputKind::Command => {
+                        command::run(
                             engine,
+                            &mut compiler,
+                            &mut mode,
                             trimmed,
-                            semantic_engine::is_write_explanation(trimmed),
+                            &read_mode,
+                            &progress,
                         )
                         .await
-                    } else {
-                        run_query(engine, trimmed, &read_mode).await
+                    }
+                    InputKind::Ask => {
+                        async {
+                            if compiler.is_none() {
+                                compiler = Some(Compiler::new(config::provider()?));
+                            }
+                            run_ask(
+                                engine,
+                                compiler.as_ref().expect("compiler initialized"),
+                                trimmed,
+                                false,
+                                &read_mode,
+                                Some(&progress),
+                            )
+                            .await
+                        }
+                        .await
+                    }
+                    InputKind::Sql => {
+                        if semantic_engine::is_write_statement(trimmed) {
+                            crate::run_write(
+                                engine,
+                                trimmed,
+                                semantic_engine::is_write_explanation(trimmed),
+                            )
+                            .await
+                        } else {
+                            run_query(engine, trimmed, &read_mode).await
+                        }
                     }
                 };
+                editor.helper_mut().expect("REPL helper").mode = mode;
                 let elapsed = started.elapsed();
                 match result {
                     Ok(()) => {
                         // Metadata/help commands don't need execution summaries.
-                        if !trimmed.starts_with('.')
+                        if kind != InputKind::Command
                             || [".ask", ".plan"]
                                 .contains(&trimmed.split_whitespace().next().unwrap_or(""))
                         {
@@ -131,10 +277,32 @@ fn paint(text: &str, style: &str, enabled: bool) -> String {
     }
 }
 
+fn welcome(
+    project: Option<&std::path::Path>,
+    relations: usize,
+    history: &str,
+    color: bool,
+    dumb: bool,
+) {
+    if dumb {
+        println!("  o o\n o [=]  {}", paint("SemanticDB", "1;36", color));
+    } else {
+        println!("  • •\n ○ ▤   {}", paint("SemanticDB", "1;36", color));
+    }
+    println!(
+        "Project: {} · {} relation(s)",
+        project.map_or_else(|| "none".to_owned(), |path| path.display().to_string()),
+        relations
+    );
+    println!("History: {history}");
+    println!("SQL mode · Shift-Tab switches SQL / Ask · .help lists commands");
+}
+
 struct EditorHelper {
     catalog: completion::Catalog,
     hinter: HistoryHinter,
     color: bool,
+    mode: ReplMode,
 }
 
 impl EditorHelper {
@@ -143,6 +311,7 @@ impl EditorHelper {
             catalog: completion::Catalog::default(),
             hinter: HistoryHinter::new(),
             color,
+            mode: ReplMode::Sql,
         }
     }
 
@@ -160,7 +329,18 @@ impl EditorHelper {
             result.push_str(&input[end..]);
             return result;
         }
+        if self.mode == ReplMode::Ask {
+            return input.into();
+        }
         self.highlight_sql(input)
+    }
+
+    fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<String>) {
+        if self.mode == ReplMode::Ask && !line.trim_start().starts_with('.') {
+            (pos, Vec::new())
+        } else {
+            self.catalog.complete(line, pos)
+        }
     }
 
     fn highlight_sql(&self, input: &str) -> String {
@@ -217,7 +397,7 @@ impl Completer for EditorHelper {
         pos: usize,
         _: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
-        let (start, candidates) = self.catalog.complete(line, pos);
+        let (start, candidates) = self.candidates(line, pos);
         Ok((
             start,
             candidates
@@ -234,7 +414,7 @@ impl Completer for EditorHelper {
 impl Hinter for EditorHelper {
     type Hint = String;
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        if self.color {
+        if self.color && (self.mode == ReplMode::Sql || line.trim_start().starts_with('.')) {
             self.hinter.hint(line, pos, ctx)
         } else {
             None
@@ -244,7 +424,7 @@ impl Hinter for EditorHelper {
 
 impl Validator for EditorHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {
-        Ok(if lex::complete(ctx.input()) {
+        Ok(if self.mode.complete(ctx.input()) {
             ValidationResult::Valid(None)
         } else {
             ValidationResult::Incomplete
@@ -261,7 +441,12 @@ impl Highlighter for EditorHelper {
         }
     }
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(&'s self, prompt: &'p str, _: bool) -> Cow<'b, str> {
-        Cow::Owned(paint(prompt, "1;36", self.color))
+        let style = if self.mode == ReplMode::Ask {
+            "1;35"
+        } else {
+            "1;36"
+        };
+        Cow::Owned(paint(prompt, style, self.color))
     }
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
         // Without styling, ghost text is indistinguishable from editable input.
@@ -279,6 +464,30 @@ impl Highlighter for EditorHelper {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn modes_route_validate_complete_and_record_history() {
+        assert_eq!(input_kind(ReplMode::Sql, "SELECT 1;"), InputKind::Sql);
+        assert_eq!(input_kind(ReplMode::Ask, "show wells"), InputKind::Ask);
+        assert_eq!(
+            input_kind(ReplMode::Ask, ".plan show wells"),
+            InputKind::Command
+        );
+        assert!(!ReplMode::Sql.complete("SELECT 1"));
+        assert!(ReplMode::Ask.complete("show wells"));
+        assert_eq!(
+            history_entry(InputKind::Ask, "show wells"),
+            ".ask show wells"
+        );
+        assert_eq!(history_entry(InputKind::Sql, "SELECT 1;"), "SELECT 1;");
+
+        let mut helper = EditorHelper::new(true);
+        assert!(helper.candidates("SEL", 3).1.contains(&"SELECT".to_owned()));
+        helper.mode = ReplMode::Ask;
+        assert!(helper.candidates("SELECT ", 7).1.is_empty());
+        assert_eq!(helper.highlighted("SELECT 1"), "SELECT 1");
+        assert!(helper.candidates(".mo", 3).1.contains(&".mode".to_owned()));
+    }
 
     #[test]
     fn color_policy_and_lossless_highlighting() {

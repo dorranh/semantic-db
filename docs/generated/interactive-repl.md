@@ -6,10 +6,29 @@ Start an interactive session with a project:
 cargo run -p semantic-cli -- repl --project-config examples/geospatial/semantic-db.yaml
 ```
 
-The REPL uses normal terminal scrollback. SQL input is highlighted; result cells
-retain their original formatting. Successful executions show elapsed time, and
-errors report time before failure. Natural-language timings include compilation
-and any execution.
+The REPL uses normal terminal scrollback. Its compact startup banner shows the
+project, relation count, history location, and mode shortcut. SQL input is
+highlighted; result cells retain their original formatting. Successful executions
+show elapsed time, and errors report time before failure. Natural-language timings
+include compilation and any execution.
+
+## SQL and Ask modes
+
+The session starts in SQL mode (`sdb sql> `). Press Shift-Tab to switch to Ask mode
+(`sdb ask> `) and back. `.mode sql` and `.mode ask` provide the same switch when a
+terminal intercepts Shift-Tab. A switch keeps the text and cursor position of a
+partially edited draft, without executing it or adding it to history. Rustyline
+redraws the draft under the new prompt, leaving the previous prompt in scrollback.
+
+In Ask mode, type a natural-language request and press Enter to compile and execute
+it; no semicolon is needed. `.ask REQUEST` and `.plan REQUEST` continue to work in
+either mode. Dot commands, including `.help`, are available in both modes. Ask
+compilation displays a short progress indicator in styled terminals and a static
+message otherwise. Query evaluation does not report progress yet.
+
+History remains shared between modes. Plain requests submitted in Ask mode are
+stored as `.ask REQUEST`, so recalling them works in either mode. Existing SQL
+entries stay as SQL text; switch to SQL mode before executing a recalled SQL entry.
 
 ## Editing and completion
 
@@ -26,7 +45,8 @@ and any execution.
 
 Autocomplete covers dot commands, `.schema` relation names, SQL keywords, and
 catalog tables, views, and columns.
-Natural-language arguments to `.ask` and `.plan` are not treated as SQL.
+Natural-language arguments to `.ask` and `.plan` are not treated as SQL. In Ask
+mode, plain text does not receive SQL completion or highlighting.
 
 Completion considers the entire editing buffer, including text after the cursor.
 For example, with `FROM wells w` already entered, `w.` in the SELECT list offers
@@ -66,12 +86,13 @@ output and no REPL history.
 
 SQL still accepts one statement per submission, and execution still collects
 results in memory. Use `LIMIT` for exploratory queries. This change does not add
-a pager, a full-screen UI, progress indicators, or cancellation during execution.
+a pager, a full-screen UI, query-evaluation progress, or cancellation during
+execution.
 
 ## Verification
 
 `cargo test -p semantic-cli --locked` covers the editor helper, completion scopes,
-statement framing, history persistence, and terminal behavior.
+statement framing, mode switching, history persistence, and terminal behavior.
 The terminal smoke tests use Python 3's standard-library PTY support on Unix;
 they exercise completion, multiline editing/recall, reverse search, resizing,
 interrupt/EOF handling, project views, restart persistence, and color controls.

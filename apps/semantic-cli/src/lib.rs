@@ -330,10 +330,11 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
         return Err("sdb repl requires a terminal; use sdb sql - for stdin".into());
     }
     let path = project_path(args.project)?;
-    let mut engine = load_engine(path, &registry).await?;
+    let mut engine = load_engine(path.clone(), &registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
     repl::run(
         &mut engine,
+        path,
         args.no_color,
         args.no_history,
         args.history_file,
@@ -417,6 +418,7 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
         &args.request,
         args.compile_only,
         &ReadMode::new(&args.read, false, args.read_report),
+        None,
     )
     .await
 }
@@ -608,8 +610,14 @@ async fn run_ask(
     request: &str,
     compile_only: bool,
     read_mode: &ReadMode,
+    progress: Option<&repl::ProgressReporter>,
 ) -> Result<()> {
-    let compilation = compiler.compile(engine, request).await?;
+    let indicator = progress.map(|reporter| reporter.start("Compiling request"));
+    let compilation = compiler.compile(engine, request).await;
+    if let Some(indicator) = indicator {
+        indicator.finish();
+    }
+    let compilation = compilation?;
     match compilation.outcome {
         GroundingOutcome::Grounded { query } => {
             println!(

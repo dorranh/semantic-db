@@ -18,6 +18,7 @@ pub(super) const COMMANDS: &[&str] = &[
     ".schema",
     ".ask",
     ".plan",
+    ".mode",
     ".cache-status",
     ".cache-refresh",
     ".cache-invalidate",
@@ -119,6 +120,16 @@ impl Catalog {
                     return (
                         start,
                         filter(self.relations.keys().cloned(), &input[start..pos]),
+                    );
+                }
+                ".mode" => {
+                    let start = end + input[end..].len() - input[end..].trim_start().len();
+                    if pos < start {
+                        return (pos, vec![]);
+                    }
+                    return (
+                        start,
+                        filter(["sql".to_owned(), "ask".to_owned()], &input[start..pos]),
                     );
                 }
                 ".cache-bypass" => {

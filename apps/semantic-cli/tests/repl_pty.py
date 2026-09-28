@@ -37,7 +37,8 @@ class Session:
         self.pending = b""
         self.transcript = b""
         self.resize(24, 100)
-        self.expect(b"semantic> ")
+        self.prompt = b"sdb sql> "
+        self.expect(self.prompt)
 
     def send(self, text):
         os.write(self.fd, text.encode() if isinstance(text, str) else text)
@@ -71,7 +72,7 @@ class Session:
     def executed(self, input, marker=b"1 row(s)"):
         self.send(input)
         output = self.expect(marker)
-        self.expect(b"semantic> ")
+        self.expect(self.prompt)
         return output
 
     def close(self):
@@ -79,7 +80,7 @@ class Session:
             self.send(".quit\r")
         else:
             self.send(b"\x03")
-            self.expect(b"semantic> ")
+            self.expect(self.prompt)
             self.send(b"\x04")
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
@@ -103,6 +104,48 @@ class Session:
 
 
 class ReplTests(unittest.TestCase):
+    def test_modes_preserve_drafts_and_ask_history(self):
+        with tempfile.TemporaryDirectory(prefix="semantic-pty-") as directory:
+            history = str(Path(directory) / "history")
+            session = Session(directory, ["--history-file", history])
+            try:
+                self.assertIn(b"Shift-Tab", session.transcript)
+                session.send(b"\x1b[Z")
+                session.prompt = b"sdb ask> "
+                session.expect(session.prompt)
+                session.executed("show wells\r", b"set OPENAI_API_KEY")
+
+                session.send(".mode sql\r")
+                session.prompt = b"sdb sql> "
+                session.expect(session.prompt)
+                session.send("SELECT 41\r+1;")
+                session.send("\x01\x1b[A\x01" + "\x1b[C" * 8)
+                session.send(b"\x1b[Z")
+                session.prompt = b"sdb ask> "
+                session.expect(session.prompt)
+                session.send(b"\x1b[Z")
+                session.prompt = b"sdb sql> "
+                session.expect(session.prompt)
+                self.assertIn(b"43", session.executed("\x04" + "2" + "\x05\r"))
+
+                session.send(".mode ask\r")
+                session.prompt = b"sdb ask> "
+                session.expect(session.prompt)
+                session.send("one deep well\x01" + "\x1b[C" * 4)
+                session.send(b"\x1b[Z")
+                session.prompt = b"sdb sql> "
+                session.expect(session.prompt)
+                session.send(b"\x1b[Z")
+                session.prompt = b"sdb ask> "
+                session.expect(session.prompt)
+                session.executed("very \r", b"set OPENAI_API_KEY")
+            finally:
+                session.close()
+            stored = Path(history).read_text()
+            self.assertIn(".ask show wells", stored)
+            self.assertIn(".ask one very deep well", stored)
+            self.assertEqual(stored.count("SELECT 4"), 1)
+
     def test_editing_completion_search_and_history(self):
         with tempfile.TemporaryDirectory(prefix="semantic-pty-") as directory:
             history = str(Path(directory) / "history")
@@ -112,12 +155,12 @@ class ReplTests(unittest.TestCase):
                 query = "SELECT w.well_i FROM wells w LIMIT 1;"
                 session.send(query + "\x01" + "\x1b[C" * len("SELECT w.well_i") + "\t\x05\r")
                 self.assertIn(b"W-001", session.expect(b"1 row(s)"))
-                session.expect(b"semantic> ")
+                session.expect(session.prompt)
                 # All lines remain in one editable buffer: replace the first digit.
                 session.send("SELECT 41\r+1;")
                 session.send("\x01\x1b[A\x01" + "\x1b[C" * 7 + "\x04" + "5\x05\r")
                 self.assertIn(b"52", session.expect(b"1 row(s)"))
-                session.expect(b"semantic> ")
+                session.expect(session.prompt)
                 # Recall/reexecute the whole multiline statement.
                 self.assertIn(b"52", session.executed("\x1b[A\r"))
                 session.executed("SELECT 987 AS history_marker;\r")
@@ -125,7 +168,7 @@ class ReplTests(unittest.TestCase):
                 self.assertIn(b"987", session.executed("\x12history_marker\r"))
                 # Cancel incomplete input, resize, then execute normally.
                 session.send("SELECT 'unfinished\x03")
-                session.expect(b"semantic> ")
+                session.expect(session.prompt)
                 session.resize(14, 50)
                 self.assertIn(b"123", session.executed("SELECT 123; -- trailing comment\r"))
                 session.executed("SELECT missing;\r", b"Failed after")
