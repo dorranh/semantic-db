@@ -11,21 +11,38 @@ mod tls_fixture;
 async fn connector_integration_postgres_ossie() {
     let db = fixture::Database::start().await;
     db.client.batch_execute("CREATE TABLE items (id BIGINT, label TEXT); INSERT INTO items VALUES (1,'one'),(2,NULL)").await.unwrap();
-    let model=semantic_ossie::OssieDocument::parse(&json!({"version":"0.2.0.dev0","semantic_model":[{"name":"app","datasets":[{"name":"renamed","source":"app.items","fields":[{"name":"item_id","datatype":"Integer","expression":{"dialects":[{"dialect":"ANSI_SQL","expression":"id"}]}},{"name":"label","datatype":"String","expression":{"dialects":[{"dialect":"ANSI_SQL","expression":"label"}]}}]}]}]}).to_string()).unwrap();
-    let config=serde_json::from_value(json!({"ossie":"unused.yaml","connections":{"app":{"connector":"postgres","connection_string_env":"TEST_PG"}},"sources":{"app.items":{"connection":"app","schema":"public","table":"items"}}})).unwrap();
-    let project = Project::new(config, model, PathBuf::from(".")).unwrap();
-    let loaded = project
-        .load(&Registry::standard(), &|name| {
-            (name == "TEST_PG").then(|| db.url.clone())
-        })
-        .await
+    let model=json!({"version":"0.2.0.dev0","semantic_model":[{"name":"app","datasets":[{"name":"renamed","source":"app.items","fields":[{"name":"item_id","datatype":"Integer","expression":{"dialects":[{"dialect":"ANSI_SQL","expression":"id"}]}},{"name":"label","datatype":"String","expression":{"dialects":[{"dialect":"ANSI_SQL","expression":"label"}]}}]}]}]}).to_string();
+    for optimized in [true, false] {
+        let config=serde_json::from_value(json!({"ossie":"unused.yaml","connections":{"app":{"connector":"postgres","connection_string_env":"TEST_PG","allow_insecure_transport":true,"filter_pushdown":optimized,"federation":optimized}},"sources":{"app.items":{"connection":"app","schema":"public","table":"items"}}})).unwrap();
+        let project = Project::new(
+            config,
+            semantic_ossie::OssieDocument::parse(&model).unwrap(),
+            PathBuf::from("."),
+        )
         .unwrap();
-    let rows = loaded
-        .engine
-        .query("SELECT item_id FROM renamed WHERE label IS NULL")
-        .await
-        .unwrap();
-    assert_eq!(rows[0].num_rows(), 1);
+        let loaded = project
+            .load(&Registry::standard(), &|name| {
+                (name == "TEST_PG").then(|| db.url.clone())
+            })
+            .await
+            .unwrap();
+        for sql in [
+            "SELECT item_id FROM renamed WHERE label IS NULL",
+            "SELECT item_id FROM renamed WHERE item_id=2",
+            "SELECT item_id FROM renamed WHERE lower(label)='one' LIMIT 1",
+        ] {
+            let rows = loaded.engine.query(sql).await.unwrap();
+            assert_eq!(rows.iter().map(|b| b.num_rows()).sum::<usize>(), 1);
+            assert_eq!(
+                datafusion::common::ScalarValue::try_from_array(rows[0].column(0), 0).unwrap(),
+                datafusion::common::ScalarValue::Int64(Some(if sql.contains("lower") {
+                    1
+                } else {
+                    2
+                }))
+            );
+        }
+    }
 }
 #[test]
 fn postgres_configuration_is_checked_offline() {
@@ -33,6 +50,9 @@ fn postgres_configuration_is_checked_offline() {
     for config in [
         json!({"connection_string_env":""}),
         json!({"connection_string_env":"PG","pool_size":0}),
+        json!({"connection_string_env":"PG","query_timeout_ms":0}),
+        json!({"connection_string_env":"PG","max_batch_bytes":0}),
+        json!({"connection_string_env":"PG","max_in_list":4097}),
         json!({"connection_string_env":"PG","batch_size":8193}),
         json!({"connection_string_env":"PG","password":"secret"}),
         json!({"connection_string_env":"PG","ca_pem_env":""}),
@@ -131,7 +151,7 @@ async fn connector_integration_postgres_app_only_loading() {
     ));
     std::fs::create_dir(&directory).unwrap();
     std::fs::write(directory.join("v.sql"), "SELECT id,label FROM items").unwrap();
-    let config = json!({"connections":{"app":{"connector":"postgres","connection_string_env":"PG","write_enabled":true}},"app_tables":{"items":{"connection":"app","schema":"public","table":"app_items"}},"views":{"labels":{"sql_file":"v.sql"}}});
+    let config = json!({"connections":{"app":{"connector":"postgres","connection_string_env":"PG","allow_insecure_transport":true,"write_enabled":true}},"app_tables":{"items":{"connection":"app","schema":"public","table":"app_items"}},"views":{"labels":{"sql_file":"v.sql"}}});
     std::fs::write(directory.join("semantic-db.yaml"), config.to_string()).unwrap();
     let project = Project::from_path(directory.join("semantic-db.yaml")).unwrap();
     assert!(
@@ -213,8 +233,7 @@ async fn connector_integration_postgres_checked_merge_from_modeled_files() {
         let config = files.config_connector(connector, json!({"path": name}));
         let mut value: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
-        value["connections"]["app"] =
-            json!({"connector": "postgres", "connection_string_env": "PG", "write_enabled": true});
+        value["connections"]["app"] = json!({"connector": "postgres", "connection_string_env": "PG", "allow_insecure_transport": true, "write_enabled": true});
         value["app_tables"] =
             json!({"stored": {"connection": "app", "schema": "public", "table": "file_items"}});
         std::fs::write(&config, value.to_string()).unwrap();

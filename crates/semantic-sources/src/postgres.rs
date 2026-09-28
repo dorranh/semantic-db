@@ -1,5 +1,5 @@
 use super::*;
-use semantic_postgres::{Postgres, PostgresTlsConfig};
+use semantic_postgres::{Postgres, PostgresOptions, PostgresTlsConfig};
 
 pub struct PostgresConnector;
 struct Connection(Postgres);
@@ -14,6 +14,8 @@ struct ConnectionOptions {
     client_key_pem_env: Option<String>,
     #[serde(default)]
     write_enabled: bool,
+    #[serde(flatten)]
+    execution: PostgresOptions,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,6 +29,7 @@ impl ConnectorFactory for PostgresConnector {
     }
     fn validate_connection(&self, value: &Options) -> Result<()> {
         let c: ConnectionOptions = options(value)?;
+        c.execution.validate()?;
         if c.connection_string_env.trim().is_empty()
             || c.pool_size == Some(0)
             || c.batch_size.is_some_and(|n| !(1..=8192).contains(&n))
@@ -107,11 +110,12 @@ impl ConnectorFactory for PostgresConnector {
                 client_cert_pem: secret(&c.client_cert_pem_env, "/client_cert_pem_env")?,
                 client_key_pem: secret(&c.client_key_pem_env, "/client_key_pem_env")?,
             };
-            let postgres = Postgres::new_with_tls(
+            let postgres = Postgres::new_with_options(
                 &url,
                 c.pool_size.unwrap_or(8),
                 c.batch_size.unwrap_or(1024),
                 tls,
+                c.execution,
             )?;
             Ok(Arc::new(Connection(if c.write_enabled {
                 postgres.with_writes()

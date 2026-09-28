@@ -83,6 +83,8 @@ impl QueryOptions {
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct QueryMetrics {
     pub remote_bytes: usize,
+    /// Portion of remote_bytes estimated by connectors without wire counters.
+    pub estimated_remote_bytes: usize,
     pub decoded_bytes: usize,
     pub remote_requests: usize,
     pub cache_hits: usize,
@@ -106,6 +108,7 @@ pub struct QueryContext {
     cancelled: AtomicBool,
     notification: Notify,
     remote_bytes: AtomicUsize,
+    estimated_remote_bytes: AtomicUsize,
     decoded_bytes: AtomicUsize,
     requests: AtomicUsize,
     hits: AtomicUsize,
@@ -122,6 +125,7 @@ impl QueryContext {
             cancelled: AtomicBool::new(false),
             notification: Notify::new(),
             remote_bytes: AtomicUsize::new(0),
+            estimated_remote_bytes: AtomicUsize::new(0),
             decoded_bytes: AtomicUsize::new(0),
             requests: AtomicUsize::new(0),
             hits: AtomicUsize::new(0),
@@ -176,6 +180,12 @@ impl QueryContext {
             "query remote byte budget exhausted",
         )
     }
+    pub fn charge_remote_estimated(&self, bytes: usize) -> Result<()> {
+        self.charge_remote(bytes)?;
+        self.estimated_remote_bytes
+            .fetch_add(bytes, Ordering::Relaxed);
+        Ok(())
+    }
     pub fn charge_decoded(&self, bytes: usize) -> Result<()> {
         self.check()?;
         charge(
@@ -203,6 +213,7 @@ impl QueryContext {
     pub fn metrics(&self) -> QueryMetrics {
         QueryMetrics {
             remote_bytes: self.remote_bytes.load(Ordering::Relaxed),
+            estimated_remote_bytes: self.estimated_remote_bytes.load(Ordering::Relaxed),
             decoded_bytes: self.decoded_bytes.load(Ordering::Relaxed),
             remote_requests: self.requests.load(Ordering::Relaxed),
             cache_hits: self.hits.load(Ordering::Relaxed),

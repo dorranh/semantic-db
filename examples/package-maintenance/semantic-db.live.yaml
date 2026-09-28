@@ -12,6 +12,7 @@
         {
           "connector": "postgres",
           "connection_string_env": "APP_DATABASE_URL",
+          "allow_insecure_transport": true,
           "batch_size": 256,
           "write_enabled": true,
         },

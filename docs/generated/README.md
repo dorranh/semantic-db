@@ -26,6 +26,7 @@ the supported type and execution contracts.
 5. [Grounding with authored views](authored-view-grounding.md): checked view binding, typed query lowering, and the remaining interpretation boundary.
 6. [Reads, writes, and reconciliation strategy](writes-and-reconciliation-strategy.md): proposed read/commit boundaries, snapshot and visibility guarantees, and eventual convergence.
 7. [Reads, writes, and reconciliation technical design](writes-and-reconciliation-design.md): proposed read/write APIs, snapshot sessions, checked merges, connector contracts, and implementation stages.
+8. [Semantic compiler architecture](semantic-compiler-architecture.md): proposed lossless Catalog IR, recoverable context selection, Intent and Bound Query IRs, deterministic relational lowering, SQL generation, and evaluation gates.
 
 The examples use synthetic wells, subsurface intervals, and survey documents.
 These are example datasets, not assumptions embedded in the core abstractions.

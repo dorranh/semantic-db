@@ -74,3 +74,8 @@ docs *args: docs-install
 # Build the GitHub Pages site and check internal links.
 docs-build: docs-install
     npm --prefix docs/site run build
+
+# PostgreSQL release gate: query placement, budgets, TLS, writes and configured loading.
+test-postgres:
+    cargo test -p semantic-postgres --locked -- --include-ignored
+    cargo test -p semantic-sources --features postgres --locked --test postgres -- --include-ignored

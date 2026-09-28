@@ -1,6 +1,7 @@
 use super::*;
 use datafusion::common::ScalarValue;
 use datafusion::error::Result;
+use datafusion::physical_plan::metrics::{ExecutionPlanMetricsSet, MetricBuilder};
 use futures::future::BoxFuture;
 use semantic_engine::{self as engine, *};
 use semantic_runtime::staging::StagedInput;
@@ -49,23 +50,17 @@ impl Postgres {
         table: &str,
     ) -> EResult<(Arc<dyn TableProvider>, ReadBinding, Option<WriteBinding>)> {
         let target = format!("{}.{}", identifier(namespace)?, identifier(table)?);
-        let client = self
-            .pool
-            .get()
-            .await
-            .map_err(|_| err("Postgres connection failed"))?;
-        let row = client
-            .query_one("SELECT $1::text::regclass::oid", &[&target])
-            .await
-            .map_err(native_error)?;
-        let oid: u32 = row.get(0);
-        drop(client);
-        let resource = format!("{}:{oid}", self.domain);
+        let metadata = self.metadata(namespace, table).await?;
+        let resource = format!("{}:{}", self.domain, metadata.oid);
+        let provider = self.bind_provider(namespace, table, metadata.clone())?;
         self.resources
             .lock()
             .unwrap()
             .insert(resource.clone(), target);
-        let provider = self.table(namespace, table).await?;
+        self.resource_revisions
+            .lock()
+            .unwrap()
+            .insert(resource.clone(), metadata.revision);
         let columns = provider
             .schema()
             .fields()
@@ -91,6 +86,12 @@ impl Postgres {
             .get(resource)
             .cloned()
             .ok_or_else(|| err("unknown Postgres resource identity"))
+    }
+    fn validate_read_revision(&self, resource: &str, metadata: &TableMetadata) -> EResult<()> {
+        if self.resource_revisions.lock().unwrap().get(resource) != Some(&metadata.revision) {
+            return Err(err("Postgres resource schema changed; reload required"));
+        }
+        Ok(())
     }
     fn validate_receipts(&self, receipts: &[CommitReceipt]) -> EResult<()> {
         let issued = self.receipts.lock().unwrap();
@@ -118,22 +119,18 @@ impl Postgres {
         let context = QueryContext::new(QueryOptions::default())?;
         let client = context
             .run(async {
-                self.pool
-                    .get()
+                self.acquire()
                     .await
                     .map_err(|_| failure("Postgres connection failed"))
             })
             .await?;
-        let lease = Lease {
-            client: Some(client),
-            clean: false,
-        };
+        let lease = self.lease(client);
         let c = lease.client.as_ref().unwrap();
         let isolation = match isolation {
             Isolation::RepeatableRead => "REPEATABLE READ",
             Isolation::Serializable => "SERIALIZABLE",
         };
-        c.batch_execute(&format!("BEGIN ISOLATION LEVEL {isolation} READ {}; SET LOCAL idle_in_transaction_session_timeout = '{}ms'",if write{"WRITE"}else{"ONLY"},lifetime.as_millis())).await.map_err(native_error)?;
+        c.batch_execute(&format!("BEGIN ISOLATION LEVEL {isolation} READ {}; SET LOCAL idle_in_transaction_session_timeout = '{}ms'",if write{"WRITE"}else{"ONLY"},lifetime.as_millis().min(self.options.idle_transaction_timeout_ms as u128))).await.map_err(native_error)?;
         let standby: bool = c
             .query_one("SELECT pg_is_in_recovery()", &[])
             .await
@@ -175,6 +172,7 @@ struct Metadata {
     defaults: BTreeMap<String, bool>,
     types: BTreeMap<String, DataType>,
     collations: BTreeMap<String, String>,
+    jsonb_columns: BTreeSet<String>,
 }
 async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> EResult<Metadata> {
     let target = pg.target(resource)?;
@@ -186,7 +184,7 @@ async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> E
     if !resource.ends_with(&format!(":{oid}")) {
         return Err(err("physical resource changed; reload required"));
     }
-    let rows=c.query("SELECT a.attname, a.atttypid, a.attnotnull, a.attgenerated::text, a.attidentity::text, pg_get_expr(d.adbin,d.adrelid), a.attnum::int, CASE WHEN a.attcollation=0 THEN NULL ELSE quote_ident(n.nspname)||'.'||quote_ident(co.collname) END, co.collisdeterministic FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum LEFT JOIN pg_collation co ON co.oid=a.attcollation LEFT JOIN pg_namespace n ON n.oid=co.collnamespace WHERE a.attrelid=$1::text::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum",&[&target]).await.map_err(native_error)?;
+    let rows=c.query("SELECT a.attname, a.atttypid, a.attnotnull, a.attgenerated::text, a.attidentity::text, pg_get_expr(d.adbin,d.adrelid), a.attnum::int, CASE WHEN a.attcollation=0 THEN NULL ELSE quote_ident(n.nspname)||'.'||quote_ident(co.collname) END, co.collisdeterministic, a.atttypmod FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum LEFT JOIN pg_collation co ON co.oid=a.attcollation LEFT JOIN pg_namespace n ON n.oid=co.collnamespace WHERE a.attrelid=$1::text::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum",&[&target]).await.map_err(native_error)?;
     if rows.is_empty() {
         return Err(err("Postgres target has no supported columns"));
     }
@@ -196,11 +194,15 @@ async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> E
     let mut nonnull = BTreeSet::new();
     let mut types = BTreeMap::new();
     let mut collations = BTreeMap::new();
+    let mut jsonb_columns = BTreeSet::new();
     let mut checked = true;
     let mut revision = String::new();
     for row in &rows {
         let n: String = row.get(0);
         let oid: u32 = row.get(1);
+        if oid == Type::JSONB.oid() {
+            jsonb_columns.insert(n.clone());
+        }
         let required: bool = row.get(2);
         let generated: String = row.get(3);
         let identity: String = row.get(4);
@@ -208,10 +210,24 @@ async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> E
         let number: i32 = row.get(6);
         let collation: Option<String> = row.get(7);
         let deterministic: Option<bool> = row.get(8);
-        let ty = arrow_type(
-            &Type::from_oid(oid).ok_or_else(|| err("unsupported Postgres target type"))?,
-        )?;
+        let ty = if oid == Type::NUMERIC.oid() {
+            codec::decimal_type(row.get(9))?
+        } else {
+            arrow_type(
+                &Type::from_oid(oid).ok_or_else(|| err("unsupported Postgres target type"))?,
+            )?
+        };
         checked &= generated.is_empty() && identity.is_empty() && deterministic != Some(false);
+        // Rich value codecs do not imply checked reconciliation equality semantics.
+        checked &= !matches!(
+            ty,
+            DataType::Decimal128(..)
+                | DataType::FixedSizeBinary(_)
+                | DataType::Binary
+                | DataType::Time64(_)
+                | DataType::Interval(_)
+                | DataType::List(_)
+        ) && oid != Type::JSONB.oid();
         // Only literal defaults (optionally cast to a builtin type) are accepted.
         let safe = default.as_ref().is_none_or(|d| safe_default(d));
         defaults.insert(n.clone(), !required || default.is_some() && safe);
@@ -225,10 +241,10 @@ async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> E
             collations.insert(n.clone(), co.clone());
         }
         revision.push_str(&format!(
-            "{n:?}:{oid}:{required}:{generated}:{identity}:{default:?}:{collation:?}:{deterministic:?};"
+            "{n:?}:{oid}:{ty:?}:{required}:{generated}:{identity}:{default:?}:{collation:?}:{deterministic:?};"
         ));
-        // Keep provider schema compatibility: the read connector historically reports all fields nullable.
-        fields.push(Field::new(n, ty, true));
+        // Match the read schema contract, including required columns.
+        fields.push(Field::new(n, ty, !required));
     }
     let indices=c.query("SELECT indkey::smallint[], indexrelid::text FROM pg_index WHERE indrelid=$1::text::regclass AND indisunique AND indisvalid AND indisready AND indimmediate AND indpred IS NULL AND indexprs IS NULL AND indnkeyatts=indnatts AND NOT EXISTS(SELECT 1 FROM unnest(indkey::smallint[],indcollation::oid[]) AS parts(attnum,collation_oid) JOIN pg_attribute a ON a.attrelid=indrelid AND a.attnum=parts.attnum WHERE parts.collation_oid<>a.attcollation) AND NOT EXISTS(SELECT 1 FROM unnest(indclass::oid[]) op JOIN pg_opclass oc ON oc.oid=op JOIN pg_namespace ns ON ns.oid=oc.opcnamespace WHERE ns.nspname<>'pg_catalog' OR NOT oc.opcdefault)",&[&target]).await.map_err(native_error)?;
     let mut keys = vec![];
@@ -290,6 +306,7 @@ async fn inspect(c: &tokio_postgres::Client, pg: &Postgres, resource: &str) -> E
         defaults,
         types,
         collations,
+        jsonb_columns,
     })
 }
 fn safe_default(sql: &str) -> bool {
@@ -376,8 +393,7 @@ impl WriteConnection for Postgres {
                 return Err(err("Postgres writes disabled"));
             }
             let c = self
-                .pool
-                .get()
+                .acquire()
                 .await
                 .map_err(|_| err("Postgres connection failed"))?;
             Ok(inspect(&c, self, target).await?.info)
@@ -386,8 +402,7 @@ impl WriteConnection for Postgres {
     fn validate_operation<'a>(&'a self, plan: &'a MutationPlan) -> BoxFuture<'a, EResult<()>> {
         Box::pin(async move {
             let c = self
-                .pool
-                .get()
+                .acquire()
                 .await
                 .map_err(|_| err("Postgres connection failed"))?;
             validate(&inspect(&c, self, &plan.target).await?, plan)
@@ -509,15 +524,7 @@ impl WriteConnection for Postgres {
                         .join(",")
                 ));
             }
-            let mut lease = Lease {
-                client: Some(
-                    self.pool
-                        .get()
-                        .await
-                        .map_err(|_| err("Postgres connection failed"))?,
-                ),
-                clean: false,
-            };
+            let mut lease = self.lease(self.acquire().await?);
             let c = lease.client.as_ref().unwrap();
             c.batch_execute(&format!(
                 "BEGIN READ WRITE; CREATE TABLE {}.{} ({})",
@@ -581,17 +588,25 @@ impl ReadConnection for Postgres {
             {
                 return Err(err("receipt does not cover resource"));
             }
-            let c = self
-                .pool
-                .get()
-                .await
-                .map_err(|_| err("Postgres connection failed"))?;
-            let meta = inspect(&c, self, resource).await?;
-            Ok(Arc::new(PgTable {
+            let target = self.target(resource)?;
+            let meta = self.metadata_target(&target).await?;
+            self.validate_read_revision(resource, &meta)?;
+            let fallback = Arc::new(PgTable {
                 postgres: self.clone(),
-                target: self.target(resource)?,
-                schema: meta.info.schema,
-            }) as Arc<dyn TableProvider>)
+                target,
+                schema: meta.schema.clone(),
+                metadata: meta,
+            });
+            if self.options.federation && self.options.filter_pushdown {
+                Ok(federation::provider(
+                    self.clone(),
+                    "semantic",
+                    resource,
+                    fallback,
+                )?)
+            } else {
+                Ok(fallback as Arc<dyn TableProvider>)
+            }
         })
     }
     fn open_read_session<'a>(
@@ -702,6 +717,8 @@ impl ConnectorSession for PgSession {
             .await
             .map_err(native_error)?;
             let meta = inspect(c, &self.postgres, resource).await?;
+            let revision = metadata::inspect(c, &self.postgres.target(resource)?).await?;
+            self.postgres.validate_read_revision(resource, &revision)?;
             Ok(Arc::new(SessionTable {
                 session: self.clone(),
                 target: self.postgres.target(resource)?,
@@ -839,9 +856,32 @@ impl ConnectorSession for PgSession {
         })
     }
 }
-fn native_type(ty: &DataType) -> EResult<&'static str> {
+fn native_type(ty: &DataType) -> EResult<String> {
+    if let DataType::Decimal128(p, s) = ty {
+        if *s < 0 || *p > 38 || *s as u8 > *p {
+            return Err(err("unsupported numeric mutation type"));
+        }
+        return Ok(format!("numeric({p},{s})"));
+    }
+    if let DataType::List(item) = ty {
+        if !matches!(
+            item.data_type(),
+            DataType::Boolean
+                | DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::Utf8
+        ) {
+            return Err(err("unsupported Postgres array mutation type"));
+        }
+        return Ok(format!("{}[]", native_type(item.data_type())?));
+    }
     Ok(match ty {
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => "text",
+        DataType::Binary => "bytea",
+        DataType::FixedSizeBinary(16) => "uuid",
+        DataType::Time64(TimeUnit::Microsecond) => "time",
+        DataType::Interval(IntervalUnit::MonthDayNano) => "interval",
         DataType::Boolean => "boolean",
         DataType::Int16 => "smallint",
         DataType::Int32 => "integer",
@@ -852,9 +892,38 @@ fn native_type(ty: &DataType) -> EResult<&'static str> {
         DataType::Timestamp(TimeUnit::Microsecond, None) => "timestamp",
         DataType::Timestamp(TimeUnit::Microsecond, Some(_)) => "timestamptz",
         _ => return Err(err("unsupported Postgres mutation type")),
-    })
+    }
+    .to_owned())
 }
-fn value(v: &ScalarValue, ty: &Type) -> EResult<Box<dyn ToSql + Sync + Send>> {
+pub(crate) fn value(v: &ScalarValue, ty: &Type) -> EResult<Box<dyn ToSql + Sync + Send>> {
+    if ty == &Type::NUMERIC {
+        let bytes = if v.is_null() {
+            None
+        } else if let ScalarValue::Decimal128(Some(value), _, scale) = v {
+            if *scale < 0 {
+                return Err(err("unsupported numeric parameter scale"));
+            }
+            Some(codec::encode_numeric(*value, *scale))
+        } else {
+            return Err(err("NUMERIC requires an exact decimal parameter"));
+        };
+        return Ok(Box::new(codec::BinaryValue(bytes, ty.clone())));
+    }
+    if ty == &Type::JSONB {
+        let bytes = if v.is_null() {
+            None
+        } else if let ScalarValue::Utf8(Some(text))
+        | ScalarValue::LargeUtf8(Some(text))
+        | ScalarValue::Utf8View(Some(text)) = v
+        {
+            let mut bytes = vec![1];
+            bytes.extend_from_slice(text.as_bytes());
+            Some(bytes)
+        } else {
+            return Err(err("JSONB requires UTF-8 JSON"));
+        };
+        return Ok(Box::new(codec::BinaryValue(bytes, ty.clone())));
+    }
     let t = arrow_type(ty)?;
     let v = if v.is_null() {
         ScalarValue::try_from(&t)?
@@ -864,15 +933,83 @@ fn value(v: &ScalarValue, ty: &Type) -> EResult<Box<dyn ToSql + Sync + Send>> {
     };
     Ok(match v {
         ScalarValue::Utf8(v) => Box::new(v),
+        ScalarValue::Binary(v) => Box::new(v),
+        ScalarValue::FixedSizeBinary(16, v) => Box::new(codec::BinaryValue(v, ty.clone())),
+        ScalarValue::Time64Microsecond(v) => Box::new(
+            v.map(|n| {
+                if !(0..86_400_000_000).contains(&n) {
+                    return None;
+                }
+                u32::try_from(n / 1_000_000).ok().and_then(|seconds| {
+                    chrono::NaiveTime::from_num_seconds_from_midnight_opt(
+                        seconds,
+                        (n % 1_000_000) as u32 * 1000,
+                    )
+                })
+            })
+            .transpose_option()?,
+        ),
+        ScalarValue::IntervalMonthDayNano(v) => Box::new(codec::BinaryValue(
+            v.map(|v| {
+                if v.nanoseconds % 1000 != 0 {
+                    return Err(err("Postgres interval requires whole microseconds"));
+                }
+                let mut bytes = vec![];
+                bytes.extend_from_slice(&(v.nanoseconds / 1000).to_be_bytes());
+                bytes.extend_from_slice(&v.days.to_be_bytes());
+                bytes.extend_from_slice(&v.months.to_be_bytes());
+                Ok(bytes)
+            })
+            .transpose()?,
+            ty.clone(),
+        )),
+        ScalarValue::List(array) => {
+            let values = if array.is_null(0) {
+                None
+            } else {
+                Some(array.value(0))
+            };
+            macro_rules! list_value {
+                ($a:ty) => {
+                    Box::new(values.map(|a| {
+                        a.as_any()
+                            .downcast_ref::<$a>()
+                            .unwrap()
+                            .iter()
+                            .collect::<Vec<_>>()
+                    })) as Box<dyn ToSql + Sync + Send>
+                };
+            }
+            match array.value_type() {
+                DataType::Int16 => list_value!(Int16Array),
+                DataType::Int32 => list_value!(Int32Array),
+                DataType::Int64 => list_value!(Int64Array),
+                DataType::Boolean => list_value!(BooleanArray),
+                DataType::Utf8 => Box::new(values.map(|a| {
+                    a.as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.map(str::to_owned))
+                        .collect::<Vec<_>>()
+                })),
+                _ => return Err(err("unsupported Postgres array parameter")),
+            }
+        }
         ScalarValue::Boolean(v) => Box::new(v),
         ScalarValue::Int16(v) => Box::new(v),
         ScalarValue::Int32(v) => Box::new(v),
         ScalarValue::Int64(v) => Box::new(v),
         ScalarValue::Float32(v) => Box::new(v),
         ScalarValue::Float64(v) => Box::new(v),
-        ScalarValue::Date32(v) => Box::new(v.map(|n| {
-            chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap() + chrono::Duration::days(n as i64)
-        })),
+        ScalarValue::Date32(v) => Box::new(
+            v.map(|n| {
+                chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
+                    .unwrap()
+                    .checked_add_signed(chrono::Duration::days(n as i64))
+            })
+            .transpose_option()?,
+        ),
         ScalarValue::TimestampMicrosecond(v, None) => Box::new(
             v.map(|n| chrono::DateTime::from_timestamp_micros(n).map(|d| d.naive_utc()))
                 .transpose_option()?,
@@ -1056,7 +1193,11 @@ async fn apply_native(
                     Ok(format!(
                         "{} {}{}",
                         q(source),
-                        native_type(&meta.types[dest])?,
+                        if meta.jsonb_columns.contains(dest) {
+                            "jsonb".into()
+                        } else {
+                            native_type(&meta.types[dest])?
+                        },
                         meta.collations
                             .get(dest)
                             .map(|c| format!(" COLLATE {c}"))
@@ -1165,42 +1306,47 @@ impl TableProvider for SessionTable {
     fn table_type(&self) -> TableType {
         TableType::Base
     }
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> Result<Vec<datafusion::logical_expr::TableProviderFilterPushDown>> {
+        Ok(filters
+            .iter()
+            .map(|e| predicate::classify(e, &self.schema, &self.session.postgres.options))
+            .collect())
+    }
     async fn scan(
         &self,
-        state: &dyn Session,
+        _: &dyn Session,
         projection: Option<&Vec<usize>>,
-        _: &[Expr],
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let indices = projection
-            .cloned()
-            .unwrap_or_else(|| (0..self.schema.fields().len()).collect());
-        let schema = Arc::new(self.schema.project(&indices)?);
-        let columns = indices
-            .iter()
-            .map(|i| q(self.schema.field(*i).name()))
-            .collect::<Vec<_>>();
-        let select = if columns.is_empty() {
-            "1 AS __row".into()
-        } else {
-            columns.join(",")
-        };
-        let sql = format!(
-            "SELECT {select} FROM {}{}",
-            self.target,
-            limit.map(|n| format!(" LIMIT {n}")).unwrap_or_default()
-        );
+        let (sql, schema, parameters) = predicate::scan_sql(
+            &self.target,
+            &self.schema,
+            projection,
+            filters,
+            limit,
+            &self.session.postgres.options,
+        )?;
+        let metrics = ExecutionPlanMetricsSet::new();
         let partition = Arc::new(SessionPartition {
             session: self.session.clone(),
-            schema: schema.clone(),
-            sql,
+            schema,
+            sql: sql.clone(),
+            parameters,
+            metrics: metrics.clone(),
         });
-        StreamingTable::try_new(schema, vec![partition])?
-            .scan(state, None, &[], None)
-            .await
+        Ok(Arc::new(execution::SessionExec::new(
+            partition, sql, metrics,
+        )))
     }
 }
+
 struct SessionPartition {
+    metrics: ExecutionPlanMetricsSet,
+    parameters: predicate::Parameters,
     session: PgSession,
     schema: SchemaRef,
     sql: String,
@@ -1218,22 +1364,235 @@ impl PartitionStream for SessionPartition {
         let session = self.session.clone();
         let schema = self.schema.clone();
         let sql = self.sql.clone();
+        let parameters = self.parameters.clone();
         let query = QueryContext::from_task(&task)
             .unwrap_or_else(|| QueryContext::new(QueryOptions::default()).unwrap());
         let output = schema.clone();
+        let metrics = self.metrics.clone();
         let stream = async_stream::try_stream! {
-            session.check().map_err(|e|failure(&e.to_string()))?;
-            let collected=tokio::time::timeout_at(session.expires,async{
-                let lease=session.lease.lock().await;let c=lease.as_ref().and_then(|l|l.client.as_ref()).ok_or_else(||failure("session closed"))?;
-                let cursor=q(&format!("semantic_cursor_{}",semantic_runtime::unique_id().replace('-',"_")));
-                query.run(async{c.batch_execute(&format!("DECLARE {cursor} NO SCROLL CURSOR FOR {sql}")).await.map_err(|_|failure("session scan failed"))}).await?;
-                let mut batches=vec![];
-                loop{query.request_started()?;let rows=query.run(async{c.query(&format!("FETCH FORWARD {} FROM {cursor}",session.postgres.batch_size),&[]).await.map_err(|_|failure("session fetch failed"))}).await?;if rows.is_empty(){break;}let b=batch(&schema,&rows)?;query.charge_decoded(b.get_array_memory_size())?;query.charge_remote(b.get_array_memory_size())?;batches.push(b);}
-                c.batch_execute(&format!("CLOSE {cursor}")).await.map_err(|_|failure("session cursor cleanup failed"))?;Ok::<_,datafusion::error::DataFusionError>(batches)
-            }).await.map_err(|_|failure("session expired")).and_then(|r|r);
-            if collected.is_err(){session.poisoned.store(true,Ordering::Release);session.lease.lock().await.take();}
-            for b in collected?{yield b;}
+            let started = std::time::Instant::now();
+            let elapsed = MetricBuilder::new(&metrics).elapsed_compute(0);
+            let _timer = elapsed.timer();
+            let fetches = MetricBuilder::new(&metrics).counter("fetches", 0);
+            let rows_metric = MetricBuilder::new(&metrics).output_rows(0);
+            let decoded = MetricBuilder::new(&metrics).counter("decoded_bytes", 0);
+            let wire_metric = MetricBuilder::new(&metrics).counter("estimated_wire_bytes", 0);
+            session.check().map_err(|e| failure(&e.to_string()))?;
+            let mut abandoned = SessionScanGuard {
+                session: session.clone(),
+                complete: false,
+            };
+            let deadline = session.expires.min(query.deadline()).min(
+                tokio::time::Instant::now()
+                    + Duration::from_millis(session.postgres.options.query_timeout_ms),
+            );
+            let collected = query
+                .run(async {
+                    tokio::time::timeout_at(deadline, async {
+                        let lease = session.lease.lock().await;
+                        let c = lease
+                            .as_ref()
+                            .and_then(|l| l.client.as_ref())
+                            .ok_or_else(|| failure("session closed"))?;
+                        MetricBuilder::new(&metrics)
+                            .counter("queue_ns", 0)
+                            .add(started.elapsed().as_nanos().min(usize::MAX as u128) as usize);
+                        let cursor = q(&format!(
+                            "semantic_cursor_{}",
+                            semantic_runtime::unique_id().replace('-', "_")
+                        ));
+                        execution::set_timeouts(c, &session.postgres, &query, deadline).await?;
+                        let statement = query
+                            .run(async {
+                                c.prepare(&format!("DECLARE {cursor} NO SCROLL CURSOR FOR {sql}"))
+                                    .await
+                                    .map_err(|_| failure("session scan planning failed"))
+                            })
+                            .await?;
+                        let values = parameters.bind(statement.params())?;
+                        let refs = values
+                            .iter()
+                            .map(|v| v.as_ref() as &(dyn ToSql + Sync))
+                            .collect::<Vec<_>>();
+                        query
+                            .run(async {
+                                c.execute(&statement, &refs)
+                                    .await
+                                    .map_err(|_| failure("session scan failed"))
+                            })
+                            .await?;
+                        session
+                            .postgres
+                            .counters
+                            .executions
+                            .fetch_add(1, Ordering::Relaxed);
+                        MetricBuilder::new(&metrics)
+                            .counter("remote_executions", 0)
+                            .add(1);
+                        let reservation = datafusion::execution::memory_pool::MemoryConsumer::new(
+                            "Postgres pinned collection",
+                        )
+                        .register(task.memory_pool());
+                        let mut batches = vec![];
+                        let mut total = 0usize;
+                        loop {
+                            query.request_started()?;
+                            if tokio::time::Instant::now() >= deadline {
+                                return Err(failure("Postgres session query timed out"));
+                            }
+                            session
+                                .postgres
+                                .counters
+                                .fetches
+                                .fetch_add(1, Ordering::Relaxed);
+                            fetches.add(1);
+                            let fetch = format!(
+                                "FETCH FORWARD {} FROM {cursor}",
+                                session.postgres.batch_size
+                            );
+                            let stream = query
+                                .run(async {
+                                    c.query_raw(&fetch, std::iter::empty::<&(dyn ToSql + Sync)>())
+                                        .await
+                                        .map_err(|_| failure("session fetch failed"))
+                                })
+                                .await?;
+                            tokio::pin!(stream);
+                            use futures::StreamExt;
+                            let mut rows = vec![];
+                            let mut admitted = 1024usize;
+                            while let Some(row) = query
+                                .run(async {
+                                    tokio::time::timeout_at(deadline, stream.next())
+                                        .await
+                                        .map_err(|_| failure("session query timed out"))?
+                                        .transpose()
+                                        .map_err(|_| failure("session fetch failed"))
+                                })
+                                .await?
+                            {
+                                admitted = admitted.saturating_add(
+                                    codec::admitted_size(std::slice::from_ref(&row))?
+                                        .saturating_sub(1024),
+                                );
+                                if admitted > session.postgres.options.max_batch_bytes
+                                    || total.saturating_add(admitted)
+                                        > session.postgres.options.max_session_bytes
+                                {
+                                    return Err(failure(
+                                        "Postgres session memory budget exhausted",
+                                    ));
+                                }
+                                reservation.try_resize(total.saturating_add(admitted))?;
+                                rows.push(row);
+                            }
+                            if rows.is_empty() {
+                                break;
+                            }
+                            query.charge_decoded(admitted)?;
+                            let wire = rows.iter().try_fold(0usize, |n, r| {
+                                execution::estimated_wire_size(r).map(|b| n.saturating_add(b))
+                            })?;
+                            query.charge_remote_estimated(wire)?;
+                            let b = batch(&schema, &rows)?;
+                            execution::validate_nulls(&b)?;
+                            if b.get_array_memory_size() > admitted {
+                                return Err(failure("Postgres decode reservation exceeded"));
+                            }
+                            total = total.saturating_add(b.get_array_memory_size());
+                            session
+                                .postgres
+                                .counters
+                                .rows
+                                .fetch_add(rows.len() as u64, Ordering::Relaxed);
+                            session
+                                .postgres
+                                .counters
+                                .estimated_wire_bytes
+                                .fetch_add(wire as u64, Ordering::Relaxed);
+                            session
+                                .postgres
+                                .counters
+                                .decoded_bytes
+                                .fetch_add(b.get_array_memory_size() as u64, Ordering::Relaxed);
+                            rows_metric.add(rows.len());
+                            decoded.add(b.get_array_memory_size());
+                            wire_metric.add(wire);
+                            batches.push(b);
+                        }
+                        query
+                            .run(async {
+                                c.batch_execute(&format!("CLOSE {cursor}"))
+                                    .await
+                                    .map_err(|_| failure("session cursor cleanup failed"))
+                            })
+                            .await?;
+                        Ok::<_, datafusion::error::DataFusionError>((batches, reservation))
+                    })
+                    .await
+                    .map_err(|_| failure("session expired"))
+                    .and_then(|r| r)
+                })
+                .await;
+            abandoned.complete = true;
+            if collected.is_err() {
+                session.poisoned.store(true, Ordering::Release);
+                session.lease.lock().await.take();
+            }
+            let (batches, _reservation) = collected?;
+            MetricBuilder::new(&metrics)
+                .counter("first_batch_ns", 0)
+                .add(started.elapsed().as_nanos().min(usize::MAX as u128) as usize);
+            for b in batches {
+                yield b;
+            }
         };
         Box::pin(RecordBatchStreamAdapter::new(output, stream))
+    }
+}
+
+struct SessionScanGuard {
+    session: PgSession,
+    complete: bool,
+}
+impl Drop for SessionScanGuard {
+    fn drop(&mut self) {
+        if !self.complete {
+            self.session.poisoned.store(true, Ordering::Release);
+            if let Ok(mut lease) = self.session.lease.try_lock() {
+                lease.take();
+            } else if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                let lease = self.session.lease.clone();
+                runtime.spawn(async move {
+                    lease.lock().await.take();
+                });
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod codec_tests {
+    use super::*;
+    #[test]
+    fn added_mutation_types_are_checked_and_encoded() {
+        use bytes::BytesMut;
+        let decimal = ScalarValue::Decimal128(Some(-12345678901234561234), 20, 4);
+        let value = value(&decimal, &Type::NUMERIC).unwrap();
+        let mut bytes = BytesMut::new();
+        value.to_sql_checked(&Type::NUMERIC, &mut bytes).unwrap();
+        assert_eq!(
+            codec::numeric(&bytes, 20, 4).unwrap(),
+            -12345678901234561234
+        );
+        assert_eq!(
+            native_type(&DataType::Decimal128(20, 4)).unwrap(),
+            "numeric(20,4)"
+        );
+        assert!(super::value(&ScalarValue::Date32(Some(i32::MAX)), &Type::DATE).is_err());
+        assert!(super::value(&ScalarValue::Time64Microsecond(Some(-1)), &Type::TIME).is_err());
+        let interval =
+            ScalarValue::IntervalMonthDayNano(Some(IntervalMonthDayNanoType::make_value(1, 2, 1)));
+        assert!(super::value(&interval, &Type::INTERVAL).is_err());
     }
 }

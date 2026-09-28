@@ -17,7 +17,7 @@ async fn connector_integration_postgres() {
         CREATE TABLE "odd space"."Mixed" (id BIGINT, label TEXT, flag BOOLEAN, small SMALLINT, n INTEGER, f REAL, d DOUBLE PRECISION, day DATE, local TIMESTAMP, utc TIMESTAMPTZ);
         INSERT INTO "odd space"."Mixed" VALUES (1,'hello',true,2,3,1.5,2.5,'2026-09-01','2026-09-01 12:34:56.123456','2026-09-01 14:34:56.123456+02'),(2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),(3,'last',false,-2,-3,0,0,'1969-12-31','1969-12-31','1969-12-31+00');
         CREATE VIEW slow AS SELECT 1::bigint AS id WHERE pg_sleep(4)::text = '';
-        CREATE TABLE unsupported (x uuid);
+        CREATE TYPE custom_enum AS ENUM ('x'); CREATE TABLE unsupported (x custom_enum);
     "#).await.unwrap();
     let pg = Postgres::new(&db.url, 1, 1).unwrap();
     assert!(pg.table("public", "unsupported").await.is_err());

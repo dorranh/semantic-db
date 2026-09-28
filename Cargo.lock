@@ -4612,6 +4612,8 @@ version = "0.1.0"
 dependencies = [
  "arrow-schema",
  "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "thiserror",
 ]
 
@@ -4658,14 +4660,18 @@ dependencies = [
 name = "semantic-compiler"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "datafusion",
  "reqwest 0.12.28",
  "semantic-catalog",
  "semantic-engine",
  "semantic-plan",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4759,8 +4765,10 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "datafusion",
+ "datafusion-federation",
  "deadpool-postgres",
  "futures",
  "rustls",
@@ -4769,6 +4777,7 @@ dependencies = [
  "semantic-catalog",
  "semantic-engine",
  "semantic-runtime",
+ "serde",
  "testcontainers",
  "tokio",
  "tokio-postgres",

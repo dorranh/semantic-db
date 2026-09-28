@@ -8,6 +8,9 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+serde.workspace = true
+bytes = "1"
+datafusion-federation.workspace = true
 semantic-engine.workspace = true
 semantic-catalog.workspace = true
 datafusion.workspace = true

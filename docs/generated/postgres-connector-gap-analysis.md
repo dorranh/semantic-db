@@ -201,3 +201,13 @@ release target is a production TLS policy, bounded execution, exact pushdown for
 a documented predicate subset, and guarded same-connection federation for the
 common SQL operators above. Broader PostgreSQL syntax should remain a measured
 follow-up, with explicit local fallback whenever equivalence is unproven.
+
+## Implementation follow-through (2026-09-28)
+
+The snapshot above is retained as the original backlog. The implemented operator
+and type matrix, security/resource defaults, refresh and rotation behavior,
+qualification limits, release gate and measured fixture results now live in
+[PostgreSQL connector operations](postgres-connector-operations.md). The guarded
+release target is implemented; unproven operators retain explicit local fallback,
+and the profiling-driven optional transport/parallelism/runtime-filter work
+remains a follow-up.

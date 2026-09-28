@@ -160,12 +160,18 @@ pub(crate) fn manager(
     config: Config,
     mode: SslMode,
     secrets: &PostgresTlsConfig,
-) -> Result<Manager> {
+) -> Result<(Manager, Option<MakeRustlsConnect>)> {
     let tls = build_tls(mode, secrets)?;
-    Ok(Manager::from_connect(
-        config,
-        PgConnect { mode, tls },
-        ManagerConfig::default(),
+    let cancel_tls = tls.clone();
+    Ok((
+        Manager::from_connect(
+            config,
+            PgConnect { mode, tls },
+            ManagerConfig {
+                recycling_method: deadpool_postgres::RecyclingMethod::Verified,
+            },
+        ),
+        cancel_tls,
     ))
 }
 
