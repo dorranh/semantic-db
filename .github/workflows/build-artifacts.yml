@@ -36,21 +36,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-dist
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.0/cargo-dist-installer.sh | sh
-      - name: Test the connector set and both commands
-        run: cargo test --profile dist --locked --target ${{ matrix.target }} -p semantic-sources -p semantic-cli -p semantic-server
+      # ci.yml runs the workspace tests on pushes; this job checks the packaged binary.
       - name: Build and package sdb
         run: dist build --artifacts=local --target ${{ matrix.target }} --output-format=json > target/dist-manifest.json
       - name: Verify packaged executable and checksum
         working-directory: target/distrib
         run: |
-          shasum -a 256 -c semantic-cli-${{ matrix.target }}.tar.gz.sha256
-          mkdir smoke
-          tar -xzf semantic-cli-${{ matrix.target }}.tar.gz -C smoke --strip-components=1
-          test -x smoke/sdb
-          test -f smoke/LICENSE
+          sed '/^[[:space:]]*$/d' semantic-cli-${{ matrix.target }}.tar.gz.sha256 | shasum -a 256 -c -
+          smoke_dir=$(mktemp -d)
+          trap 'rm -rf "$smoke_dir"' EXIT
+          tar -xzf semantic-cli-${{ matrix.target }}.tar.gz -C "$smoke_dir" --strip-components=1
+          test -x "$smoke_dir/sdb"
+          test -f "$smoke_dir/LICENSE"
           version=$(jq -r '.releases[] | select(.app_name == "semantic-cli") | .app_version' ../dist-manifest.json)
-          test "$(smoke/sdb --version)" = "sdb $version"
-          smoke/sdb repl --query 'SELECT 42 AS answer'
+          test "$("$smoke_dir/sdb" --version)" = "sdb $version"
+          "$smoke_dir/sdb" repl --query 'SELECT 42 AS answer'
       - uses: actions/upload-artifact@v4
         with:
           name: sdb-${{ matrix.target }}-${{ github.run_number }}-${{ github.sha }}
