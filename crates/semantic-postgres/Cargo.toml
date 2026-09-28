@@ -14,6 +14,11 @@ datafusion.workspace = true
 semantic-runtime.workspace = true
 tokio-postgres.workspace = true
 deadpool-postgres.workspace = true
+tokio-postgres-rustls.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
+rustls-pemfile.workspace = true
+url.workspace = true
 tokio = { workspace = true, features = ["time", "sync"] }
 async-trait.workspace = true
 async-stream.workspace = true

@@ -48,6 +48,10 @@ custom CA is supplied. Use `verify-full` for production TLS. The optional
 connection options `ca_pem_env`, `client_cert_pem_env`, and `client_key_pem_env`
 name PEM secrets supplied by the host; client certificate and key must be paired.
 For verified modes, a supplied CA replaces the system trust roots.
+Custom CAs cannot be combined with `allow` or `prefer`, and libpq certificate
+file-path parameters are not supported. The client key must be an unencrypted
+PEM private key.
+
 File readers use DataFusion batch execution; CLI/server result buffering still applies. File support does
 not imply filesystem snapshots, watched directories, or query-time refresh.
 

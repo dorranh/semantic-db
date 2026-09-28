@@ -4,6 +4,8 @@ use serde_json::json;
 use std::path::PathBuf;
 #[path = "../../../tests/support/postgres.rs"]
 mod fixture;
+#[path = "../../../tests/support/postgres_tls.rs"]
+mod tls_fixture;
 #[tokio::test]
 #[ignore = "requires Docker"]
 async fn connector_integration_postgres_ossie() {
@@ -33,6 +35,8 @@ fn postgres_configuration_is_checked_offline() {
         json!({"connection_string_env":"PG","pool_size":0}),
         json!({"connection_string_env":"PG","batch_size":8193}),
         json!({"connection_string_env":"PG","password":"secret"}),
+        json!({"connection_string_env":"PG","ca_pem_env":""}),
+        json!({"connection_string_env":"PG","client_cert_pem_env":"CERT"}),
     ] {
         assert!(
             PostgresConnector
@@ -53,6 +57,63 @@ fn postgres_configuration_is_checked_offline() {
         PostgresConnector
             .validate_source(json!({"table":"items"}).as_object().unwrap())
             .is_err()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires Docker and OpenSSL"]
+async fn connector_integration_postgres_tls_secret_options() {
+    use semantic_sources::{ConnectorFactory, PostgresConnector};
+    let db = tls_fixture::Database::start(false).await;
+    db.plain_client
+        .as_ref()
+        .unwrap()
+        .batch_execute("CREATE TABLE items (id bigint)")
+        .await
+        .unwrap();
+    let config = json!({
+        "connection_string_env": "PG_URL",
+        "ca_pem_env": "PG_CA"
+    });
+    let connection = PostgresConnector
+        .connect(config.as_object().unwrap(), &|name| match name {
+            "PG_URL" => Some(db.connection_url("verify-full", "localhost")),
+            "PG_CA" => Some(db.certs.ca_pem.clone()),
+            _ => None,
+        })
+        .await
+        .unwrap();
+    let source = json!({"schema":"public","table":"items"});
+    assert!(
+        connection
+            .table(source.as_object().unwrap(), std::path::Path::new("."))
+            .await
+            .is_ok()
+    );
+
+    let mtls = tls_fixture::Database::start(true).await;
+    let config = json!({
+        "connection_string_env": "PG_URL",
+        "ca_pem_env": "PG_CA",
+        "client_cert_pem_env": "PG_CERT",
+        "client_key_pem_env": "PG_KEY"
+    });
+    let connection = PostgresConnector
+        .connect(config.as_object().unwrap(), &|name| match name {
+            "PG_URL" => Some(mtls.connection_string("verify-full", "localhost")),
+            "PG_CA" => Some(mtls.certs.ca_pem.clone()),
+            "PG_CERT" => Some(mtls.certs.client_cert_pem.clone()),
+            "PG_KEY" => Some(mtls.certs.client_key_pem.clone()),
+            _ => None,
+        })
+        .await
+        .unwrap();
+    let source = json!({"schema":"public","table":"tls_probe"});
+    assert!(
+        connection
+            .table(source.as_object().unwrap(), std::path::Path::new("."))
+            .await
+            .is_ok()
     );
 }
 

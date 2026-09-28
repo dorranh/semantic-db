@@ -12,3 +12,11 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --all-features --locked
+  postgres-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p semantic-postgres --all-features --locked --test tls -- --ignored
+      - run: cargo test -p semantic-sources --features postgres --locked --test postgres connector_integration_postgres_tls_secret_options -- --ignored

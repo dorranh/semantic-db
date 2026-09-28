@@ -1,3 +1,4 @@
+mod tls;
 mod write;
 // PostgreSQL scans with bounded native cursor fetches. Ordinary scans observe independently.
 use async_trait::async_trait;
@@ -16,10 +17,12 @@ use datafusion::{
         streaming::PartitionStream,
     },
 };
-use deadpool_postgres::{Manager, Object, Pool};
+use deadpool_postgres::{Object, Pool};
 use semantic_runtime::{QueryContext, QueryOptions, failure};
 use std::{fmt, sync::Arc, time::Duration};
-use tokio_postgres::{NoTls, Row, types::Type};
+use tokio_postgres::{Row, types::Type};
+
+pub use tls::PostgresTlsConfig;
 
 #[derive(Clone)]
 pub struct Postgres {
@@ -38,24 +41,31 @@ impl fmt::Debug for Postgres {
     }
 }
 impl Postgres {
-    /// Credentials are supplied by the host. This initial connector requires an
-    /// explicitly plaintext local/private connection (sslmode=disable).
+    /// Credentials are supplied by the host. The connection string must specify
+    /// an explicit sslmode.
     pub fn new(url: &str, pool_size: usize, batch_size: usize) -> Result<Self> {
+        Self::new_with_tls(url, pool_size, batch_size, PostgresTlsConfig::default())
+    }
+
+    /// Connect with optional custom trust roots and client identity PEMs.
+    pub fn new_with_tls(
+        url: &str,
+        pool_size: usize,
+        batch_size: usize,
+        tls: PostgresTlsConfig,
+    ) -> Result<Self> {
         if pool_size == 0 || !(1..=8192).contains(&batch_size) {
             return Err(failure("invalid Postgres pool or batch size"));
         }
-        let mut config: tokio_postgres::Config = url
+        let (normalized, mode) = tls::normalize_connection_string(url)?;
+        let mut config: tokio_postgres::Config = normalized
             .parse()
             .map_err(|_| failure("invalid Postgres connection string"))?;
-        if config.get_ssl_mode() != tokio_postgres::config::SslMode::Disable {
-            return Err(failure(
-                "Postgres connector currently requires sslmode=disable; TLS is not implemented",
-            ));
-        }
         config.connect_timeout(Duration::from_secs(10));
         // All backend sessions are read-only, including metadata inspection.
         config.options("-c default_transaction_read_only=on -c statement_timeout=30000 -c idle_in_transaction_session_timeout=30000");
-        let pool = Pool::builder(Manager::new(config, NoTls))
+        let manager = tls::manager(config, mode, &tls)?;
+        let pool = Pool::builder(manager)
             .max_size(pool_size)
             .build()
             .map_err(|_| failure("could not configure Postgres pool"))?;
