@@ -174,7 +174,7 @@ impl<'a> CompilationSession<'a> {
                         ));
                     }
                     record.cache_status = "hit_same_snapshot_and_scope";
-                    record_bound(&query.bound, &mut record);
+                    record_bound(&query.bound, &mut record, RequirementScope::Row);
                     if let Some(evidence) = &query.request_evidence {
                         record.request_digest = Some(semantic_catalog::canonical_digest(
                             &serde_json::json!(evidence.original_request),

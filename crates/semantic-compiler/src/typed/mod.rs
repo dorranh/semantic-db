@@ -22,6 +22,7 @@ mod graph;
 pub use graph::{CompiledGraph, GraphReplayBundle, compile_graph, compile_graph_intent};
 
 use std::{
+    collections::BTreeSet,
     io::Write,
     sync::Arc,
     time::{Duration, Instant},
@@ -181,6 +182,9 @@ pub struct Work {
     pub index_bytes_visited: usize,
     pub search_postings_visited: usize,
     pub context_expansions: usize,
+    pub graph_nodes_visited: usize,
+    pub graph_edges_visited: usize,
+    pub graph_outputs_checked: usize,
 }
 #[derive(Debug, Serialize)]
 pub struct StageRecord {
@@ -344,6 +348,8 @@ pub struct CompiledQuery {
     intent: RowQuery,
     bound: BoundQuery,
     relational: RelationalPlan,
+    required_relations: BTreeSet<String>,
+    restricted_scope: bool,
     sql: SqlArtifact,
 }
 impl CompiledQuery {
@@ -368,9 +374,40 @@ impl CompiledQuery {
         }
         Ok(())
     }
+    fn check_execution_scope(
+        &self,
+        allowed_relations: Option<&BTreeSet<String>>,
+    ) -> Result<(), CompileDiagnostic> {
+        if let Some(allowed) = allowed_relations {
+            if self.required_relations.is_subset(allowed) {
+                return Ok(());
+            }
+            return Err(diagnostic(
+                "execution_scope",
+                "Current execution scope does not authorize every compiled relation",
+            ));
+        }
+        if self.restricted_scope {
+            return Err(diagnostic(
+                "execution_scope",
+                "A scope-restricted artifact requires current execution authorization",
+            ));
+        }
+        Ok(())
+    }
     /// Rebuild through deterministic DataFusion expressions, without reading rows.
     pub async fn plan_direct(&self, engine: &Engine) -> Result<DataFrame, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
+        self.relational.plan_direct(engine).await
+    }
+    pub async fn plan_direct_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+    ) -> Result<DataFrame, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
         self.relational.plan_direct(engine).await
     }
     /// Explicit execution through the engine's parameter and runtime-budget path.
@@ -381,6 +418,20 @@ impl CompiledQuery {
         options: semantic_engine::ReadOptions,
     ) -> Result<semantic_engine::ReadExecution, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
+        engine
+            .execute_read(self.sql.statement(), self.sql.values(), options)
+            .await
+            .map_err(lower::backend_error)
+    }
+    pub async fn execute_read_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+        options: semantic_engine::ReadOptions,
+    ) -> Result<semantic_engine::ReadExecution, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
         engine
             .execute_read(self.sql.statement(), self.sql.values(), options)
             .await
@@ -392,11 +443,41 @@ impl CompiledQuery {
         options: QueryOptions,
     ) -> Result<QueryExecution, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
         engine
             .execute_parameters(self.sql.statement(), self.sql.values(), options)
             .await
             .map_err(lower::backend_error)
     }
+    pub async fn execute_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+        options: QueryOptions,
+    ) -> Result<QueryExecution, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
+        engine
+            .execute_parameters(self.sql.statement(), self.sql.values(), options)
+            .await
+            .map_err(lower::backend_error)
+    }
+}
+
+fn bound_required_relations(bound: &BoundQuery) -> BTreeSet<String> {
+    let mut relations = BTreeSet::from([bound.input.id.clone()]);
+    for requirement in &bound.requirements {
+        match &requirement.operation {
+            bind::BoundOperation::Related { relationship } => {
+                relations.insert(relationship.right.id.clone());
+            }
+            bind::BoundOperation::Lookup { lookup, .. } => {
+                relations.insert(lookup.relationship.right.id.clone());
+            }
+            _ => {}
+        }
+    }
+    relations
 }
 
 /// Deterministic entry point; no model provider is required.
@@ -529,7 +610,7 @@ async fn compile_bound(
         )));
         record.request_spans_validated = true;
     }
-    record_bound(&bound, record);
+    record_bound(&bound, record, RequirementScope::Row);
     let start = Instant::now();
     options.check()?;
     let result = lower::lower(&bound);
@@ -571,12 +652,15 @@ async fn compile_bound(
     .await;
     record.stage("backend", start, &result);
     result?;
+    let required_relations = bound_required_relations(&bound);
     let artifact = CompiledQuery {
         request_evidence: options.request_evidence.clone(),
         request_context: options.request_context.clone(),
         intent: query,
         bound,
         relational,
+        required_relations,
+        restricted_scope: options.allowed_relations.is_some(),
         sql,
     };
     options.check()?;
@@ -1056,7 +1140,21 @@ fn artifact_digest(query: &CompiledQuery) -> String {
     )
 }
 
-fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord) {
+enum RequirementScope<'a> {
+    Row,
+    GraphLeaf(&'a str),
+}
+
+fn safe_requirement_id(value: &impl Serialize) -> String {
+    format!(
+        "requirement/{}",
+        semantic_catalog::canonical_digest(
+            &serde_json::to_value(value).expect("requirement identity serializes")
+        )
+    )
+}
+
+fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: RequirementScope<'_>) {
     record.execution_obligations.clear();
     record.bound_digest = Some(semantic_catalog::canonical_digest(
         &serde_json::to_value(bound).expect("bound query serializes"),
@@ -1088,7 +1186,17 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord) {
         .requirements
         .iter()
         .map(|requirement| RequirementDisposition {
-            requirement_id: requirement.id.clone(),
+            requirement_id: safe_requirement_id(&match scope {
+                RequirementScope::Row => serde_json::json!({
+                    "kind": "row",
+                    "requirement": requirement.id,
+                }),
+                RequirementScope::GraphLeaf(node) => serde_json::json!({
+                    "kind": "graph_leaf",
+                    "node": node,
+                    "requirement": requirement.id,
+                }),
+            }),
             result: "bound",
             rule: match &requirement.operation {
                 bind::BoundOperation::Lookup { .. } => "lookup.same_query_uniqueness_obligation.v1",

@@ -56,6 +56,8 @@ pub struct CompiledGraph {
     root: usize,
     request_context: Option<RequestContext>,
     request_evidence: Option<GraphRequestEvidence>,
+    required_relations: BTreeSet<String>,
+    restricted_scope: bool,
     sql: SqlArtifact,
 }
 impl CompiledGraph {
@@ -71,12 +73,47 @@ impl CompiledGraph {
         }
         Ok(())
     }
+    fn check_execution_scope(
+        &self,
+        allowed_relations: Option<&BTreeSet<String>>,
+    ) -> Result<(), CompileDiagnostic> {
+        if let Some(allowed) = allowed_relations {
+            if self.required_relations.is_subset(allowed) {
+                return Ok(());
+            }
+            return Err(diagnostic(
+                "execution_scope",
+                "Current execution scope does not authorize every compiled relation",
+            ));
+        }
+        if self.restricted_scope {
+            return Err(diagnostic(
+                "execution_scope",
+                "A scope-restricted artifact requires current execution authorization",
+            ));
+        }
+        Ok(())
+    }
     pub async fn execute(
         &self,
         engine: &Engine,
         options: QueryOptions,
     ) -> Result<QueryExecution, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
+        engine
+            .execute_parameters(self.sql.statement(), self.sql.values(), options)
+            .await
+            .map_err(lower::backend_error)
+    }
+    pub async fn execute_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+        options: QueryOptions,
+    ) -> Result<QueryExecution, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
         engine
             .execute_parameters(self.sql.statement(), self.sql.values(), options)
             .await
@@ -88,6 +125,20 @@ impl CompiledGraph {
         options: semantic_engine::ReadOptions,
     ) -> Result<semantic_engine::ReadExecution, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
+        engine
+            .execute_read(self.sql.statement(), self.sql.values(), options)
+            .await
+            .map_err(lower::backend_error)
+    }
+    pub async fn execute_read_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+        options: semantic_engine::ReadOptions,
+    ) -> Result<semantic_engine::ReadExecution, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
         engine
             .execute_read(self.sql.statement(), self.sql.values(), options)
             .await
@@ -95,6 +146,19 @@ impl CompiledGraph {
     }
     pub async fn plan_direct(&self, engine: &Engine) -> Result<DataFrame, CompileDiagnostic> {
         self.check_snapshot(engine)?;
+        self.check_execution_scope(None)?;
+        self.plan_direct_unchecked(engine).await
+    }
+    pub async fn plan_direct_authorized(
+        &self,
+        engine: &Engine,
+        allowed_relations: &BTreeSet<String>,
+    ) -> Result<DataFrame, CompileDiagnostic> {
+        self.check_snapshot(engine)?;
+        self.check_execution_scope(Some(allowed_relations))?;
+        self.plan_direct_unchecked(engine).await
+    }
+    async fn plan_direct_unchecked(&self, engine: &Engine) -> Result<DataFrame, CompileDiagnostic> {
         let mut frames: Vec<DataFrame> = Vec::new();
         for node in &self.nodes {
             let frame = match &node.operation {
@@ -308,6 +372,29 @@ pub(super) async fn build(
     }
     let snapshot = engine.catalog().snapshot();
     record.snapshot_id = Some(snapshot.id().into());
+    record.work.graph_nodes_visited = record
+        .work
+        .graph_nodes_visited
+        .saturating_add(query.nodes.len());
+    record.work.graph_edges_visited = record.work.graph_edges_visited.saturating_add(
+        query
+            .nodes
+            .iter()
+            .filter(|node| !matches!(&node.operation, GraphOperation::Rows { .. }))
+            .count()
+            .saturating_mul(2),
+    );
+    record.work.graph_outputs_checked = record.work.graph_outputs_checked.saturating_add(
+        query
+            .nodes
+            .iter()
+            .map(|node| match &node.operation {
+                GraphOperation::Rows { .. } => 0,
+                GraphOperation::Set { columns, .. } => columns.len(),
+                GraphOperation::Compose { keys, outputs, .. } => keys.len() + outputs.len(),
+            })
+            .sum(),
+    );
     let order = topological(&query, options)?;
     let mut indexes = BTreeMap::new();
     let mut nodes: Vec<CheckedNode> = Vec::new();
@@ -321,24 +408,18 @@ pub(super) async fn build(
                 let plan = lower::lower(&bound)?;
                 let (slots, keys) = leaf_slots(&bound);
                 let mut leaf_record = CompilationRecord::new("graph_leaf");
-                record_bound(&bound, &mut leaf_record);
+                record_bound(
+                    &bound,
+                    &mut leaf_record,
+                    RequirementScope::GraphLeaf(&node.id),
+                );
                 record.definition_refs.extend(leaf_record.definition_refs);
                 record
                     .execution_obligations
                     .extend(leaf_record.execution_obligations);
-                record.requirement_dispositions.extend(
-                    leaf_record
-                        .requirement_dispositions
-                        .into_iter()
-                        .map(|mut r| {
-                            r.requirement_id = GraphRequirementRef::Leaf {
-                                node: node.id.clone(),
-                                requirement: r.requirement_id,
-                            }
-                            .record_id();
-                            r
-                        }),
-                );
+                record
+                    .requirement_dispositions
+                    .extend(leaf_record.requirement_dispositions);
                 (
                     CheckedOperation::Rows {
                         bound: Box::new(bound),
@@ -450,7 +531,7 @@ pub(super) async fn build(
         record
             .requirement_dispositions
             .push(RequirementDisposition {
-                requirement_id: target.record_id(),
+                requirement_id: safe_requirement_id(&target),
                 rule,
                 result: "lowered_and_verified",
             });
@@ -462,11 +543,25 @@ pub(super) async fn build(
     record.bound_digest = Some(semantic_catalog::canonical_digest(
         &serde_json::to_value(&nodes).expect("bound graph serializes"),
     ));
+    record.relational_digest = Some(semantic_catalog::canonical_digest(&serde_json::json!({
+        "nodes": &nodes,
+        "root": root,
+        "ordering": &query.ordering,
+        "limit": query.limit,
+    })));
     record.stage("graph_bind_lower", start, &Ok::<_, CompileDiagnostic>(()));
     let sql = emit(&nodes, root, &query, &snapshot, options)?;
     if sql.statement().len() > options.max_sql_bytes {
         return Err(diagnostic("sql_limit", "Graph SQL exceeds its byte budget"));
     }
+    let required_relations = nodes
+        .iter()
+        .filter_map(|node| match &node.operation {
+            CheckedOperation::Rows { bound, .. } => Some(bound_required_relations(bound)),
+            _ => None,
+        })
+        .flatten()
+        .collect();
     let result = CompiledGraph {
         proposal: query,
         snapshot_id: snapshot.id().into(),
@@ -474,10 +569,12 @@ pub(super) async fn build(
         root,
         request_context: options.request_context.clone(),
         request_evidence: options.graph_request_evidence.clone(),
+        required_relations,
+        restricted_scope: options.allowed_relations.is_some(),
         sql,
     };
     let start = Instant::now();
-    let direct = result.plan_direct(engine).await?;
+    let direct = result.plan_direct_unchecked(engine).await?;
     let emitted = engine
         .plan_generated_sql(result.sql.statement())
         .await

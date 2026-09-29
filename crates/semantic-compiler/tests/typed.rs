@@ -1607,6 +1607,83 @@ async fn replay_is_bounded_revalidates_and_checks_pipeline_and_artifact_identity
 }
 
 #[tokio::test]
+async fn scope_restricted_artifacts_require_current_execution_authorization() {
+    use semantic_plan::graph::{GraphOperation, GraphQuery, QueryNode};
+
+    let engine = fixture();
+    let allowed = std::collections::BTreeSet::from(["items".to_string()]);
+    let mut options = CompileOptions::default();
+    options.allowed_relations = Some(allowed.clone());
+    let rows = compiled(compile_rows(&engine, query(), options.clone()).await);
+    assert_eq!(
+        rows.plan_direct(&engine).await.unwrap_err().code,
+        "execution_scope"
+    );
+    rows.plan_direct_authorized(&engine, &allowed)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows.plan_direct_authorized(&engine, &Default::default())
+            .await
+            .unwrap_err()
+            .code,
+        "execution_scope"
+    );
+
+    let graph = GraphQuery {
+        version: 1,
+        nodes: vec![QueryNode {
+            id: "items".into(),
+            source_text: "item IDs".into(),
+            operation: GraphOperation::Rows { query: query() },
+        }],
+        root: "items".into(),
+        ordering: vec![],
+        limit: None,
+        unresolved: vec![],
+    };
+    let result = semantic_compiler::typed::compile_graph(&engine, graph, options).await;
+    let TypedOutcome::CompiledGraph { query: graph } = result.outcome else {
+        panic!("{:?}", result.outcome)
+    };
+    assert_eq!(
+        graph.plan_direct(&engine).await.unwrap_err().code,
+        "execution_scope"
+    );
+    graph
+        .plan_direct_authorized(&engine, &allowed)
+        .await
+        .unwrap();
+    assert_eq!(
+        graph
+            .plan_direct_authorized(&engine, &Default::default())
+            .await
+            .unwrap_err()
+            .code,
+        "execution_scope"
+    );
+}
+
+#[tokio::test]
+async fn normal_records_digest_model_supplied_requirement_identities() {
+    let mut q = query();
+    q.requirements[0].id = "private-client-requirement-7f3c".into();
+    let result = compile_rows(&fixture(), q, CompileOptions::default()).await;
+    assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
+    assert_eq!(result.record.requirement_dispositions.len(), 1);
+    assert!(
+        result.record.requirement_dispositions[0]
+            .requirement_id
+            .starts_with("requirement/")
+    );
+    assert!(
+        !serde_json::to_string(&result.record)
+            .unwrap()
+            .contains("private-client-requirement-7f3c")
+    );
+}
+
+#[tokio::test]
 async fn provider_attempts_account_for_reported_and_unknown_usage() {
     use semantic_compiler::provider::{
         CompletionMetadata, CompletionStatus, ModelCompletion, TokenUsage,
@@ -2219,6 +2296,7 @@ async fn intent_retains_exact_request_and_validates_utf8_spans_without_claiming_
     let result = compile_intent(&engine, intent.clone(), CompileOptions::default()).await;
     assert!(result.record.request_spans_validated);
     assert!(result.record.request_digest.is_some());
+    assert!(result.record.relational_digest.is_some());
     let record = serde_json::to_string(&result.record).unwrap();
     assert!(!record.contains("Montrér"));
     let artifact = compiled(result);
@@ -3135,7 +3213,12 @@ async fn query_graph_sets_preserve_duplicates_nulls_parameter_slots_and_requirem
                 .record
                 .requirement_dispositions
                 .iter()
-                .any(|r| r.requirement_id == "leaf/left/subset")
+                .all(|r| r.requirement_id.starts_with("requirement/"))
+        );
+        assert!(
+            !serde_json::to_string(&result.record)
+                .unwrap()
+                .contains("subset")
         );
         let mut disconnected = q.clone();
         disconnected.root = "left".into();
@@ -3714,20 +3797,19 @@ async fn graph_intent_covers_scoped_requirements_order_limit_and_replays_exact_e
         result.outcome
     );
     assert!(result.record.request_digest.is_some());
-    let expected: std::collections::BTreeSet<_> = intent
-        .evidence
-        .requirements
-        .iter()
-        .map(|e| e.target.record_id())
-        .collect();
+    assert!(result.record.relational_digest.is_some());
+    assert_eq!(result.record.work.graph_nodes_visited, 3);
+    assert_eq!(result.record.work.graph_edges_visited, 2);
+    assert_eq!(result.record.work.graph_outputs_checked, 1);
     let recorded: std::collections::BTreeSet<_> = result
         .record
         .requirement_dispositions
         .iter()
         .map(|d| d.requirement_id.clone())
         .collect();
-    assert_eq!(recorded, expected);
+    assert_eq!(recorded.len(), intent.evidence.requirements.len());
     assert_eq!(recorded.len(), result.record.requirement_dispositions.len());
+    assert!(recorded.iter().all(|id| id.starts_with("requirement/")));
     assert!(
         result
             .record
@@ -3735,13 +3817,10 @@ async fn graph_intent_covers_scoped_requirements_order_limit_and_replays_exact_e
             .iter()
             .all(|d| d.result == "lowered_and_verified")
     );
-    assert!(recorded.contains("leaf/a~1b/c"));
-    assert!(recorded.contains("leaf/a/b~1c"));
-    assert!(
-        !serde_json::to_string(&result.record)
-            .unwrap()
-            .contains("Montrér")
-    );
+    let record_json = serde_json::to_string(&result.record).unwrap();
+    for sensitive in ["Montrér", "a/b", "b/c"] {
+        assert!(!record_json.contains(sensitive));
+    }
     let digest = result.record.artifact_digest;
     let TypedOutcome::CompiledGraph { query: artifact } = result.outcome else {
         panic!("{:?}", result.outcome)
@@ -3809,7 +3888,10 @@ async fn graph_intent_covers_scoped_requirements_order_limit_and_replays_exact_e
     assert!(matches!(legacy.outcome, TypedOutcome::CompiledGraph { .. }));
     assert!(!legacy.record.request_spans_validated);
     assert!(legacy.record.request_digest.is_none());
-    assert_eq!(legacy.record.requirement_dispositions.len(), expected.len());
+    assert_eq!(
+        legacy.record.requirement_dispositions.len(),
+        intent.evidence.requirements.len()
+    );
     let model = compiler(vec![
         serde_json::to_string(&TypedProposal::GraphIntent {
             query: intent.query,
