@@ -6,6 +6,8 @@ use datafusion::{
 };
 use std::sync::Arc;
 
+use crate::{FunctionKind, FunctionPlacement, MVP_EXECUTION_PROFILE};
+
 pub(super) fn optimizer_rules() -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let mut rules = datafusion_federation::default_optimizer_rules();
     let index = rules
@@ -40,10 +42,19 @@ impl OptimizerRule for GuardedFederation {
             }
             for expression in node.expressions() {
                 expression.apply(|expr| {
+                    let function = match expr {
+                        Expr::ScalarFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Scalar, function.func.name()),
+                        Expr::AggregateFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Aggregate, function.func.name()),
+                        Expr::WindowFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Window, function.fun.name()),
+                        _ => None,
+                    };
                     requires_local |= matches!(expr, Expr::InSubquery(_))
-                        || matches!(expr, Expr::ScalarFunction(function) if matches!(function.func.name(), "semantic_ratio_i64_v1" | "semantic_assert_single_v1"));
-                    requires_local |= matches!(expr, Expr::AggregateFunction(function) if function.func.name() == "semantic_sum_v1")
-                        || matches!(expr, Expr::WindowFunction(function) if function.fun.name() == "semantic_sum_v1");
+                        || function.is_some_and(|function| {
+                            function.placement == FunctionPlacement::LocalOnly
+                        });
                     Ok(TreeNodeRecursion::Continue)
                 })?;
             }

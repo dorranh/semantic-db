@@ -36,30 +36,12 @@ impl Parameters {
     }
 }
 pub(crate) fn sql_type(ty: &DataType) -> Option<String> {
-    Some(match ty {
-        DataType::Boolean => "boolean".into(),
-        DataType::Int16 => "smallint".into(),
-        DataType::Int32 => "integer".into(),
-        DataType::Int64 => "bigint".into(),
-        DataType::Utf8 => "text".into(),
-        DataType::Date32 => "date".into(),
-        DataType::Timestamp(TimeUnit::Microsecond, None) => "timestamp".into(),
-        DataType::Timestamp(TimeUnit::Microsecond, Some(tz)) if tz.as_ref() == "UTC" => {
-            "timestamptz".into()
-        }
-        _ => return None,
-    })
+    POSTGRES_EXECUTION_PROFILE
+        .parameter_type(ty)
+        .map(str::to_owned)
 }
 pub(crate) fn comparable(ty: &DataType) -> bool {
-    matches!(
-        ty,
-        DataType::Boolean
-            | DataType::Int16
-            | DataType::Int32
-            | DataType::Int64
-            | DataType::Date32
-            | DataType::Timestamp(TimeUnit::Microsecond, _)
-    )
+    POSTGRES_EXECUTION_PROFILE.comparable(ty)
 }
 fn column<'a>(e: &'a Expr, schema: &'a Schema) -> Option<(&'a str, &'a DataType)> {
     if let Expr::Column(c) = e {

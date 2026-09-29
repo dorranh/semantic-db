@@ -7,6 +7,8 @@ mod contracts;
 pub use compiler_functions::{semantic_assert_single_v1, semantic_ratio_i64_v1};
 mod deferred;
 pub use deferred::{DeferredBackend, DeferredOptions, DeferredProviderReport};
+mod execution_profile;
+pub use execution_profile::*;
 mod reads;
 mod writes;
 pub use contracts::*;

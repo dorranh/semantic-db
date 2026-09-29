@@ -38,9 +38,9 @@ async fn integer_ratios_preserve_precision_sign_extremes_and_null_zero_contracts
 }
 
 // A remote engine without compiler UDFs proves that federation cannot silently
-// substitute remote arithmetic for the versioned local contract.
+// substitute remote arithmetic or obligations for the versioned local contract.
 #[tokio::test]
-async fn exact_ratio_stays_local_while_its_aggregate_is_federated() {
+async fn compiler_functions_stay_local_while_safe_aggregate_is_federated() {
     use async_trait::async_trait;
     use datafusion::{
         arrow::{
@@ -150,6 +150,64 @@ async fn exact_ratio_stays_local_while_its_aggregate_is_federated() {
     assert!(
         !sql.contains("semantic_ratio_i64_v1"),
         "local contract shipped remotely: {sql}"
+    );
+
+    queries.lock().unwrap().clear();
+    let result = engine
+        .query("SELECT semantic_sum_v1(n) FROM amounts")
+        .await
+        .unwrap();
+    assert_eq!(
+        ScalarValue::try_from_array(result[0].column(0), 0).unwrap(),
+        ScalarValue::Int64(Some(2))
+    );
+    let sql = queries.lock().unwrap().join("\n").to_lowercase();
+    assert!(
+        !sql.contains("semantic_sum_v1"),
+        "checked aggregate shipped remotely: {sql}"
+    );
+
+    queries.lock().unwrap().clear();
+    let result = engine
+        .query(
+            "SELECT semantic_assert_single_v1(COUNT(*)) \
+             FROM amounts WHERE n=99",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        ScalarValue::try_from_array(result[0].column(0), 0).unwrap(),
+        ScalarValue::Boolean(Some(true))
+    );
+    let sql = queries.lock().unwrap().join("\n").to_lowercase();
+    assert!(
+        !sql.contains("semantic_assert_single_v1"),
+        "uniqueness obligation shipped remotely: {sql}"
+    );
+
+    queries.lock().unwrap().clear();
+    let result = engine
+        .query(
+            "SELECT semantic_sum_v1(n) OVER (ORDER BY n ROWS BETWEEN \
+             UNBOUNDED PRECEDING AND CURRENT ROW) FROM amounts ORDER BY n",
+        )
+        .await
+        .unwrap();
+    let actual = result
+        .iter()
+        .flat_map(|batch| {
+            (0..batch.num_rows())
+                .map(|row| ScalarValue::try_from_array(batch.column(0), row).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        vec![ScalarValue::Int64(Some(1)), ScalarValue::Int64(Some(2))]
+    );
+    let sql = queries.lock().unwrap().join("\n").to_lowercase();
+    assert!(
+        !sql.contains("semantic_sum_v1"),
+        "checked window aggregate shipped remotely: {sql}"
     );
 }
 
