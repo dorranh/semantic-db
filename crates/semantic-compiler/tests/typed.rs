@@ -1595,6 +1595,16 @@ async fn replay_is_bounded_revalidates_and_checks_pipeline_and_artifact_identity
             .outcome,
         TypedOutcome::Rejected { .. }
     ));
+    restored.execution_profile_revision = "unavailable".into();
+    assert_eq!(
+        restored
+            .replay(&engine, CompileOptions::default())
+            .await
+            .unwrap_err()
+            .code,
+        "replay_profile"
+    );
+    restored.execution_profile_revision = semantic_engine::MVP_EXECUTION_PROFILE_REVISION.into();
     restored.pipeline_revision = "unavailable".into();
     assert_eq!(
         restored
@@ -1615,6 +1625,10 @@ async fn scope_restricted_artifacts_require_current_execution_authorization() {
     let mut options = CompileOptions::default();
     options.allowed_relations = Some(allowed.clone());
     let rows = compiled(compile_rows(&engine, query(), options.clone()).await);
+    assert_eq!(
+        rows.execution_profile_revision(),
+        semantic_engine::MVP_EXECUTION_PROFILE_REVISION
+    );
     assert_eq!(
         rows.plan_direct(&engine).await.unwrap_err().code,
         "execution_scope"
@@ -1647,6 +1661,10 @@ async fn scope_restricted_artifacts_require_current_execution_authorization() {
         panic!("{:?}", result.outcome)
     };
     assert_eq!(
+        graph.execution_profile_revision(),
+        semantic_engine::MVP_EXECUTION_PROFILE_REVISION
+    );
+    assert_eq!(
         graph.plan_direct(&engine).await.unwrap_err().code,
         "execution_scope"
     );
@@ -1670,6 +1688,10 @@ async fn normal_records_digest_model_supplied_requirement_identities() {
     q.requirements[0].id = "private-client-requirement-7f3c".into();
     let result = compile_rows(&fixture(), q, CompileOptions::default()).await;
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
+    assert_eq!(
+        result.record.execution_profile_revision,
+        semantic_engine::MVP_EXECUTION_PROFILE_REVISION
+    );
     assert_eq!(result.record.requirement_dispositions.len(), 1);
     assert!(
         result.record.requirement_dispositions[0]
@@ -3668,6 +3690,16 @@ async fn graph_replay_is_bounded_pinned_and_revalidates_host_scope_and_artifact_
         matches!(scoped.outcome,TypedOutcome::Rejected{diagnostic} if diagnostic.code=="access_scope")
     );
     tampered = restored;
+    tampered.execution_profile_revision = "old".into();
+    assert_eq!(
+        tampered
+            .replay(&engine, CompileOptions::default())
+            .await
+            .unwrap_err()
+            .code,
+        "replay_profile"
+    );
+    tampered.execution_profile_revision = semantic_engine::MVP_EXECUTION_PROFILE_REVISION.into();
     tampered.pipeline_revision = "old".into();
     assert_eq!(
         tampered

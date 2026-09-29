@@ -8,6 +8,7 @@ use serde::Deserialize;
 pub struct GraphReplayBundle {
     pub version: u32,
     pub pipeline_revision: String,
+    pub execution_profile_revision: String,
     pub snapshot_id: String,
     pub artifact_digest: String,
     pub proposal: GraphQuery,
@@ -20,6 +21,7 @@ impl CompiledGraph {
         let bundle = GraphReplayBundle {
             version: 1,
             pipeline_revision: PIPELINE_REVISION.into(),
+            execution_profile_revision: self.execution_profile_revision.into(),
             snapshot_id: self.snapshot_id.clone(),
             artifact_digest: semantic_catalog::canonical_digest(
                 &serde_json::json!({"pipeline":PIPELINE_REVISION,"artifact":self}),
@@ -47,6 +49,12 @@ impl GraphReplayBundle {
             return Err(diagnostic(
                 "replay_version",
                 "Graph replay requires the recorded pipeline revision",
+            ));
+        }
+        if self.execution_profile_revision != MVP_EXECUTION_PROFILE_REVISION {
+            return Err(diagnostic(
+                "replay_profile",
+                "Graph replay requires the recorded execution profile revision",
             ));
         }
         if self.snapshot_id != engine.catalog().snapshot().id() {

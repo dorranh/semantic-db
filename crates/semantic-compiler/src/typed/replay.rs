@@ -1,16 +1,17 @@
 //! Explicit bounded structured replay. Captures contain literals and must be
 //! retained under the caller's access/retention policy, separately from telemetry.
 use super::{CompileDiagnostic, CompileOptions, CompiledQuery, TypedCompilation, diagnostic};
-use semantic_engine::Engine;
+use semantic_engine::{Engine, MVP_EXECUTION_PROFILE_REVISION};
 use semantic_plan::typed::SemanticQuery;
 use serde::{Deserialize, Serialize};
 
-pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-7/datafusion-55";
+pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-8/datafusion-55";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReplayBundle {
     pub version: u32,
     pub pipeline_revision: String,
+    pub execution_profile_revision: String,
     pub snapshot_id: String,
     pub artifact_digest: String,
     pub proposal: SemanticQuery,
@@ -23,6 +24,7 @@ impl CompiledQuery {
         let bundle = ReplayBundle {
             version: 1,
             pipeline_revision: PIPELINE_REVISION.into(),
+            execution_profile_revision: self.execution_profile_revision.into(),
             snapshot_id: self.bound.snapshot_id().into(),
             artifact_digest: super::artifact_digest(self),
             proposal: self.intent.clone(),
@@ -50,6 +52,12 @@ impl ReplayBundle {
             return Err(diagnostic(
                 "replay_version",
                 "Replay requires the recorded compiler pipeline revision",
+            ));
+        }
+        if self.execution_profile_revision != MVP_EXECUTION_PROFILE_REVISION {
+            return Err(diagnostic(
+                "replay_profile",
+                "Replay requires the recorded execution profile revision",
             ));
         }
         if self.snapshot_id != engine.catalog().snapshot().id() {

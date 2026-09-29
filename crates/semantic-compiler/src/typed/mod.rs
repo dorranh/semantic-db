@@ -30,7 +30,7 @@ use std::{
 
 use datafusion::dataframe::DataFrame;
 use semantic_catalog::CatalogSnapshot;
-use semantic_engine::{Engine, QueryExecution, QueryOptions};
+use semantic_engine::{Engine, MVP_EXECUTION_PROFILE_REVISION, QueryExecution, QueryOptions};
 use semantic_plan::typed::{ContextRequest, RowOperation, RowPredicate, RowQuery, TypedProposal};
 use serde::Serialize;
 use tokio::sync::watch;
@@ -197,6 +197,7 @@ pub struct CompilationRecord {
     pub compilation_id: String,
     pub compiler_build: &'static str,
     pub pipeline_revision: &'static str,
+    pub execution_profile_revision: &'static str,
     pub prompt_digest: Option<String>,
     pub bound_digest: Option<String>,
     pub request_digest: Option<String>,
@@ -262,6 +263,7 @@ impl CompilationRecord {
             compilation_id: format!("{epoch:x}-{ordinal:x}"),
             compiler_build: env!("CARGO_PKG_VERSION"),
             pipeline_revision: PIPELINE_REVISION,
+            execution_profile_revision: MVP_EXECUTION_PROFILE_REVISION,
             prompt_digest: None,
             bound_digest: None,
             request_digest: None,
@@ -348,6 +350,7 @@ pub struct CompiledQuery {
     intent: RowQuery,
     bound: BoundQuery,
     relational: RelationalPlan,
+    execution_profile_revision: &'static str,
     required_relations: BTreeSet<String>,
     restricted_scope: bool,
     sql: SqlArtifact,
@@ -364,6 +367,9 @@ impl CompiledQuery {
     }
     pub fn sql(&self) -> &SqlArtifact {
         &self.sql
+    }
+    pub fn execution_profile_revision(&self) -> &str {
+        self.execution_profile_revision
     }
     fn check_snapshot(&self, engine: &Engine) -> Result<(), CompileDiagnostic> {
         if engine.catalog().snapshot().id() != self.bound.snapshot_id() {
@@ -659,6 +665,7 @@ async fn compile_bound(
         intent: query,
         bound,
         relational,
+        execution_profile_revision: MVP_EXECUTION_PROFILE_REVISION,
         required_relations,
         restricted_scope: options.allowed_relations.is_some(),
         sql,

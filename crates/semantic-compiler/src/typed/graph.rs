@@ -54,6 +54,7 @@ pub struct CompiledGraph {
     snapshot_id: String,
     nodes: Vec<CheckedNode>,
     root: usize,
+    execution_profile_revision: &'static str,
     request_context: Option<RequestContext>,
     request_evidence: Option<GraphRequestEvidence>,
     required_relations: BTreeSet<String>,
@@ -63,6 +64,9 @@ pub struct CompiledGraph {
 impl CompiledGraph {
     pub fn sql(&self) -> &SqlArtifact {
         &self.sql
+    }
+    pub fn execution_profile_revision(&self) -> &str {
+        self.execution_profile_revision
     }
     fn check_snapshot(&self, engine: &Engine) -> Result<(), CompileDiagnostic> {
         if engine.catalog().snapshot().id() != self.snapshot_id {
@@ -567,6 +571,7 @@ pub(super) async fn build(
         snapshot_id: snapshot.id().into(),
         nodes,
         root,
+        execution_profile_revision: MVP_EXECUTION_PROFILE_REVISION,
         request_context: options.request_context.clone(),
         request_evidence: options.graph_request_evidence.clone(),
         required_relations,

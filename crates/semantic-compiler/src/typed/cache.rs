@@ -135,7 +135,7 @@ impl<'a> CompilationSession<'a> {
                 let snapshot = self.engine.catalog().snapshot();
                 record.snapshot_id = Some(snapshot.id().into());
                 let key = semantic_catalog::canonical_digest(
-                    &serde_json::json!({"pipeline":PIPELINE_REVISION,"snapshot":snapshot.id(),"scope":options.allowed_relations,"context":options.request_context,"evidence":options.request_evidence,"proposal":proposal}),
+                    &serde_json::json!({"pipeline":PIPELINE_REVISION,"execution_profile":MVP_EXECUTION_PROFILE_REVISION,"snapshot":snapshot.id(),"scope":options.allowed_relations,"context":options.request_context,"evidence":options.request_evidence,"proposal":proposal}),
                 );
                 let lock = {
                     let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
