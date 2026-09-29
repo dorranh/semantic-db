@@ -16,7 +16,7 @@ catalog snapshot. Compilation plans queries but does not read result rows.
 | --- | --- | --- | --- |
 | Row projection, predicate, order, limit | One relation occurrence; exact field names and typed literals; Boolean predicate tree; explicit null order | Scope, exact physical types, comparison operators, requirement IDs, one final limit and read-only planning | SQL null logic and engine binary Utf8 ordering; no implicit casts, collation conversion or computed model expressions |
 | Group and aggregate | Explicit groups; count/sum/min/max; supported exact scalar inputs; optional distinct | Every dimension is grouped, aggregate/output-stage scope, exact result type and checked SUM lowering | Empty count is zero; other empty aggregates are null; signed/decimal SUM overflow fails execution |
-| Governed metric | Exact catalog metric name, source grain, result/empty contract, compatible row and lookup dimensions, metric-local filters and policies | Optional request unit and source-grain requirements must match exactly. A temporal restriction requires exactly one matching `CalendarFilter`, the exact authored calendar grain and a resolved interval inside half-open coverage | Temporal applicability supports Date32 and UTC absolute Timestamp only. Missing temporal metadata rejects calendar-filtered metric use; explicit null means unrestricted. No unit conversion or general predicate implication |
+| Governed metric | Exact authored catalog name, alias or catalog-scope-unique durable identity; source grain, result/empty contract, compatible row and lookup dimensions, metric-local filters and policies | Every exact competing name/alias remains a candidate. Exact requested unit, source grain and temporal applicability may select one; zero applicable candidates rejects and multiple applicable candidates return `ambiguous_metric` rather than using search rank | Temporal applicability supports Date32 and UTC absolute Timestamp only. Missing temporal metadata rejects calendar-filtered metric use; explicit null means unrestricted. No unit conversion, general predicate implication or approximate semantic equivalence |
 | Governed ratio | Two governed Int64 aggregate components with the same source grain; authored zero and unit behavior | Component metric checks, exact optional requested ratio unit/source grain, aggregate-before-divide | Decimal128(38,18), truncation toward zero, null propagation and authored zero-denominator behavior |
 | Calendar filter | Whole Gregorian day, ISO week, month or year from caller-pinned instant and IANA timezone | Nonzero bounded period, Date32 or UTC Timestamp field, half-open boundaries, DST ambiguity rejection | No fiscal calendar, rolling duration, naive timestamp or invented request clock |
 | Window | rank/dense-rank/count/sum/min/max; entire partition or through-current-peer frame | Explicit ordering where required, no nesting, row-versus-group input scope, peer semantics, additive governed rollup contract | No arbitrary frames or distinct window aggregates; finalized ratios and distinct states are not scalar-summed |
@@ -45,7 +45,19 @@ guarantee.
 ## Global execution and lifecycle contracts
 
 - Every compilation pins one catalog snapshot. Planning/execution and replay
-  reject snapshot drift; replay also pins the pipeline and evidence envelope.
+  reject snapshot drift. Artifacts, records, cache keys and replay pin the
+  versioned execution profile as well as the compiler pipeline and evidence
+  envelope; the current pipeline is revision 8.
+- A compile-time relation allow-list is not perpetual authorization. Artifacts
+  compiled under a restricted scope require a current allow-list at every SQL,
+  direct-plan or read execution boundary, and reject if any bound relation is
+  no longer authorized.
+- The MVP engine profile fixes checked integer SUM, exact integer ratio, SQL
+  three-valued null comparison, explicit null ordering, binary UTF-8, UTC
+  instants, aggregate/window and typed positional-parameter behavior. Compiler
+  functions remain local. PostgreSQL pushdown is limited to its versioned
+  declared equivalent subset; text collation and unchecked arithmetic remain
+  local.
 - Catalog publication validates governed field references, metric temporal
   coverage types/bounds, relationship endpoints and definition identities.
   Applicability edits change semantic/object revisions and therefore cache and
@@ -55,6 +67,10 @@ guarantee.
   literals or model responses.
 - Work, recursion, bytes, model calls, context expansion, graph expansion,
   admission, cache retention, cancellation and deadlines are bounded.
+- Normal records digest model/user requirement identities, account for graph
+  nodes, edges and checked outputs, and fingerprint graph relational state.
+  Exact request text and identities remain confined to explicit artifacts and
+  bounded captures.
 - Ordinary Rust tracing and compiler-owned records are supported. OpenTelemetry
   is intentionally out of scope.
 
@@ -68,7 +84,10 @@ natural-language completeness remain unsupported or future work. A bounded
 retrieval miss never establishes catalog-wide absence.
 
 Primary deterministic evidence is in `crates/semantic-compiler/tests/typed.rs`,
+`crates/semantic-compiler/tests/mvp_acceptance.rs`,
 `crates/semantic-compiler/tests/retrieval.rs`,
 `crates/semantic-catalog/tests/publication.rs`, and
-`apps/semantic-server/tests/typed.rs`. Live model and database coverage is a
-separate optional release artifact.
+`apps/semantic-server/tests/typed.rs`. The checked-in acceptance expectations are
+in `crates/semantic-compiler/tests/fixtures/mvp_acceptance.json`; the release
+evidence index is [the MVP release audit](compiler-mvp-release-audit.md). Live
+model and database coverage is a separate optional release artifact.

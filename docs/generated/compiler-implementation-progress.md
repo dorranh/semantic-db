@@ -195,13 +195,53 @@ source grain. Authored temporal restrictions bind one real calendar filter to an
 exact calendar grain and a half-open Date32/UTC Timestamp coverage interval;
 unknown or incompatible applicability fails closed. Publication validates and
 revisions these contracts, and context hydration includes the governed time
-field. The pipeline revision is now 7.
+field. The pipeline revision at that checkpoint was 7.
 
-Validation after this continuation: the broad offline gate passes 143 tests
+Validation at that continuation checkpoint: the broad offline gate passes 143 tests
 across the selected catalog/compiler/engine/Ossie/server/CLI libraries and test
 binaries, including 48 typed compiler, 8 catalog publication, 6 retrieval, 3
 in-process server typed and 5 CLI command tests. Formatting, diff checks and
-strict Clippy across all targets of those six packages pass. Full-design gaps
-remain, particularly backend capability
-profiles, broader semantic applicability/alternatives, held-out evaluation,
-post-composition calculations and graph caching.
+strict Clippy across all targets of those six packages pass. At that checkpoint,
+full-design gaps included backend capability profiles, broader semantic
+applicability/alternatives, held-out evaluation, post-composition calculations
+and graph caching. The MVP completion checkpoint below supersedes this interim
+status while retaining the historical evidence.
+
+## MVP completion checkpoint
+
+The recommended narrow MVP profile is complete as of 2026-09-29. Binding now
+preserves exact competing metric/ratio names and aliases across the authorized
+catalog scope. Exact unit, source-grain and temporal contracts may disambiguate a
+single candidate; otherwise binding returns stable applicability, grounding,
+identity, scope or ambiguity diagnostics. Durable identities must be unique, and
+window rollup validation consumes the canonical resolved metric.
+
+The engine exposes a versioned MVP execution profile for checked integer sums,
+exact ratios, null comparison and ordering, binary text behavior, UTC timestamps,
+aggregate/window behavior, typed parameters and local-only compiler functions.
+The PostgreSQL connector exposes a versioned conservative subset and keeps
+unproved text collation and arithmetic local. Compiler artifacts, records, cache
+keys and replay pin the execution profile; the compiler pipeline is revision 8.
+Artifacts compiled with a restricted relation scope require a current scope at
+every direct, SQL and read execution boundary.
+
+The records/privacy audit now uses opaque digests for model/user requirement IDs
+in normal records, counts graph nodes, edges and outputs, and fingerprints graph
+relational state. Exact evidence remains in explicit artifacts and bounded replay
+captures. The release suite adds independently stored expected rows and diagnostic
+codes for governed policy, relationship roles and duplicate keys, bag sets,
+missing/null/composite/scalar fact composition, output filter stage, calendar/DST,
+applicability mutation, ambiguity, scope and context bounds.
+
+Final offline evidence: 157 tests pass across 20 selected catalog/compiler/engine/
+Ossie/server/CLI binaries, including 51 typed compiler tests and 10 MVP acceptance
+tests. The backend lane separately passes 9 PostgreSQL library tests. Strict
+all-target Clippy passes across those packages plus PostgreSQL; `cargo fmt --all
+-- --check` and `git diff --check` pass. No live database or model-service test is
+claimed, and OpenTelemetry remains out of scope.
+
+This closes the P0 MVP gate only. The unchecked broad architecture items above
+remain intentionally broader than this profile. The next functional work is P1:
+post-composition calculations, broader semantic/applicability types, graph and
+dependency-aware caches, importer/deferred-source expansion where demanded,
+held-out model evaluation and repeatable production performance measurements.

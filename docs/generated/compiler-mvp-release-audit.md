@@ -9,10 +9,12 @@ full architecture is implemented.
 The additive release-gate suite is
 `crates/semantic-compiler/tests/mvp_acceptance.rs`; its independently stored
 expectations are in `crates/semantic-compiler/tests/fixtures/mvp_acceptance.json`.
-At the time this audit was written the suite had been formatted and inspected,
-but deliberately not run: the integration agent is the sole owner of Cargo
-commands. The MVP cannot be called released until that agent records a passing
-targeted test plus the repository's broad offline checks.
+All 10 acceptance tests pass. The combined offline regression gate passes 157
+tests across 20 selected catalog/compiler/engine/Ossie/server/CLI binaries,
+including 51 typed compiler tests, 10 acceptance tests, 8 catalog publication
+tests, 6 retrieval tests, 3 in-process server tests and 5 CLI command tests.
+Strict all-target Clippy also passes across those packages plus the PostgreSQL
+connector. Formatting and diff checks pass.
 
 The suite uses deterministic typed proposals for semantic correctness. Its one
 scripted provider case establishes orchestration and accounting only. It does
@@ -31,33 +33,42 @@ network, or model-provider result is claimed.
 | §§6–8, 12: calendar and applicability | Pinned request context, half-open UTC bounds, metric temporal applicability | `calendar_day_uses_half_open_bounds_across_a_dst_transition` and `metric_time_grain_and_coverage_reject_outside_the_authored_contract` | Gregorian calendar, named timezone, Date32 or UTC timestamp fields, exact grain and coverage | Business calendars and temporal relationship alignment remain unsupported |
 | §§4–6, 11: access and work bounds | Scope-aware retrieval/binding and bounded candidate search | `scope_and_context_bounds_fail_explicitly_and_scripted_provider_is_only_orchestration` checks `access_scope`, `search_limit`, and zero model calls on pre-provider exhaustion | Caller-provided relation allow-list and configured local limits | Broader admission/load testing remains P1 unless integration exposes a blocker |
 | §§6–8: ambiguity | Binder preserves competing exact authored labels and applies explicit applicability | `applicability_resolves_competing_metrics_and_catalog_mutation_restores_ambiguity` checks unit-based disambiguation, then mutates the competitor into applicability and requires `ambiguous_metric`; `structurally_ambiguous_output_aliases_reject_instead_of_being_ranked` separately checks `invalid_output` | Exact authored-label competition and the narrow exact applicability profile | General authority/precedence systems and approximate semantic equivalence remain unsupported |
-| §10: public entry points | Existing HTTP structured row, graph and graph-intent routes; existing CLI typed flags | `apps/semantic-server/tests/typed.rs` and `apps/semantic-cli/tests/commands.rs` | Compilation APIs; the HTTP compilation route does not execute rows | Re-run those tests after integration; a live external server/CLI environment is not claimed |
-| §§13–15: records, replay and tracing | Existing bounded records, Rust tracing, captures, replay and graph replay | Existing focused tests in `crates/semantic-compiler/tests/typed.rs` | Ordinary Rust tracing; bounded captures | OpenTelemetry is explicitly out of scope; no exporter requirement is part of this gate |
+| §§9, 12–13: backend validity | Versioned engine and PostgreSQL execution profiles; centralized local-only compiler functions; conservative connector eligibility | Fake-remote tests cover safe aggregate pushdown plus local ratio/checked-SUM/window/uniqueness behavior; PostgreSQL unit tests cover exact integer/null/order/limit and local text/arithmetic fallback | Local DataFusion is the semantic reference; PostgreSQL only pushes its declared equivalent subset | Live PostgreSQL was not run; no external connector equivalence claim is made |
+| §10: public entry points | Existing HTTP structured row, graph and graph-intent routes; existing CLI typed flags | 3 `apps/semantic-server/tests/typed.rs` and 5 `apps/semantic-cli/tests/commands.rs` tests pass in the combined gate | Compilation APIs; the HTTP compilation route does not execute rows | A live external server/CLI environment is not claimed |
+| §§13–15: records, replay and tracing | Bounded records, ordinary Rust tracing, captures, replay and graph replay; opaque normal-record requirement IDs; graph work/fingerprint accounting; execution-profile identity | Focused privacy, work-accounting, scope-revalidation and replay-profile tests in `crates/semantic-compiler/tests/typed.rs` | Exact sensitive evidence is retained only in explicit artifacts/captures; restricted artifacts require current execution authorization | OpenTelemetry is explicitly out of scope; no exporter requirement is part of this gate |
 
-## Required integration commands
+## Recorded integration commands
 
 The build marshal should run, in order:
 
 ```text
-cargo test -p semantic-compiler --test mvp_acceptance
-cargo test -p semantic-compiler --test typed --test retrieval --test compilation
-cargo test -p semantic-server --test typed
-cargo test -p semantic-cli --test commands
+cargo test -p semantic-compiler --test mvp_acceptance --offline
+cargo test -p semantic-catalog -p semantic-compiler -p semantic-engine \
+  -p semantic-ossie -p semantic-server -p semantic-cli \
+  --lib --test publication --test snapshots --test search --test source \
+  --test typed --test retrieval --test compilation --test deferred \
+  --test query --test compiler_functions --test import --test commands \
+  --test mvp_acceptance --offline
+cargo clippy -p semantic-catalog -p semantic-compiler -p semantic-engine \
+  -p semantic-postgres -p semantic-ossie -p semantic-server -p semantic-cli \
+  --all-targets --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
 ```
 
-Then run the repository's agreed broad offline test, formatting and strict
-all-target Clippy gates. Live Postgres, ClickHouse and model-provider checks are
-separate optional evidence and must be labelled with their environment and
+These gates passed on 2026-09-29. The backend lane additionally passed 9
+PostgreSQL library tests. Live PostgreSQL, ClickHouse and model-provider checks
+are separate optional evidence and must be labelled with their environment and
 configuration.
 
-## Release blockers and non-claims
+## Release criteria and non-claims
 
 - Any incorrect expected row, mismatch between direct and emitted-SQL execution,
   unexpected successful ambiguity/scope/applicability case, or failure to enforce
   duplicate lookup keys is a correctness release blocker.
-- The competing-definition fixture depends on the applicability lane's
-  `ambiguous_metric` contract and must be validated only after those production
-  changes are integrated.
+- The checked-in competing-definition fixture passes against the integrated
+  `ambiguous_metric` contract. Future changes that make it select by rank are a
+  release blocker.
 - Held-out interpretation/retrieval quality is not measured by scripted-provider
   tests. Optional live-model evaluations must record model, prompt/protocol,
   configuration, fixture revision and results separately.

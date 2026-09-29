@@ -12,7 +12,30 @@ checkpoint passes the 143-test broad gate, including 48 typed compiler, 8 catalo
 publication, 6 retrieval, 3 server and 5 CLI tests. Formatting, diff checks and
 strict all-target Clippy pass. Item B's evidence contract and the implemented
 portion of A are no longer greenfield; broader applicability/alternative
-resolution and the other listed P0/P1 work remain.
+resolution and the other listed P0/P1 work remained at that checkpoint. The
+completion update below supersedes that interim status.
+
+MVP completion update, 2026-09-29: the narrow supported-profile P0 gate is now
+implemented. Exact competing metric names and aliases remain candidates until a
+catalog-scope-unique durable identity or exact unit/source-grain/temporal
+applicability selects one; ambiguity fails closed. A versioned local execution
+profile centralizes numeric, null, ordering, text, timestamp, aggregate, window,
+parameter and compiler-function behavior, while PostgreSQL pushdown is limited to
+its declared equivalent subset. Artifacts, records, cache identity and replay pin
+that profile. Scope-restricted artifacts also require current authorization at
+execution instead of treating compile-time scope as perpetual authority. Normal
+records use opaque requirement identities and now account for graph work and
+relational fingerprints.
+
+The additive acceptance suite and its independent expected rows/diagnostics are
+checked in with a generated [release audit](compiler-mvp-release-audit.md). The
+combined offline gate passes 157 tests across 20 selected binaries; strict
+all-target Clippy across the catalog, compiler, engine, PostgreSQL, Ossie, server
+and CLI packages, formatting and diff checks pass. This completes the recommended
+MVP, not the full architecture. Sections F and G below remain P1/P2 work,
+especially post-composition calculations, graph caching, broader semantic types,
+held-out live-model evaluation and measured production performance. Live database
+and model-service checks were not run and are not claimed.
 
 ## Objective and how to use this document
 

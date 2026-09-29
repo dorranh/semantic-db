@@ -249,7 +249,6 @@ async fn governed_metric_and_row_policy_match_independent_expected_rows() {
                 applicability: MetricApplicability {
                     required_unit: Some("points".into()),
                     required_source_grain: vec!["id".into()],
-                    ..Default::default()
                 },
             },
         ),
@@ -857,7 +856,6 @@ fn competing_metric_query() -> RowQuery {
             applicability: MetricApplicability {
                 required_unit: Some("points".into()),
                 required_source_grain: vec!["id".into()],
-                ..Default::default()
             },
         },
     );
@@ -971,7 +969,6 @@ fn temporal_metric_query(unit: CalendarUnit) -> RowQuery {
                 applicability: MetricApplicability {
                     required_unit: Some("points".into()),
                     required_source_grain: vec!["id".into()],
-                    ..Default::default()
                 },
             },
         ),
