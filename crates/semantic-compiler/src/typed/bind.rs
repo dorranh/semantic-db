@@ -129,6 +129,28 @@ struct RequestedTemporalWindow {
     end: Literal,
 }
 
+#[derive(Clone, Copy)]
+enum GovernedMetricCandidate<'a> {
+    Metric {
+        relation: &'a SnapshotRelation,
+        name: &'a str,
+        definition: &'a semantic_catalog::MetricDefinition,
+    },
+    Ratio {
+        relation: &'a SnapshotRelation,
+        name: &'a str,
+        definition: &'a semantic_catalog::RatioDefinition,
+    },
+}
+
+impl<'a> GovernedMetricCandidate<'a> {
+    fn relation(self) -> &'a SnapshotRelation {
+        match self {
+            Self::Metric { relation, .. } | Self::Ratio { relation, .. } => relation,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(super) struct BoundRelationship {
     pub definition: ObjectRef,
@@ -259,6 +281,7 @@ pub(super) fn bind(
     let mut definitions = Vec::new();
     let mut metrics = std::collections::BTreeMap::new();
     let mut ratios = std::collections::BTreeMap::new();
+    let mut resolved_metric_names = std::collections::BTreeMap::new();
     let mut lookups = std::collections::BTreeMap::new();
     let lookup_dimensions: Vec<_> = query
         .requirements
@@ -361,73 +384,102 @@ pub(super) fn bind(
                 applicability,
                 ..
             } => {
-                let semantics = relation.definition().semantics.as_ref().ok_or_else(|| {
-                    diagnostic("unknown_metric", "Metric is not declared on this relation")
-                })?;
-                if let Some(ratio) = semantics.ratio_metrics.get(name) {
-                    if ratio.id.is_empty() || semantics.metrics.contains_key(name) {
-                        return Err(diagnostic(
-                            "metric_contract",
-                            "Governed metric identities must be explicit and unambiguous",
-                        ));
+                let selected = resolve_governed_metric(
+                    snapshot,
+                    relation,
+                    name,
+                    &requirement.source_text,
+                    applicability,
+                    &temporal_windows,
+                    options,
+                )?;
+                let semantics = relation
+                    .definition()
+                    .semantics
+                    .as_ref()
+                    .expect("resolved metric belongs to selected relation");
+                match selected {
+                    GovernedMetricCandidate::Ratio {
+                        name: selected_name,
+                        definition: ratio,
+                        ..
+                    } => {
+                        resolved_metric_names.insert(requirement.id.clone(), None);
+                        if ratio.id.is_empty() || semantics.metrics.contains_key(selected_name) {
+                            return Err(diagnostic(
+                                "metric_contract",
+                                "Governed metric identities must be explicit and unambiguous",
+                            ));
+                        }
+                        validate_ratio_applicability(
+                            semantics,
+                            ratio,
+                            applicability,
+                            &temporal_windows,
+                        )?;
+                        let component_applicability = MetricApplicability {
+                            required_unit: None,
+                            required_source_grain: applicability.required_source_grain.clone(),
+                        };
+                        let numerator = binder.metric(
+                            &ratio.numerator,
+                            &grouping_fields,
+                            &lookup_dimensions,
+                            &component_applicability,
+                            &temporal_windows,
+                        )?;
+                        let denominator = binder.metric(
+                            &ratio.denominator,
+                            &grouping_fields,
+                            &lookup_dimensions,
+                            &component_applicability,
+                            &temporal_windows,
+                        )?;
+                        if numerator.1.0 != DataType::Int64 || denominator.1.0 != DataType::Int64 {
+                            return Err(diagnostic(
+                                "ratio_type",
+                                "Governed ratio components require Int64 aggregates",
+                            ));
+                        }
+                        if semantics.metrics[&ratio.numerator].source_grain
+                            != semantics.metrics[&ratio.denominator].source_grain
+                        {
+                            return Err(diagnostic(
+                                "ratio_grain",
+                                "Single-source ratio components must share their declared source grain",
+                            ));
+                        }
+                        definitions.extend([
+                            relation
+                                .definition_reference("ratio", selected_name)
+                                .expect("indexed definition")
+                                .clone(),
+                            numerator.2,
+                            denominator.2,
+                        ]);
+                        ratios.insert(
+                            requirement.id.clone(),
+                            (numerator.0, denominator.0, ratio.zero),
+                        );
+                        Some((DataType::Decimal128(38, 18), true))
                     }
-                    validate_required_unit(&ratio.unit, applicability.required_unit.as_deref())?;
-                    let component_applicability = MetricApplicability {
-                        required_unit: None,
-                        required_source_grain: applicability.required_source_grain.clone(),
-                    };
-                    let numerator = binder.metric(
-                        &ratio.numerator,
-                        &grouping_fields,
-                        &lookup_dimensions,
-                        &component_applicability,
-                        &temporal_windows,
-                    )?;
-                    let denominator = binder.metric(
-                        &ratio.denominator,
-                        &grouping_fields,
-                        &lookup_dimensions,
-                        &component_applicability,
-                        &temporal_windows,
-                    )?;
-                    if numerator.1.0 != DataType::Int64 || denominator.1.0 != DataType::Int64 {
-                        return Err(diagnostic(
-                            "ratio_type",
-                            "Governed ratio components require Int64 aggregates",
-                        ));
+                    GovernedMetricCandidate::Metric {
+                        name: selected_name,
+                        ..
+                    } => {
+                        resolved_metric_names
+                            .insert(requirement.id.clone(), Some(selected_name.to_owned()));
+                        let (input, ty, reference) = binder.metric(
+                            selected_name,
+                            &grouping_fields,
+                            &lookup_dimensions,
+                            applicability,
+                            &temporal_windows,
+                        )?;
+                        definitions.push(reference);
+                        metrics.insert(requirement.id.clone(), input);
+                        Some(ty)
                     }
-                    if semantics.metrics[&ratio.numerator].source_grain
-                        != semantics.metrics[&ratio.denominator].source_grain
-                    {
-                        return Err(diagnostic(
-                            "ratio_grain",
-                            "Single-source ratio components must share their declared source grain",
-                        ));
-                    }
-                    definitions.extend([
-                        relation
-                            .definition_reference("ratio", name)
-                            .expect("indexed definition")
-                            .clone(),
-                        numerator.2,
-                        denominator.2,
-                    ]);
-                    ratios.insert(
-                        requirement.id.clone(),
-                        (numerator.0, denominator.0, ratio.zero),
-                    );
-                    Some((DataType::Decimal128(38, 18), true))
-                } else {
-                    let (input, ty, reference) = binder.metric(
-                        name,
-                        &grouping_fields,
-                        &lookup_dimensions,
-                        applicability,
-                        &temporal_windows,
-                    )?;
-                    definitions.push(reference);
-                    metrics.insert(requirement.id.clone(), input);
-                    Some(ty)
                 }
             }
             RowOperation::Group { field, .. } => {
@@ -460,7 +512,7 @@ pub(super) fn bind(
     // proposal order. Cycles/window nesting cannot acquire a valid output slot.
     for (index, requirement) in query.requirements.iter().enumerate() {
         if let RowOperation::Window { window, .. } = &requirement.operation {
-            validate_window_rollup(window, query, relation, options)?;
+            validate_window_rollup(window, query, relation, &resolved_metric_names, options)?;
             let (window, ty, nullable) = binder.window(window, aggregate_query, &output_slots)?;
             let mut name = format!("__semantic_window_{index}");
             while relation.field(&name).is_some() {
@@ -1526,6 +1578,263 @@ impl Binder<'_> {
     }
 }
 
+fn resolve_governed_metric<'a>(
+    snapshot: &'a CatalogSnapshot,
+    selected_relation: &'a SnapshotRelation,
+    selector: &str,
+    source_text: &str,
+    requested: &MetricApplicability,
+    temporal_windows: &[RequestedTemporalWindow],
+    options: &CompileOptions,
+) -> Result<GovernedMetricCandidate<'a>, CompileDiagnostic> {
+    if selector.trim().is_empty() {
+        return Err(diagnostic(
+            "unknown_metric",
+            "A governed metric selector must be nonempty",
+        ));
+    }
+
+    // Ground against the exact request evidence before trusting a model-selected
+    // catalog handle. This deliberately narrow rule does not attempt fuzzy
+    // phrase interpretation, but an exact authored ambiguity cannot disappear
+    // merely because the proposal picked one canonical name or identity.
+    let grounded = collect_metric_candidates(snapshot, source_text, false, options)?;
+    if !grounded.is_empty() {
+        let grounded = choose_metric_candidate(grounded, requested, temporal_windows)?;
+        let selected = collect_metric_candidates(snapshot, selector, false, options)?;
+        if !selected
+            .iter()
+            .copied()
+            .any(|candidate| same_metric_candidate(candidate, grounded))
+        {
+            return Err(diagnostic(
+                "metric_grounding",
+                "The selected governed definition does not match the exact authored request label",
+            ));
+        }
+        return ensure_metric_relation(grounded, selected_relation);
+    }
+
+    // A durable identity can bypass label ambiguity when the source phrase did
+    // not itself exactly match an authored label, but the identity must be unique
+    // throughout the allowed catalog scope.
+    let identities = collect_metric_candidates(snapshot, selector, true, options)?;
+    match identities.as_slice() {
+        [candidate] => return ensure_metric_relation(*candidate, selected_relation),
+        [] => {}
+        _ => {
+            return Err(diagnostic(
+                "metric_identity",
+                "A durable metric identity resolves to multiple governed definitions",
+            ));
+        }
+    }
+
+    // Canonical display names and aliases have equal authority. Search ranking
+    // is deliberately absent from this decision.
+    let candidates = collect_metric_candidates(snapshot, selector, false, options)?;
+    ensure_metric_relation(
+        choose_metric_candidate(candidates, requested, temporal_windows)?,
+        selected_relation,
+    )
+}
+
+fn choose_metric_candidate<'a>(
+    candidates: Vec<GovernedMetricCandidate<'a>>,
+    requested: &MetricApplicability,
+    temporal_windows: &[RequestedTemporalWindow],
+) -> Result<GovernedMetricCandidate<'a>, CompileDiagnostic> {
+    if candidates.is_empty() {
+        return Err(diagnostic(
+            "unknown_metric",
+            "No exact authored metric name, alias or identity matches the selector",
+        ));
+    }
+    if candidates.len() == 1 {
+        return Ok(candidates[0]);
+    }
+    let applicable = candidates
+        .into_iter()
+        .filter(|candidate| {
+            candidate_applicability(*candidate, requested, temporal_windows).is_ok()
+        })
+        .collect::<Vec<_>>();
+    match applicable.as_slice() {
+        [candidate] => Ok(*candidate),
+        [] => Err(diagnostic(
+            "metric_applicability",
+            "No competing governed definition satisfies the exact requested applicability",
+        )),
+        _ => Err(diagnostic(
+            "ambiguous_metric",
+            "Multiple governed definitions match the selector and exact applicability; use a durable metric identity",
+        )),
+    }
+}
+
+fn same_metric_candidate(
+    left: GovernedMetricCandidate<'_>,
+    right: GovernedMetricCandidate<'_>,
+) -> bool {
+    match (left, right) {
+        (
+            GovernedMetricCandidate::Metric {
+                relation: left_relation,
+                name: left_name,
+                ..
+            },
+            GovernedMetricCandidate::Metric {
+                relation: right_relation,
+                name: right_name,
+                ..
+            },
+        )
+        | (
+            GovernedMetricCandidate::Ratio {
+                relation: left_relation,
+                name: left_name,
+                ..
+            },
+            GovernedMetricCandidate::Ratio {
+                relation: right_relation,
+                name: right_name,
+                ..
+            },
+        ) => std::ptr::eq(left_relation, right_relation) && left_name == right_name,
+        _ => false,
+    }
+}
+
+fn collect_metric_candidates<'a>(
+    snapshot: &'a CatalogSnapshot,
+    selector: &str,
+    identity_only: bool,
+    options: &CompileOptions,
+) -> Result<Vec<GovernedMetricCandidate<'a>>, CompileDiagnostic> {
+    let mut candidates = Vec::new();
+    let mut relations_visited = 0usize;
+    for relation in snapshot.relations() {
+        options.check()?;
+        if !super::context::allowed(&relation.definition().name, options) {
+            continue;
+        }
+        relations_visited = relations_visited.saturating_add(1);
+        if relations_visited > options.max_index_objects {
+            return Err(diagnostic(
+                "work_limit",
+                "Metric alternative resolution exceeded the relation budget",
+            ));
+        }
+        candidates.extend(metric_candidates(relation, selector, identity_only));
+        if candidates.len() > options.max_nodes {
+            return Err(diagnostic(
+                "work_limit",
+                "Metric alternative resolution exceeded the candidate budget",
+            ));
+        }
+    }
+    Ok(candidates)
+}
+
+fn metric_candidates<'a>(
+    relation: &'a SnapshotRelation,
+    selector: &str,
+    identity_only: bool,
+) -> Vec<GovernedMetricCandidate<'a>> {
+    let Some(semantics) = &relation.definition().semantics else {
+        return Vec::new();
+    };
+    let mut candidates = Vec::new();
+    for (name, definition) in &semantics.metrics {
+        let matches = definition.id == selector
+            || (!identity_only
+                && (name == selector || definition.aliases.iter().any(|a| a == selector)));
+        if matches {
+            candidates.push(GovernedMetricCandidate::Metric {
+                relation,
+                name,
+                definition,
+            });
+        }
+    }
+    for (name, definition) in &semantics.ratio_metrics {
+        let matches = definition.id == selector
+            || (!identity_only
+                && (name == selector || definition.aliases.iter().any(|a| a == selector)));
+        if matches {
+            candidates.push(GovernedMetricCandidate::Ratio {
+                relation,
+                name,
+                definition,
+            });
+        }
+    }
+    candidates
+}
+
+fn ensure_metric_relation<'a>(
+    candidate: GovernedMetricCandidate<'a>,
+    selected_relation: &SnapshotRelation,
+) -> Result<GovernedMetricCandidate<'a>, CompileDiagnostic> {
+    if std::ptr::eq(candidate.relation(), selected_relation) {
+        Ok(candidate)
+    } else {
+        Err(diagnostic(
+            "metric_scope",
+            "The matching governed definition belongs to a different relation; select it explicitly",
+        ))
+    }
+}
+
+fn candidate_applicability(
+    candidate: GovernedMetricCandidate<'_>,
+    requested: &MetricApplicability,
+    temporal_windows: &[RequestedTemporalWindow],
+) -> Result<(), CompileDiagnostic> {
+    match candidate {
+        GovernedMetricCandidate::Metric { definition, .. } => {
+            validate_metric_applicability(definition, requested, temporal_windows)
+        }
+        GovernedMetricCandidate::Ratio {
+            relation,
+            definition,
+            ..
+        } => validate_ratio_applicability(
+            relation
+                .definition()
+                .semantics
+                .as_ref()
+                .expect("ratio candidate has semantics"),
+            definition,
+            requested,
+            temporal_windows,
+        ),
+    }
+}
+
+fn validate_ratio_applicability(
+    semantics: &semantic_catalog::RelationSemantics,
+    ratio: &semantic_catalog::RatioDefinition,
+    requested: &MetricApplicability,
+    temporal_windows: &[RequestedTemporalWindow],
+) -> Result<(), CompileDiagnostic> {
+    validate_required_unit(&ratio.unit, requested.required_unit.as_deref())?;
+    let component_request = MetricApplicability {
+        required_unit: None,
+        required_source_grain: requested.required_source_grain.clone(),
+    };
+    for name in [&ratio.numerator, &ratio.denominator] {
+        let component = semantics.metrics.get(name).ok_or_else(|| {
+            diagnostic(
+                "metric_contract",
+                "Governed ratio depends on a missing aggregate metric",
+            )
+        })?;
+        validate_metric_applicability(component, &component_request, temporal_windows)?;
+    }
+    Ok(())
+}
+
 fn validate_metric_applicability(
     metric: &semantic_catalog::MetricDefinition,
     requested: &MetricApplicability,
@@ -1663,6 +1972,7 @@ fn validate_window_rollup(
     window: &WindowSpec,
     query: &RowQuery,
     relation: &SnapshotRelation,
+    resolved_metric_names: &std::collections::BTreeMap<String, Option<String>>,
     options: &CompileOptions,
 ) -> Result<(), CompileDiagnostic> {
     if window.function != WindowFunction::Sum {
@@ -1687,7 +1997,10 @@ fn validate_window_rollup(
             distinct: true,
             ..
         } => Err(unsupported()),
-        RowOperation::Metric { name, .. } => {
+        RowOperation::Metric { .. } => {
+            let Some(Some(name)) = resolved_metric_names.get(&input.id) else {
+                return Err(unsupported());
+            };
             let metric = relation
                 .definition()
                 .semantics

@@ -1048,6 +1048,12 @@ async fn governed_fixture() -> Engine {
     governed_fixture_rollup(None).await
 }
 async fn governed_fixture_rollup(rollup: Option<std::collections::BTreeSet<String>>) -> Engine {
+    governed_fixture_with_competitor(rollup, None).await
+}
+async fn governed_fixture_with_competitor(
+    rollup: Option<std::collections::BTreeSet<String>>,
+    competitor_unit: Option<&str>,
+) -> Engine {
     use semantic_catalog::{
         EmptyBehavior, GovernedFilter, MetricDefinition, Presence, RelationSemantics, RowPolicy,
     };
@@ -1141,12 +1147,48 @@ async fn governed_fixture_rollup(rollup: Option<std::collections::BTreeSet<Strin
             source_refs: vec![],
         },
     );
+    if let Some(unit) = competitor_unit {
+        semantics.metrics.insert(
+            "qualified_count".into(),
+            MetricDefinition {
+                id: "metrics/qualified-count".into(),
+                description: "Count with a deliberately competing authored label".into(),
+                aliases: vec!["qualified points".into()],
+                function: AggregateFunction::Count,
+                field: None,
+                distinct: false,
+                source_grain: vec!["id".into()],
+                compatible_dimensions: ["label".into()].into(),
+                compatible_lookup_dimensions: vec![],
+                sum_rollup_dimensions: rollup,
+                row_filters: vec![],
+                result_type: DataType::Int64,
+                unit: Presence::Value(unit.into()),
+                temporal: Presence::Missing,
+                empty_behavior: EmptyBehavior::Zero,
+                source_refs: vec![],
+            },
+        );
+    }
     let provider = engine
         .plan_generated_sql("SELECT * FROM items")
         .await
         .unwrap()
         .into_view();
     engine.register_table(relation, provider).unwrap();
+    engine
+}
+
+async fn governed_fixture_with_duplicate_identities() -> Engine {
+    let mut engine = governed_fixture().await;
+    let mut duplicate = engine.catalog().relation("governed").unwrap().clone();
+    duplicate.name = "other_governed".into();
+    let provider = engine
+        .plan_generated_sql("SELECT * FROM items")
+        .await
+        .unwrap()
+        .into_view();
+    engine.register_table(duplicate, provider).unwrap();
     engine
 }
 
@@ -1329,6 +1371,84 @@ async fn metric_applicability_enforces_exact_unit_grain_and_temporal_coverage() 
             "expected {code}"
         );
     }
+}
+
+#[tokio::test]
+async fn competing_metric_labels_require_identity_or_unique_exact_applicability() {
+    fn alias_query(unit: Option<&str>) -> RowQuery {
+        let mut metric = requirement(
+            "metric",
+            RowOperation::Metric {
+                name: "qualified points".into(),
+                alias: "value".into(),
+                applicability: MetricApplicability {
+                    required_unit: unit.map(str::to_owned),
+                    required_source_grain: vec!["id".into()],
+                },
+            },
+        );
+        metric.source_text = "qualified points".into();
+        RowQuery {
+            input: RelationInput {
+                relation: "governed".into(),
+                instance: "r".into(),
+            },
+            requirements: vec![metric],
+            ..query()
+        }
+    }
+
+    let engine = governed_fixture_with_competitor(None, Some("rows")).await;
+    assert!(
+        matches!(compile_rows(&engine, alias_query(None), CompileOptions::default()).await.outcome,
+            TypedOutcome::Rejected { diagnostic } if diagnostic.code == "ambiguous_metric")
+    );
+    let mut model_selected_canonical_name = alias_query(None);
+    let RowOperation::Metric { name, .. } =
+        &mut model_selected_canonical_name.requirements[0].operation
+    else {
+        unreachable!()
+    };
+    *name = "qualified_score".into();
+    assert!(
+        matches!(compile_rows(&engine, model_selected_canonical_name, CompileOptions::default()).await.outcome,
+            TypedOutcome::Rejected { diagnostic } if diagnostic.code == "ambiguous_metric")
+    );
+    both_paths(&engine, alias_query(Some("points")), vec![vec!["10"]]).await;
+
+    let mut by_identity = alias_query(None);
+    let RowOperation::Metric { name, .. } = &mut by_identity.requirements[0].operation else {
+        unreachable!()
+    };
+    *name = "metrics/qualified-score".into();
+    by_identity.requirements[0].source_text = "metrics/qualified-score".into();
+    both_paths(&engine, by_identity, vec![vec!["10"]]).await;
+
+    assert!(
+        matches!(compile_rows(&engine, alias_query(Some("unknown")), CompileOptions::default()).await.outcome,
+            TypedOutcome::Rejected { diagnostic } if diagnostic.code == "metric_applicability")
+    );
+
+    // Mutation check: changing the competing contract to the requested unit
+    // invalidates the formerly unique applicability decision.
+    let mutated = governed_fixture_with_competitor(None, Some("points")).await;
+    assert!(
+        matches!(compile_rows(&mutated, alias_query(Some("points")), CompileOptions::default()).await.outcome,
+            TypedOutcome::Rejected { diagnostic } if diagnostic.code == "ambiguous_metric")
+    );
+
+    let duplicate_identities = governed_fixture_with_duplicate_identities().await;
+    let mut duplicate_identity = alias_query(None);
+    let RowOperation::Metric { name, .. } = &mut duplicate_identity.requirements[0].operation
+    else {
+        unreachable!()
+    };
+    *name = "metrics/qualified-score".into();
+    duplicate_identity.requirements[0].source_text = "metric".into();
+    assert!(
+        matches!(compile_rows(&duplicate_identities, duplicate_identity, CompileOptions::default()).await.outcome,
+            TypedOutcome::Rejected { diagnostic } if diagnostic.code == "metric_identity")
+    );
 }
 
 #[tokio::test]
