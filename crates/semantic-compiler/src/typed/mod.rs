@@ -19,7 +19,7 @@ mod temporal;
 pub use replay::{PIPELINE_REVISION, ReplayBundle};
 pub use temporal::{Calendar, ContextOrigin, RequestContext, TemporalResolution};
 mod graph;
-pub use graph::{CompiledGraph, GraphReplayBundle, compile_graph};
+pub use graph::{CompiledGraph, GraphReplayBundle, compile_graph, compile_graph_intent};
 
 use std::{
     io::Write,
@@ -67,6 +67,7 @@ impl Cancellation {
 pub struct CompileOptions {
     pub metrics: Option<Arc<CompilerMetrics>>,
     pub request_evidence: Option<semantic_plan::typed::RequestEvidence>,
+    pub graph_request_evidence: Option<semantic_plan::graph::GraphRequestEvidence>,
     pub request_context: Option<RequestContext>,
     pub timeout: Duration,
     pub cancellation: Cancellation,
@@ -100,6 +101,7 @@ impl Default for CompileOptions {
         Self {
             request_context: None,
             request_evidence: None,
+            graph_request_evidence: None,
             metrics: None,
             timeout: Duration::from_secs(30),
             cancellation: Cancellation::default(),
@@ -585,6 +587,12 @@ async fn compile_bound(
 
 fn preflight(query: &RowQuery, options: &CompileOptions) -> Result<(), CompileDiagnostic> {
     options.check()?;
+    if options.graph_request_evidence.is_some() {
+        return Err(diagnostic(
+            "graph_evidence",
+            "Graph request evidence cannot cover a standalone row query",
+        ));
+    }
     if let Some(context) = &options.request_context {
         context.validate()?;
     }
@@ -715,6 +723,10 @@ impl<P: ModelProvider> Compiler<P> {
             .request_evidence
             .as_ref()
             .is_some_and(|evidence| evidence.original_request != request)
+            || options
+                .graph_request_evidence
+                .as_ref()
+                .is_some_and(|evidence| evidence.original_request != request)
         {
             return Err(diagnostic(
                 "request_evidence",
@@ -845,6 +857,26 @@ impl<P: ModelProvider> Compiler<P> {
             record.stage("decode", start, &proposal);
             let mut attempt_options = options.clone();
             let proposal = proposal.and_then(|proposal| match proposal {
+                TypedProposal::GraphIntent { query, evidence } => {
+                    if evidence.original_request != request {
+                        return Err(diagnostic(
+                            "request_evidence",
+                            "Graph intent must retain the exact original request",
+                        ));
+                    }
+                    if options
+                        .graph_request_evidence
+                        .as_ref()
+                        .is_some_and(|host| host != &evidence)
+                    {
+                        return Err(diagnostic(
+                            "request_evidence",
+                            "Model evidence cannot replace the host graph requirement ledger",
+                        ));
+                    }
+                    attempt_options.graph_request_evidence = Some(evidence);
+                    Ok(TypedProposal::Graph { query })
+                }
                 TypedProposal::Intent { query, evidence } => {
                     if evidence.original_request != request {
                         return Err(diagnostic(

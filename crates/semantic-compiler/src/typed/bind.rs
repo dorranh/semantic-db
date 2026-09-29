@@ -122,6 +122,13 @@ pub(super) struct BoundRatioInput {
     pub filter: Option<BoundPredicate>,
 }
 
+struct RequestedTemporalWindow {
+    field: String,
+    grain: CalendarUnit,
+    start: Literal,
+    end: Literal,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(super) struct BoundRelationship {
     pub definition: ObjectRef,
@@ -286,6 +293,33 @@ pub(super) fn bind(
             }
         })
         .collect();
+    let temporal_windows = query
+        .requirements
+        .iter()
+        .filter_map(|requirement| {
+            let RowOperation::CalendarFilter { field, period } = &requirement.operation else {
+                return None;
+            };
+            Some((field, period))
+        })
+        .map(|(field, period)| {
+            let field = binder.field(field)?;
+            let context = options.request_context.as_ref().ok_or_else(|| {
+                diagnostic(
+                    "unresolved_time_context",
+                    "Relative periods require a pinned reference instant, timezone and calendar",
+                )
+            })?;
+            let (start, end, _) =
+                super::temporal::resolve(period, context, field.field.data_type())?;
+            Ok(RequestedTemporalWindow {
+                field: field.field.name().clone(),
+                grain: period.unit,
+                start,
+                end,
+            })
+        })
+        .collect::<Result<Vec<_>, CompileDiagnostic>>()?;
     let mut output_slots = std::collections::BTreeMap::new();
     for (index, requirement) in query.requirements.iter().enumerate() {
         let output_type = match &requirement.operation {
@@ -322,7 +356,11 @@ pub(super) fn bind(
                 ratios.insert(requirement.id.clone(), (numerator, denominator, *zero));
                 Some((DataType::Decimal128(38, 18), true))
             }
-            RowOperation::Metric { name, .. } => {
+            RowOperation::Metric {
+                name,
+                applicability,
+                ..
+            } => {
                 let semantics = relation.definition().semantics.as_ref().ok_or_else(|| {
                     diagnostic("unknown_metric", "Metric is not declared on this relation")
                 })?;
@@ -333,10 +371,25 @@ pub(super) fn bind(
                             "Governed metric identities must be explicit and unambiguous",
                         ));
                     }
-                    let numerator =
-                        binder.metric(&ratio.numerator, &grouping_fields, &lookup_dimensions)?;
-                    let denominator =
-                        binder.metric(&ratio.denominator, &grouping_fields, &lookup_dimensions)?;
+                    validate_required_unit(&ratio.unit, applicability.required_unit.as_deref())?;
+                    let component_applicability = MetricApplicability {
+                        required_unit: None,
+                        required_source_grain: applicability.required_source_grain.clone(),
+                    };
+                    let numerator = binder.metric(
+                        &ratio.numerator,
+                        &grouping_fields,
+                        &lookup_dimensions,
+                        &component_applicability,
+                        &temporal_windows,
+                    )?;
+                    let denominator = binder.metric(
+                        &ratio.denominator,
+                        &grouping_fields,
+                        &lookup_dimensions,
+                        &component_applicability,
+                        &temporal_windows,
+                    )?;
                     if numerator.1.0 != DataType::Int64 || denominator.1.0 != DataType::Int64 {
                         return Err(diagnostic(
                             "ratio_type",
@@ -365,8 +418,13 @@ pub(super) fn bind(
                     );
                     Some((DataType::Decimal128(38, 18), true))
                 } else {
-                    let (input, ty, reference) =
-                        binder.metric(name, &grouping_fields, &lookup_dimensions)?;
+                    let (input, ty, reference) = binder.metric(
+                        name,
+                        &grouping_fields,
+                        &lookup_dimensions,
+                        applicability,
+                        &temporal_windows,
+                    )?;
                     definitions.push(reference);
                     metrics.insert(requirement.id.clone(), input);
                     Some(ty)
@@ -1189,6 +1247,8 @@ impl Binder<'_> {
         name: &str,
         grouping_fields: &BTreeSet<&str>,
         lookup_dimensions: &[semantic_catalog::MetricLookupDimension],
+        applicability: &MetricApplicability,
+        temporal_windows: &[RequestedTemporalWindow],
     ) -> Result<(BoundRatioInput, (DataType, bool), ObjectRef), CompileDiagnostic> {
         let metric = self
             .relation
@@ -1205,6 +1265,7 @@ impl Binder<'_> {
                 "Metric requires a durable identity and explicit source grain",
             ));
         }
+        validate_metric_applicability(metric, applicability, temporal_windows)?;
         if metric.source_grain.len() > self.options.max_nodes
             || metric.row_filters.len() > self.options.max_nodes
         {
@@ -1462,6 +1523,136 @@ impl Binder<'_> {
                 }
             }
         })
+    }
+}
+
+fn validate_metric_applicability(
+    metric: &semantic_catalog::MetricDefinition,
+    requested: &MetricApplicability,
+    temporal_windows: &[RequestedTemporalWindow],
+) -> Result<(), CompileDiagnostic> {
+    validate_required_unit(&metric.unit, requested.required_unit.as_deref())?;
+    if !requested.required_source_grain.is_empty()
+        && requested.required_source_grain != metric.source_grain
+    {
+        return Err(diagnostic(
+            "metric_grain",
+            "Requested source grain does not exactly match the governed metric",
+        ));
+    }
+    match &metric.temporal {
+        semantic_catalog::Presence::Null => Ok(()),
+        semantic_catalog::Presence::Missing if temporal_windows.is_empty() => Ok(()),
+        semantic_catalog::Presence::Missing => Err(diagnostic(
+            "metric_applicability",
+            "Metric temporal applicability is unknown for the requested calendar filter",
+        )),
+        semantic_catalog::Presence::Value(contract) => {
+            let matching: Vec<_> = temporal_windows
+                .iter()
+                .filter(|window| window.field == contract.field)
+                .collect();
+            if matching.len() != 1 {
+                return Err(diagnostic(
+                    "metric_applicability",
+                    "Restricted metrics require exactly one calendar filter on their governed time field",
+                ));
+            }
+            let requested = matching[0];
+            if requested.grain != contract.grain {
+                return Err(diagnostic(
+                    "metric_time_grain",
+                    "Requested calendar grain does not match the governed metric",
+                ));
+            }
+            if !coverage_contains(
+                &contract.coverage_start,
+                &contract.coverage_end,
+                &requested.start,
+                &requested.end,
+            ) {
+                return Err(diagnostic(
+                    "metric_coverage",
+                    "Requested calendar interval is outside the governed metric coverage",
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_required_unit(
+    actual: &semantic_catalog::Presence<String>,
+    requested: Option<&str>,
+) -> Result<(), CompileDiagnostic> {
+    let Some(requested) = requested else {
+        return Ok(());
+    };
+    if requested.trim().is_empty() {
+        return Err(diagnostic(
+            "metric_unit",
+            "Requested metric units must be nonempty exact authored values",
+        ));
+    }
+    if !matches!(actual, semantic_catalog::Presence::Value(actual) if actual == requested) {
+        return Err(diagnostic(
+            "metric_unit",
+            "Requested metric unit does not exactly match the governed definition",
+        ));
+    }
+    Ok(())
+}
+
+fn coverage_contains(
+    available_start: &Literal,
+    available_end: &Literal,
+    requested_start: &Literal,
+    requested_end: &Literal,
+) -> bool {
+    match (
+        available_start,
+        available_end,
+        requested_start,
+        requested_end,
+    ) {
+        (
+            Literal::Date32(available_start),
+            Literal::Date32(available_end),
+            Literal::Date32(requested_start),
+            Literal::Date32(requested_end),
+        ) => available_start <= requested_start && requested_end <= available_end,
+        (
+            Literal::Timestamp {
+                ticks: available_start,
+                unit: available_start_unit,
+                timezone: available_start_zone,
+            },
+            Literal::Timestamp {
+                ticks: available_end,
+                unit: available_end_unit,
+                timezone: available_end_zone,
+            },
+            Literal::Timestamp {
+                ticks: requested_start,
+                unit: requested_start_unit,
+                timezone: requested_start_zone,
+            },
+            Literal::Timestamp {
+                ticks: requested_end,
+                unit: requested_end_unit,
+                timezone: requested_end_zone,
+            },
+        ) => {
+            available_start_unit == available_end_unit
+                && available_start_unit == requested_start_unit
+                && available_start_unit == requested_end_unit
+                && available_start_zone == available_end_zone
+                && available_start_zone == requested_start_zone
+                && available_start_zone == requested_end_zone
+                && available_start <= requested_start
+                && requested_end <= available_end
+        }
+        _ => false,
     }
 }
 

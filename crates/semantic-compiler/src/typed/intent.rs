@@ -1,7 +1,7 @@
 //! Request-ledger integrity. Span checks establish traceability, never proof that
 //! an interpreter understood or extracted every clause in the user's request.
 use super::{CompileDiagnostic, CompileOptions, TypedCompilation, diagnostic};
-use semantic_plan::typed::{IntentQuery, RequestEvidence, RowQuery};
+use semantic_plan::typed::{IntentQuery, RequestEvidence, RequestSpan, RowQuery};
 
 pub async fn compile_intent(
     engine: &semantic_engine::Engine,
@@ -18,22 +18,12 @@ pub(super) fn validate(
 ) -> Result<(), CompileDiagnostic> {
     super::bounded_json(evidence, options.max_input_bytes)
         .map_err(|_| diagnostic("input_limit", "Request evidence exceeds its byte budget"))?;
-    if evidence.version != 1
-        || evidence.request_id.trim().is_empty()
-        || evidence.request_id.len() > 256
-        || evidence.original_request.trim().is_empty()
-    {
-        return Err(diagnostic(
-            "request_evidence",
-            "Request evidence needs version 1, a bounded identity and original text",
-        ));
-    }
-    if !evidence.unresolved_alternatives.is_empty() {
-        return Err(diagnostic(
-            "unresolved_alternatives",
-            "Competing interpretations must be resolved before binding",
-        ));
-    }
+    validate_header(
+        evidence.version,
+        &evidence.request_id,
+        &evidence.original_request,
+        &evidence.unresolved_alternatives,
+    )?;
     if evidence.requirement_spans.len() != query.requirements.len() {
         return Err(diagnostic(
             "request_coverage",
@@ -56,40 +46,7 @@ pub(super) fn validate(
         if total > options.max_nodes {
             return Err(diagnostic("work_limit", "Request span budget exhausted"));
         }
-        if spans.is_empty() {
-            return Err(diagnostic(
-                "request_coverage",
-                "Requirement source spans cannot be empty",
-            ));
-        }
-        let mut previous_end = 0;
-        let mut text = Vec::new();
-        for span in spans {
-            if span.start >= span.end || span.start < previous_end {
-                return Err(diagnostic(
-                    "request_span",
-                    "Source spans must be nonempty, ordered and nonoverlapping within a requirement",
-                ));
-            }
-            let value = evidence
-                .original_request
-                .get(span.start..span.end)
-                .ok_or_else(|| {
-                    diagnostic(
-                        "request_span",
-                        "Source spans must lie on UTF-8 boundaries within the original request",
-                    )
-                })?;
-            if value.trim().is_empty() {
-                return Err(diagnostic(
-                    "request_span",
-                    "Whitespace alone cannot substantiate a requirement",
-                ));
-            }
-            previous_end = span.end;
-            text.push(value);
-        }
-        if text.join(" ") != requirement.source_text {
+        if span_text(&evidence.original_request, spans)? != requirement.source_text {
             return Err(diagnostic(
                 "request_span",
                 "Requirement source text must exactly equal its source spans joined by a space",
@@ -97,4 +54,66 @@ pub(super) fn validate(
         }
     }
     Ok(())
+}
+
+pub(super) fn validate_header(
+    version: u32,
+    request_id: &str,
+    original_request: &str,
+    alternatives: &[String],
+) -> Result<(), CompileDiagnostic> {
+    if version != 1
+        || request_id.trim().is_empty()
+        || request_id.len() > 256
+        || original_request.trim().is_empty()
+    {
+        return Err(diagnostic(
+            "request_evidence",
+            "Request evidence needs version 1, a bounded identity and original text",
+        ));
+    }
+    if !alternatives.is_empty() {
+        return Err(diagnostic(
+            "unresolved_alternatives",
+            "Competing interpretations must be resolved before binding",
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn span_text(
+    original_request: &str,
+    spans: &[RequestSpan],
+) -> Result<String, CompileDiagnostic> {
+    if spans.is_empty() {
+        return Err(diagnostic(
+            "request_coverage",
+            "Requirement source spans cannot be empty",
+        ));
+    }
+    let mut previous_end = 0;
+    let mut text = Vec::new();
+    for span in spans {
+        if span.start >= span.end || span.start < previous_end {
+            return Err(diagnostic(
+                "request_span",
+                "Source spans must be nonempty, ordered and nonoverlapping within a requirement",
+            ));
+        }
+        let value = original_request.get(span.start..span.end).ok_or_else(|| {
+            diagnostic(
+                "request_span",
+                "Source spans must lie on UTF-8 boundaries within the original request",
+            )
+        })?;
+        if value.trim().is_empty() {
+            return Err(diagnostic(
+                "request_span",
+                "Whitespace alone cannot substantiate a requirement",
+            ));
+        }
+        previous_end = span.end;
+        text.push(value);
+    }
+    Ok(text.join(" "))
 }

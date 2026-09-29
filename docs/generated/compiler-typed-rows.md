@@ -264,6 +264,14 @@ historical source rows.
   to the explicit IANA timezone. DST days may be 23/25 hours. Ambiguous/nonexistent
   boundaries and naive timestamp fields are rejected. Fiscal calendars and
   rolling elapsed-duration periods are not implied by these operations.
+- Governed metrics accept exact optional `required_unit` and ordered
+  `required_source_grain` constraints. A metric with authored temporal
+  applicability requires exactly one `CalendarFilter` on its governed field, the
+  exact authored calendar unit, and a resolved interval contained by its
+  half-open Date32 or UTC Timestamp coverage. Missing temporal facts reject a
+  calendar-filtered metric; explicit null is the authored unrestricted state.
+  This is a decidable profile, not unit conversion or general predicate
+  implication.
 - `Lookup` projects a dimension field through an authored relationship role with
   an explicit preserve-as-null or exclude-missing contract. Separate occurrences
   retain billing/shipping roles. A same-query grouped-key count guard rejects
@@ -288,3 +296,6 @@ The model can return `status:intent` in the same call as its query proposal.
 `/v1/compile/semantic` additionally accepts `request_context` for model-driven
 calendar interpretation. Replay pins context and evidence; callers cannot replace
 them while replaying. Compilation cache identity includes both.
+
+The complete current boundary is summarized in
+[the supported profile](compiler-supported-profile.md).

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanArray, Int64Array, StringArray},
+        array::{ArrayRef, BooleanArray, Date32Array, Int64Array, StringArray},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
         util::display::array_value_to_string,
@@ -1075,6 +1075,7 @@ async fn governed_fixture_rollup(rollup: Option<std::collections::BTreeSet<Strin
                 }],
                 result_type: DataType::Int64,
                 unit: Presence::Value("points".into()),
+                temporal: Presence::Missing,
                 empty_behavior: EmptyBehavior::Null,
                 source_refs: vec![],
             },
@@ -1122,6 +1123,7 @@ async fn governed_fixture_rollup(rollup: Option<std::collections::BTreeSet<Strin
             row_filters: vec![],
             result_type: DataType::Int64,
             unit: Presence::Value("rows".into()),
+            temporal: Presence::Missing,
             empty_behavior: EmptyBehavior::Zero,
             source_refs: vec![],
         },
@@ -1147,6 +1149,188 @@ async fn governed_fixture_rollup(rollup: Option<std::collections::BTreeSet<Strin
     engine.register_table(relation, provider).unwrap();
     engine
 }
+
+fn temporal_metric_fixture() -> Engine {
+    use semantic_catalog::{
+        EmptyBehavior, MetricDefinition, MetricTemporalApplicability, Presence, RelationSemantics,
+    };
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Int64, false),
+        Field::new("day", DataType::Date32, false),
+        Field::new("score", DataType::Int64, false),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(Int64Array::from(vec![1, 2, 3])),
+            Arc::new(Date32Array::from(vec![19737, 19763, 19792])),
+            Arc::new(Int64Array::from(vec![1, 2, 4])),
+        ],
+    )
+    .unwrap();
+    let mut relation = Relation::base("temporal_scores", schema.clone(), "memory");
+    relation.semantics = Some(RelationSemantics {
+        metrics: [(
+            "monthly_score".into(),
+            MetricDefinition {
+                id: "metrics/monthly-score".into(),
+                description: "Monthly score in the first quarter of 2024".into(),
+                aliases: vec![],
+                function: AggregateFunction::Sum,
+                field: Some("score".into()),
+                distinct: false,
+                source_grain: vec!["id".into()],
+                compatible_dimensions: Default::default(),
+                compatible_lookup_dimensions: vec![],
+                sum_rollup_dimensions: None,
+                row_filters: vec![],
+                result_type: DataType::Int64,
+                unit: Presence::Value("points".into()),
+                temporal: Presence::Value(MetricTemporalApplicability {
+                    field: "day".into(),
+                    grain: CalendarUnit::Month,
+                    coverage_start: Literal::Date32(19723),
+                    coverage_end: Literal::Date32(19814),
+                }),
+                empty_behavior: EmptyBehavior::Null,
+                source_refs: vec![],
+            },
+        )]
+        .into(),
+        ..Default::default()
+    });
+    let mut engine = Engine::new();
+    engine
+        .register_table(
+            relation,
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+    engine
+}
+
+fn temporal_metric_query(unit: CalendarUnit) -> RowQuery {
+    RowQuery {
+        version: 1,
+        input: RelationInput {
+            relation: "temporal_scores".into(),
+            instance: "r".into(),
+        },
+        requirements: vec![
+            requirement(
+                "period",
+                RowOperation::CalendarFilter {
+                    field: field("day"),
+                    period: CalendarPeriod {
+                        unit,
+                        offset: -1,
+                        count: 1,
+                    },
+                },
+            ),
+            requirement(
+                "metric",
+                RowOperation::Metric {
+                    name: "monthly_score".into(),
+                    alias: "score".into(),
+                    applicability: MetricApplicability {
+                        required_unit: Some("points".into()),
+                        required_source_grain: vec!["id".into()],
+                    },
+                },
+            ),
+        ],
+        unresolved: vec![],
+    }
+}
+
+fn temporal_options(reference: &str) -> CompileOptions {
+    use semantic_compiler::typed::{Calendar, ContextOrigin, RequestContext};
+    let mut options = CompileOptions::default();
+    options.request_context = Some(RequestContext {
+        reference_unix_millis: chrono::DateTime::parse_from_rfc3339(reference)
+            .unwrap()
+            .timestamp_millis(),
+        timezone: "UTC".into(),
+        calendar: Calendar::Gregorian,
+        origin: ContextOrigin::Caller,
+    });
+    options
+}
+
+#[tokio::test]
+async fn metric_applicability_enforces_exact_unit_grain_and_temporal_coverage() {
+    let engine = temporal_metric_fixture();
+    let valid = temporal_metric_query(CalendarUnit::Month);
+    let result = compile_rows(
+        &engine,
+        valid.clone(),
+        temporal_options("2024-03-15T12:00:00Z"),
+    )
+    .await;
+    let artifact = compiled(result);
+    assert_eq!(
+        values(
+            &artifact
+                .execute(&engine, QueryOptions::default())
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap()
+        ),
+        vec![vec!["2".to_string()]]
+    );
+
+    let mut cases = Vec::new();
+    cases.push((
+        "metric_time_grain",
+        temporal_metric_query(CalendarUnit::Day),
+        temporal_options("2024-02-10T12:00:00Z"),
+    ));
+    cases.push((
+        "metric_coverage",
+        valid.clone(),
+        temporal_options("2024-05-15T12:00:00Z"),
+    ));
+    let mut missing_filter = valid.clone();
+    missing_filter.requirements.remove(0);
+    cases.push((
+        "metric_applicability",
+        missing_filter,
+        CompileOptions::default(),
+    ));
+    let mut wrong_unit = valid.clone();
+    let RowOperation::Metric { applicability, .. } = &mut wrong_unit.requirements[1].operation
+    else {
+        unreachable!()
+    };
+    applicability.required_unit = Some("euros".into());
+    cases.push((
+        "metric_unit",
+        wrong_unit,
+        temporal_options("2024-03-15T12:00:00Z"),
+    ));
+    let mut wrong_grain = valid;
+    let RowOperation::Metric { applicability, .. } = &mut wrong_grain.requirements[1].operation
+    else {
+        unreachable!()
+    };
+    applicability.required_source_grain = vec!["day".into()];
+    cases.push((
+        "metric_grain",
+        wrong_grain,
+        temporal_options("2024-03-15T12:00:00Z"),
+    ));
+    for (code, query, options) in cases {
+        assert!(
+            matches!(compile_rows(&engine, query, options).await.outcome,
+                TypedOutcome::Rejected { diagnostic } if diagnostic.code == code),
+            "expected {code}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn governed_metric_filters_are_local_and_policies_are_unavoidable() {
     let mut q = query();
@@ -1157,6 +1341,7 @@ async fn governed_metric_filters_are_local_and_policies_are_unavoidable() {
             RowOperation::Metric {
                 name: "qualified_score".into(),
                 alias: "qualified".into(),
+                applicability: Default::default(),
             },
         ),
         requirement(
@@ -1658,6 +1843,7 @@ async fn governed_ratios_retain_component_contracts_and_retrieval_closure() {
         RowOperation::Metric {
             name: "qualified_average".into(),
             alias: "average".into(),
+            applicability: Default::default(),
         },
     )];
     both_paths(&engine, q.clone(), vec![vec!["2.500000000000000000"]]).await;
@@ -2150,6 +2336,7 @@ fn lookup_fixture(duplicate: bool, null_keys_match: bool) -> Engine {
                 row_filters: vec![],
                 result_type: DataType::Int64,
                 unit: semantic_catalog::Presence::Missing,
+                temporal: semantic_catalog::Presence::Missing,
                 empty_behavior: semantic_catalog::EmptyBehavior::Null,
                 source_refs: vec![],
             },
@@ -2569,6 +2756,7 @@ async fn metric_windows_require_additive_grain_and_mergeable_state() {
                 RowOperation::Metric {
                     name: "qualified_score".into(),
                     alias: "score".into(),
+                    applicability: Default::default(),
                 },
             ),
             requirement(
@@ -2616,6 +2804,7 @@ async fn metric_windows_require_additive_grain_and_mergeable_state() {
         RowOperation::Metric {
             name: "qualified_average".into(),
             alias: "average".into(),
+            applicability: Default::default(),
         },
         RowOperation::Aggregate {
             function: AggregateFunction::Count,
@@ -2754,6 +2943,7 @@ async fn grouped_lookups_preserve_fact_grain_missing_matches_and_metric_dimensio
             RowOperation::Metric {
                 name: "id_total".into(),
                 alias: "total".into(),
+                applicability: Default::default(),
             },
         ),
         requirement(
@@ -2945,7 +3135,7 @@ async fn query_graph_sets_preserve_duplicates_nulls_parameter_slots_and_requirem
                 .record
                 .requirement_dispositions
                 .iter()
-                .any(|r| r.requirement_id == "left/subset")
+                .any(|r| r.requirement_id == "leaf/left/subset")
         );
         let mut disconnected = q.clone();
         disconnected.root = "left".into();
@@ -3404,4 +3594,440 @@ async fn graph_replay_is_bounded_pinned_and_revalidates_host_scope_and_artifact_
             .code,
         "replay_version"
     );
+}
+
+fn traced_graph_intent() -> semantic_plan::graph::GraphIntentQuery {
+    use semantic_plan::graph::*;
+    let request = "Montrér IDs twice ascending first two";
+    let leaf = |id: &str| {
+        let mut q = query();
+        q.requirements[0].id = id.into();
+        q.requirements[0].source_text = "IDs".into();
+        q
+    };
+    let q = GraphQuery {
+        version: 1,
+        nodes: vec![
+            QueryNode {
+                id: "a/b".into(),
+                source_text: "IDs".into(),
+                operation: GraphOperation::Rows { query: leaf("c") },
+            },
+            QueryNode {
+                id: "a".into(),
+                source_text: "IDs".into(),
+                operation: GraphOperation::Rows { query: leaf("b/c") },
+            },
+            QueryNode {
+                id: "twice".into(),
+                source_text: "twice".into(),
+                operation: GraphOperation::Set {
+                    left: "a/b".into(),
+                    right: "a".into(),
+                    operator: SetOperator::Union,
+                    duplicates: Duplicates::All,
+                    columns: vec![SetColumn {
+                        id: "id".into(),
+                        left: "c".into(),
+                        right: "b/c".into(),
+                        alias: "id".into(),
+                    }],
+                },
+            },
+        ],
+        root: "twice".into(),
+        ordering: vec![GraphOrder {
+            slot: "id".into(),
+            direction: Direction::Asc,
+            nulls: NullOrder::Last,
+        }],
+        limit: Some(2),
+        unresolved: vec![],
+    };
+    let requirements = [
+        (GraphRequirementRef::Node { node: "a/b".into() }, "IDs"),
+        (
+            GraphRequirementRef::Leaf {
+                node: "a/b".into(),
+                requirement: "c".into(),
+            },
+            "IDs",
+        ),
+        (GraphRequirementRef::Node { node: "a".into() }, "IDs"),
+        (
+            GraphRequirementRef::Leaf {
+                node: "a".into(),
+                requirement: "b/c".into(),
+            },
+            "IDs",
+        ),
+        (
+            GraphRequirementRef::Node {
+                node: "twice".into(),
+            },
+            "twice",
+        ),
+        (
+            GraphRequirementRef::Output {
+                node: "twice".into(),
+                slot: "id".into(),
+            },
+            "IDs",
+        ),
+        (GraphRequirementRef::Order { index: 0 }, "ascending"),
+        (GraphRequirementRef::Limit, "first two"),
+    ]
+    .into_iter()
+    .map(|(target, text)| {
+        let start = request.find(text).unwrap();
+        GraphRequirementEvidence {
+            target,
+            source_spans: vec![RequestSpan {
+                start,
+                end: start + text.len(),
+            }],
+        }
+    })
+    .collect();
+    GraphIntentQuery {
+        query: q,
+        evidence: GraphRequestEvidence {
+            version: 1,
+            request_id: "graph-request".into(),
+            original_request: request.into(),
+            requirements,
+            unresolved_alternatives: vec![],
+        },
+    }
+}
+
+#[tokio::test]
+async fn graph_intent_covers_scoped_requirements_order_limit_and_replays_exact_evidence() {
+    use semantic_compiler::typed::{compile_graph, compile_graph_intent};
+    use semantic_plan::graph::*;
+    let engine = fixture();
+    let intent = traced_graph_intent();
+    let result = compile_graph_intent(&engine, intent.clone(), CompileOptions::default()).await;
+    assert!(
+        result.record.request_spans_validated,
+        "{:?}",
+        result.outcome
+    );
+    assert!(result.record.request_digest.is_some());
+    let expected: std::collections::BTreeSet<_> = intent
+        .evidence
+        .requirements
+        .iter()
+        .map(|e| e.target.record_id())
+        .collect();
+    let recorded: std::collections::BTreeSet<_> = result
+        .record
+        .requirement_dispositions
+        .iter()
+        .map(|d| d.requirement_id.clone())
+        .collect();
+    assert_eq!(recorded, expected);
+    assert_eq!(recorded.len(), result.record.requirement_dispositions.len());
+    assert!(
+        result
+            .record
+            .requirement_dispositions
+            .iter()
+            .all(|d| d.result == "lowered_and_verified")
+    );
+    assert!(recorded.contains("leaf/a~1b/c"));
+    assert!(recorded.contains("leaf/a/b~1c"));
+    assert!(
+        !serde_json::to_string(&result.record)
+            .unwrap()
+            .contains("Montrér")
+    );
+    let digest = result.record.artifact_digest;
+    let TypedOutcome::CompiledGraph { query: artifact } = result.outcome else {
+        panic!("{:?}", result.outcome)
+    };
+    let expected_rows = vec![vec!["1".to_string()], vec!["1".to_string()]];
+    assert_eq!(
+        values(
+            &artifact
+                .plan_direct(&engine)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap()
+        ),
+        expected_rows
+    );
+    assert_eq!(
+        values(
+            &artifact
+                .execute(&engine, QueryOptions::default())
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap()
+        ),
+        expected_rows
+    );
+    assert!(artifact.capture_replay(8).is_err());
+    let capture = artifact.capture_replay(64 * 1024).unwrap();
+    let restored: semantic_compiler::typed::GraphReplayBundle =
+        serde_json::from_slice(&serde_json::to_vec(&capture).unwrap()).unwrap();
+    assert_eq!(restored.request_evidence.as_ref(), Some(&intent.evidence));
+    let replay = restored
+        .replay(&engine, CompileOptions::default())
+        .await
+        .unwrap();
+    assert!(replay.record.request_spans_validated);
+    assert_eq!(replay.record.artifact_digest, digest);
+    let mut options = CompileOptions::default();
+    let mut changed = intent.evidence.clone();
+    changed.request_id = "changed".into();
+    options.graph_request_evidence = Some(changed);
+    assert_eq!(
+        restored.replay(&engine, options).await.unwrap_err().code,
+        "replay_evidence"
+    );
+    let mut changed = restored.clone();
+    changed
+        .request_evidence
+        .as_mut()
+        .unwrap()
+        .original_request
+        .push('!');
+    assert_eq!(
+        changed
+            .replay(&engine, CompileOptions::default())
+            .await
+            .unwrap_err()
+            .code,
+        "replay_mismatch"
+    );
+    let legacy = compile_graph(&engine, intent.query.clone(), CompileOptions::default()).await;
+    assert!(matches!(legacy.outcome, TypedOutcome::CompiledGraph { .. }));
+    assert!(!legacy.record.request_spans_validated);
+    assert!(legacy.record.request_digest.is_none());
+    assert_eq!(legacy.record.requirement_dispositions.len(), expected.len());
+    let model = compiler(vec![
+        serde_json::to_string(&TypedProposal::GraphIntent {
+            query: intent.query,
+            evidence: intent.evidence.clone(),
+        })
+        .unwrap(),
+    ]);
+    let result = model
+        .compile_typed(
+            &engine,
+            &intent.evidence.original_request,
+            CompileOptions::default(),
+        )
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::CompiledGraph { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert!(result.record.request_spans_validated);
+    assert_eq!(result.record.artifact_digest, digest);
+    // Escaping is injective even when input IDs already contain escape-like text.
+    assert_ne!(
+        GraphRequirementRef::Node { node: "a/b".into() }.record_id(),
+        GraphRequirementRef::Node {
+            node: "a~1b".into()
+        }
+        .record_id()
+    );
+}
+
+#[tokio::test]
+async fn graph_intent_rejects_incomplete_or_orphan_evidence_and_invalid_spans() {
+    use semantic_compiler::typed::compile_graph_intent;
+    use semantic_plan::graph::*;
+    let engine = fixture();
+    let original = traced_graph_intent();
+    let mut cases = Vec::new();
+    for target in [
+        GraphRequirementRef::Order { index: 0 },
+        GraphRequirementRef::Limit,
+        GraphRequirementRef::Node {
+            node: "twice".into(),
+        },
+        GraphRequirementRef::Output {
+            node: "twice".into(),
+            slot: "id".into(),
+        },
+    ] {
+        let mut intent = original.clone();
+        intent
+            .evidence
+            .requirements
+            .retain(|entry| entry.target != target);
+        cases.push(("request_coverage", intent));
+    }
+    let mut intent = original.clone();
+    intent.query.limit = None; // Removing the operation leaves an orphan mandatory clause.
+    cases.push(("request_coverage", intent));
+    let mut intent = original.clone();
+    intent.evidence.requirements[0].target = intent.evidence.requirements[1].target.clone();
+    cases.push(("request_coverage", intent));
+    let mut intent = original.clone();
+    intent.evidence.requirements[0].target = GraphRequirementRef::Node {
+        node: "missing".into(),
+    };
+    cases.push(("request_coverage", intent));
+    let mut intent = original.clone();
+    intent.evidence.requirements[0].source_spans.clear();
+    cases.push(("request_coverage", intent));
+    for span in [
+        RequestSpan { start: 6, end: 8 },
+        RequestSpan {
+            start: 0,
+            end: 1000,
+        },
+        RequestSpan { start: 8, end: 9 },
+    ] {
+        let mut intent = original.clone();
+        intent.evidence.requirements[0].source_spans = vec![span];
+        cases.push(("request_span", intent));
+    }
+    let mut intent = original.clone();
+    intent.query.nodes[0].source_text = "different".into();
+    cases.push(("request_span", intent));
+    let mut intent = original.clone();
+    intent.evidence.version = 2;
+    cases.push(("request_evidence", intent));
+    for (code, intent) in cases {
+        let result = compile_graph_intent(&engine, intent, CompileOptions::default()).await;
+        assert!(
+            matches!(&result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == code),
+            "expected {code}, got {:?}",
+            result.outcome
+        );
+        assert!(!result.record.request_spans_validated);
+    }
+    let mut unresolved = original.clone();
+    unresolved
+        .evidence
+        .unresolved_alternatives
+        .push("different group domain".into());
+    assert!(
+        matches!(compile_graph_intent(&engine, unresolved, CompileOptions::default()).await.outcome,
+        TypedOutcome::Unresolved { diagnostic } if diagnostic.code == "unresolved_alternatives")
+    );
+    let mut options = CompileOptions::default();
+    options.max_nodes = original.evidence.requirements.len() - 1;
+    assert!(
+        matches!(compile_graph_intent(&engine, original.clone(), options).await.outcome,
+        TypedOutcome::Unresolved { diagnostic } if diagnostic.code == "work_limit")
+    );
+    let mut options = CompileOptions::default();
+    options.max_input_bytes = 32;
+    assert!(
+        matches!(compile_graph_intent(&engine, original.clone(), options).await.outcome,
+        TypedOutcome::Unresolved { diagnostic } if diagnostic.code == "input_limit")
+    );
+    // Evidence of one IR kind cannot silently disappear into another compiler.
+    let mut options = CompileOptions::default();
+    options.graph_request_evidence = Some(original.evidence.clone());
+    assert!(
+        matches!(compile_rows(&engine, query(), options).await.outcome,
+        TypedOutcome::Rejected { diagnostic } if diagnostic.code == "graph_evidence")
+    );
+    let mut options = CompileOptions::default();
+    options.request_evidence = Some(traced_intent().evidence);
+    assert!(
+        matches!(compile_graph_intent(&engine, original, options).await.outcome,
+        TypedOutcome::Rejected { diagnostic } if diagnostic.code == "graph_evidence")
+    );
+}
+
+#[tokio::test]
+async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_guarantees() {
+    let engine = fixture();
+    let intent = traced_graph_intent();
+    let mut invalid = intent.clone();
+    invalid.query.ordering[0].slot = "unavailable".into();
+    let model = compiler(vec![
+        serde_json::to_string(&TypedProposal::GraphIntent {
+            query: invalid.query,
+            evidence: invalid.evidence,
+        })
+        .unwrap(),
+        serde_json::to_string(&TypedProposal::Graph {
+            query: intent.query.clone(),
+        })
+        .unwrap(),
+    ]);
+    let result = model
+        .compile_typed(
+            &engine,
+            &intent.evidence.original_request,
+            CompileOptions::default(),
+        )
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::CompiledGraph { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert_eq!(result.record.work.model_calls, 2);
+    assert!(!result.record.request_spans_validated);
+    assert!(result.record.request_digest.is_none());
+
+    let mut changed = intent.evidence.clone();
+    changed.request_id = "model-replacement".into();
+    let model = compiler(vec![
+        serde_json::to_string(&TypedProposal::GraphIntent {
+            query: intent.query.clone(),
+            evidence: changed,
+        })
+        .unwrap(),
+        serde_json::to_string(&TypedProposal::Graph {
+            query: intent.query.clone(),
+        })
+        .unwrap(),
+    ]);
+    let mut options = CompileOptions::default();
+    options.graph_request_evidence = Some(intent.evidence.clone());
+    let result = model
+        .compile_typed(&engine, &intent.evidence.original_request, options)
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::CompiledGraph { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert_eq!(result.record.work.model_calls, 2);
+    assert!(result.record.request_spans_validated);
+
+    let mut wrong_request = intent.evidence.clone();
+    wrong_request.original_request.push('!');
+    let model = compiler(vec![
+        serde_json::to_string(&TypedProposal::GraphIntent {
+            query: intent.query.clone(),
+            evidence: wrong_request,
+        })
+        .unwrap(),
+        serde_json::to_string(&TypedProposal::GraphIntent {
+            query: intent.query,
+            evidence: intent.evidence.clone(),
+        })
+        .unwrap(),
+    ]);
+    let result = model
+        .compile_typed(
+            &engine,
+            &intent.evidence.original_request,
+            CompileOptions::default(),
+        )
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::CompiledGraph { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert_eq!(result.record.work.model_calls, 2);
+    assert!(result.record.request_spans_validated);
 }

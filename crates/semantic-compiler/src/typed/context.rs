@@ -446,6 +446,9 @@ impl ContextState {
                     fields.extend(metric.source_grain.iter().cloned());
                     fields.extend(metric.field.iter().cloned());
                     fields.extend(metric.row_filters.iter().map(|filter| filter.field.clone()));
+                    if let semantic_catalog::Presence::Value(temporal) = &metric.temporal {
+                        fields.insert(temporal.field.clone());
+                    }
                 }
                 for policy in &semantics.row_policies {
                     options.check()?;

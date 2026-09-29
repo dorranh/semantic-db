@@ -115,9 +115,10 @@ impl SourceNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", content = "value", rename_all = "snake_case")]
 pub enum Presence<T> {
+    #[default]
     Missing,
     Null,
     Value(T),

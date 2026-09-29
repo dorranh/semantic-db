@@ -2,6 +2,18 @@
 
 Prepared 2026-09-29 against `e0a7b88` (`wip: Working on first proper compiler implementation`). The checkout was clean before this document was added. Recheck the current diff before editing: other agents may be working here.
 
+Continuation update, 2026-09-29: graph-wide intent evidence (including nodes,
+scoped leaf requirements, graph outputs, final ordering and limit) is implemented
+through model proposals, structured HTTP, records and replay. A narrow governed
+metric applicability profile is also implemented for exact requested units/source
+grain and exact calendar grain plus half-open Date32/UTC Timestamp coverage.
+See [the supported profile](compiler-supported-profile.md). The focused offline
+checkpoint passes the 143-test broad gate, including 48 typed compiler, 8 catalog
+publication, 6 retrieval, 3 server and 5 CLI tests. Formatting, diff checks and
+strict all-target Clippy pass. Item B's evidence contract and the implemented
+portion of A are no longer greenfield; broader applicability/alternative
+resolution and the other listed P0/P1 work remain.
+
 ## Objective and how to use this document
 
 Finish a useful, trustworthy compiler MVP with the remaining budget, then work toward the full [architecture](semantic-compiler-architecture.md). **MVP completion is not full-design completion.** This document recommends a delivery boundary; it does not replace the architecture or claim the outstanding work is already done.

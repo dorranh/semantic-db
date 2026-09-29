@@ -12,6 +12,8 @@ pub struct GraphReplayBundle {
     pub artifact_digest: String,
     pub proposal: GraphQuery,
     pub request_context: Option<RequestContext>,
+    #[serde(default)]
+    pub request_evidence: Option<GraphRequestEvidence>,
 }
 impl CompiledGraph {
     pub fn capture_replay(&self, max_bytes: usize) -> Result<GraphReplayBundle, CompileDiagnostic> {
@@ -24,6 +26,7 @@ impl CompiledGraph {
             ),
             proposal: self.proposal.clone(),
             request_context: self.request_context.clone(),
+            request_evidence: self.request_evidence.clone(),
         };
         bounded_json(&bundle, max_bytes).map_err(|_| {
             diagnostic(
@@ -63,6 +66,17 @@ impl GraphReplayBundle {
             ));
         }
         options.request_context = self.request_context.clone();
+        if options
+            .graph_request_evidence
+            .as_ref()
+            .is_some_and(|evidence| Some(evidence) != self.request_evidence.as_ref())
+        {
+            return Err(diagnostic(
+                "replay_evidence",
+                "Graph replay cannot change the recorded request evidence",
+            ));
+        }
+        options.graph_request_evidence = self.request_evidence.clone();
         preflight_graph(&self.proposal, &options.clone().start())?;
         let result = compile_graph(engine, self.proposal.clone(), options).await;
         if result

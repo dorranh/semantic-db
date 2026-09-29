@@ -2,6 +2,8 @@
 //! graph operators consume validated slots and never model-produced expressions.
 use super::*;
 mod compose;
+mod intent;
+pub use intent::compile_graph_intent;
 mod replay;
 pub use replay::GraphReplayBundle;
 mod set;
@@ -53,6 +55,7 @@ pub struct CompiledGraph {
     nodes: Vec<CheckedNode>,
     root: usize,
     request_context: Option<RequestContext>,
+    request_evidence: Option<GraphRequestEvidence>,
     sql: SqlArtifact,
 }
 impl CompiledGraph {
@@ -258,14 +261,28 @@ pub(super) fn preflight_graph(
             "Graph size exceeds its work budget",
         ));
     }
+    // Graph evidence is validated against the whole graph, never against a leaf.
+    let mut leaf_options = options.clone();
+    leaf_options.graph_request_evidence = None;
     // Preflight expression depth before bounded serialization recurses into leaves.
     for node in &query.nodes {
         if let GraphOperation::Rows { query } = &node.operation {
-            preflight(query, options)?;
+            preflight(query, &leaf_options)?;
         }
     }
-    bounded_json(query, options.max_input_bytes)
-        .map_err(|_| diagnostic("input_limit", "Graph proposal exceeds its byte budget"))?;
+    bounded_json(
+        &(query, &options.graph_request_evidence),
+        options.max_input_bytes,
+    )
+    .map_err(|_| {
+        diagnostic(
+            "input_limit",
+            "Graph proposal and evidence exceed their byte budget",
+        )
+    })?;
+    if let Some(evidence) = &options.graph_request_evidence {
+        intent::validate(query, evidence, options)?;
+    }
     Ok(())
 }
 pub(super) async fn build(
@@ -274,13 +291,21 @@ pub(super) async fn build(
     options: &CompileOptions,
     record: &mut CompilationRecord,
 ) -> Result<CompiledGraph, CompileDiagnostic> {
-    preflight_graph(&query, options)?;
     record.bound_digest = None;
+    record.request_digest = None;
+    record.request_spans_validated = false;
     record.relational_digest = None;
     record.artifact_digest = None;
     record.definition_refs.clear();
     record.execution_obligations.clear();
     record.requirement_dispositions.clear();
+    preflight_graph(&query, options)?;
+    if let Some(evidence) = &options.graph_request_evidence {
+        record.request_digest = Some(semantic_catalog::canonical_digest(&serde_json::json!(
+            evidence.original_request
+        )));
+        record.request_spans_validated = true;
+    }
     let snapshot = engine.catalog().snapshot();
     record.snapshot_id = Some(snapshot.id().into());
     let order = topological(&query, options)?;
@@ -306,7 +331,11 @@ pub(super) async fn build(
                         .requirement_dispositions
                         .into_iter()
                         .map(|mut r| {
-                            r.requirement_id = format!("{}/{}", node.id, r.requirement_id);
+                            r.requirement_id = GraphRequirementRef::Leaf {
+                                node: node.id.clone(),
+                                requirement: r.requirement_id,
+                            }
+                            .record_id();
                             r
                         }),
                 );
@@ -400,13 +429,6 @@ pub(super) async fn build(
             slots,
             group_keys,
         });
-        record
-            .requirement_dispositions
-            .push(RequirementDisposition {
-                requirement_id: node.id.clone(),
-                rule: "graph.checked_operator.v1",
-                result: "lowered_and_verified",
-            });
     }
     let root = indexes[&query.root];
     for order in &query.ordering {
@@ -416,6 +438,22 @@ pub(super) async fn build(
                 "Graph ordering requires an exact scalar output",
             ));
         }
+    }
+    for target in intent::requirements(&query, options)?.into_keys() {
+        let rule = match &target {
+            GraphRequirementRef::Leaf { .. } => continue,
+            GraphRequirementRef::Node { .. } => "graph.checked_operator.v1",
+            GraphRequirementRef::Output { .. } => "graph.output_slot.v1",
+            GraphRequirementRef::Order { .. } => "graph.final_order.v1",
+            GraphRequirementRef::Limit => "graph.final_limit.v1",
+        };
+        record
+            .requirement_dispositions
+            .push(RequirementDisposition {
+                requirement_id: target.record_id(),
+                rule,
+                result: "lowered_and_verified",
+            });
     }
     record
         .definition_refs
@@ -435,6 +473,7 @@ pub(super) async fn build(
         nodes,
         root,
         request_context: options.request_context.clone(),
+        request_evidence: options.graph_request_evidence.clone(),
         sql,
     };
     let start = Instant::now();
@@ -462,6 +501,9 @@ pub(super) async fn build(
         ));
     }
     record.stage("graph_backend", start, &Ok::<_, CompileDiagnostic>(()));
+    for disposition in &mut record.requirement_dispositions {
+        disposition.result = "lowered_and_verified";
+    }
     record.artifact_digest = Some(semantic_catalog::canonical_digest(
         &serde_json::json!({"pipeline":PIPELINE_REVISION,"artifact":result}),
     ));

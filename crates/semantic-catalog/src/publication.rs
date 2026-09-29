@@ -330,6 +330,20 @@ fn validate_definitions<'a>(
             {
                 check_field(field, edges)?;
             }
+            if matches!(&metric.unit, crate::Presence::Value(unit) if unit.trim().is_empty()) {
+                return Err(invalid("invalid_metric_unit"));
+            }
+            if let crate::Presence::Value(temporal) = &metric.temporal {
+                check_field(&temporal.field, edges)?;
+                let field = entry.field(&temporal.field).expect("checked field");
+                if !valid_temporal_coverage(
+                    field.data_type(),
+                    &temporal.coverage_start,
+                    &temporal.coverage_end,
+                ) {
+                    return Err(invalid("invalid_metric_temporal_applicability"));
+                }
+            }
             for dimension in &metric.compatible_lookup_dimensions {
                 *edges += 1;
                 if *edges > limits.max_edges {
@@ -425,6 +439,45 @@ fn validate_definitions<'a>(
         }
     }
     Ok(())
+}
+
+fn valid_temporal_coverage(
+    field_type: &crate::DataType,
+    start: &semantic_plan::typed::Literal,
+    end: &semantic_plan::typed::Literal,
+) -> bool {
+    use arrow_schema::TimeUnit;
+    use semantic_plan::typed::{Literal, TimestampUnit};
+    match (field_type, start, end) {
+        (crate::DataType::Date32, Literal::Date32(start), Literal::Date32(end)) => start < end,
+        (
+            crate::DataType::Timestamp(field_unit, Some(field_zone)),
+            Literal::Timestamp {
+                ticks: start,
+                unit: start_unit,
+                timezone: Some(start_zone),
+            },
+            Literal::Timestamp {
+                ticks: end,
+                unit: end_unit,
+                timezone: Some(end_zone),
+            },
+        ) => {
+            let unit = match field_unit {
+                TimeUnit::Second => TimestampUnit::Second,
+                TimeUnit::Millisecond => TimestampUnit::Millisecond,
+                TimeUnit::Microsecond => TimestampUnit::Microsecond,
+                TimeUnit::Nanosecond => TimestampUnit::Nanosecond,
+            };
+            *start < *end
+                && *start_unit == unit
+                && *end_unit == unit
+                && start_zone == field_zone.as_ref()
+                && end_zone == field_zone.as_ref()
+                && matches!(field_zone.as_ref(), "UTC" | "+00:00")
+        }
+        _ => false,
+    }
 }
 
 /// One current snapshot; retained readers own old generations through Arc. No

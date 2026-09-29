@@ -1,6 +1,6 @@
 //! Executable authored contracts. Prose never populates these definitions implicitly.
 use crate::{DataType, ObjectRef, Presence, SourceRef};
-use semantic_plan::typed::{AggregateFunction, Comparison, Literal};
+use semantic_plan::typed::{AggregateFunction, CalendarUnit, Comparison, Literal};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -59,9 +59,25 @@ pub struct MetricDefinition {
     pub row_filters: Vec<GovernedFilter>,
     pub result_type: DataType,
     pub unit: Presence<String>,
+    /// Exact temporal applicability for this executable profile. `Null` means
+    /// explicitly unrestricted, while `Missing` remains unknown.
+    #[serde(default)]
+    pub temporal: Presence<MetricTemporalApplicability>,
     /// This profile returns zero for empty COUNT and null for empty SUM/MIN/MAX.
     pub empty_behavior: EmptyBehavior,
     pub source_refs: Vec<SourceRef>,
+}
+
+/// A restricted metric must be queried through one matching calendar filter.
+/// Coverage is a half-open interval and uses exact Date32 or UTC Timestamp
+/// literals; no timezone/unit conversion or predicate implication is attempted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricTemporalApplicability {
+    pub field: String,
+    pub grain: CalendarUnit,
+    pub coverage_start: Literal,
+    pub coverage_end: Literal,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

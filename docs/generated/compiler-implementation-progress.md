@@ -5,6 +5,9 @@ with ordinary Rust tracing and compiler-owned records. OpenTelemetry export is
 out of scope per the implementation request. This checklist is an implementation
 audit, not a declaration that the full design is complete.
 
+The current executable boundary is listed in
+[the supported profile](compiler-supported-profile.md).
+
 ## Delivery and evidence
 
 - [x] Initial typed row slice: snapshot references, scoped field binding, requirement
@@ -181,3 +184,24 @@ Cargo clean: 136 tests across 19 binaries, with no failures or ignored tests.
 A subsequent focused graph-replay test also passes. The user's connector/runtime
 changes remain intact; the only compiler integration added to the in-flight engine
 parameter file is UInt64-to-unsigned-BIGINT type mapping for rank comparisons.
+
+The next continuation completed graph-wide request evidence and a narrow metric
+applicability profile. `GraphIntentQuery` now covers every node, leaf requirement,
+set/composition output, final order and final limit with collision-free scoped
+identities and exact UTF-8 span validation. Evidence is threaded through model
+proposals, structured HTTP, records, artifacts and graph replay; legacy graphs
+remain explicitly unvalidated. Governed metric uses can require an exact unit and
+source grain. Authored temporal restrictions bind one real calendar filter to an
+exact calendar grain and a half-open Date32/UTC Timestamp coverage interval;
+unknown or incompatible applicability fails closed. Publication validates and
+revisions these contracts, and context hydration includes the governed time
+field. The pipeline revision is now 7.
+
+Validation after this continuation: the broad offline gate passes 143 tests
+across the selected catalog/compiler/engine/Ossie/server/CLI libraries and test
+binaries, including 48 typed compiler, 8 catalog publication, 6 retrieval, 3
+in-process server typed and 5 CLI command tests. Formatting, diff checks and
+strict Clippy across all targets of those six packages pass. Full-design gaps
+remain, particularly backend capability
+profiles, broader semantic applicability/alternatives, held-out evaluation,
+post-composition calculations and graph caching.

@@ -86,6 +86,11 @@ pub enum RowOperation {
     Metric {
         name: String,
         alias: String,
+        /// Optional semantic constraints stated by the request. Omission does
+        /// not invent a unit or grain; catalog temporal restrictions are still
+        /// enforced against actual calendar-filter operations in the query.
+        #[serde(default)]
+        applicability: MetricApplicability,
     },
     /// Explicit grouping also projects the grouping value.
     Group {
@@ -120,6 +125,17 @@ pub enum RowOperation {
     Limit {
         count: u32,
     },
+}
+
+/// Narrow, exact applicability requirements for a governed metric use. General
+/// conversions and grain implication are intentionally outside this contract.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricApplicability {
+    #[serde(default)]
+    pub required_unit: Option<String>,
+    #[serde(default)]
+    pub required_source_grain: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -263,6 +279,10 @@ pub enum NullOrder {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TypedProposal {
+    GraphIntent {
+        query: crate::graph::GraphQuery,
+        evidence: crate::graph::GraphRequestEvidence,
+    },
     Graph {
         query: crate::graph::GraphQuery,
     },

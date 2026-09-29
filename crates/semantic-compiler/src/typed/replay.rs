@@ -5,7 +5,7 @@ use semantic_engine::Engine;
 use semantic_plan::typed::SemanticQuery;
 use serde::{Deserialize, Serialize};
 
-pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-5/datafusion-55";
+pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-7/datafusion-55";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReplayBundle {

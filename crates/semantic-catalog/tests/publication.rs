@@ -21,6 +21,108 @@ fn view(name: &str, dependencies: &[&str]) -> Relation {
     }
     relation
 }
+
+fn temporal_metric_relation(end: i32) -> Relation {
+    use semantic_catalog::{
+        EmptyBehavior, MetricDefinition, MetricTemporalApplicability, Presence, RelationSemantics,
+    };
+    use semantic_plan::typed::{AggregateFunction, CalendarUnit, Literal};
+    let mut relation = Relation::base(
+        "scores",
+        Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("day", DataType::Date32, false),
+            Field::new("score", DataType::Int64, false),
+        ])),
+        "source:scores",
+    );
+    relation.semantics = Some(RelationSemantics {
+        metrics: [(
+            "monthly_score".into(),
+            MetricDefinition {
+                id: "metrics/monthly-score".into(),
+                description: "Monthly score".into(),
+                aliases: vec![],
+                function: AggregateFunction::Sum,
+                field: Some("score".into()),
+                distinct: false,
+                source_grain: vec!["id".into()],
+                compatible_dimensions: Default::default(),
+                compatible_lookup_dimensions: vec![],
+                sum_rollup_dimensions: None,
+                row_filters: vec![],
+                result_type: DataType::Int64,
+                unit: Presence::Value("points".into()),
+                temporal: Presence::Value(MetricTemporalApplicability {
+                    field: "day".into(),
+                    grain: CalendarUnit::Month,
+                    coverage_start: Literal::Date32(19723),
+                    coverage_end: Literal::Date32(end),
+                }),
+                empty_behavior: EmptyBehavior::Null,
+                source_refs: vec![],
+            },
+        )]
+        .into(),
+        ..Default::default()
+    });
+    relation
+}
+
+#[test]
+fn temporal_metric_applicability_is_validated_and_revisioned() {
+    let valid = Catalog::from_relations([temporal_metric_relation(19814)]).unwrap();
+    valid.validate(&PublicationLimits::default()).unwrap();
+    let first = valid
+        .snapshot()
+        .relation("scores")
+        .unwrap()
+        .reference()
+        .revision
+        .clone();
+    let changed = Catalog::from_relations([temporal_metric_relation(19844)]).unwrap();
+    changed.validate(&PublicationLimits::default()).unwrap();
+    assert_ne!(
+        first,
+        changed
+            .snapshot()
+            .relation("scores")
+            .unwrap()
+            .reference()
+            .revision
+    );
+
+    for mut relation in [
+        temporal_metric_relation(19723),
+        temporal_metric_relation(19814),
+    ] {
+        if relation.name == "scores" {
+            let metric = relation
+                .semantics
+                .as_mut()
+                .unwrap()
+                .metrics
+                .get_mut("monthly_score")
+                .unwrap();
+            if matches!(&metric.temporal, semantic_catalog::Presence::Value(t) if t.coverage_end == semantic_plan::typed::Literal::Date32(19814))
+            {
+                let semantic_catalog::Presence::Value(temporal) = &mut metric.temporal else {
+                    unreachable!()
+                };
+                temporal.field = "missing".into();
+            }
+        }
+        assert!(matches!(
+            Catalog::from_relations([relation])
+                .unwrap()
+                .validate(&PublicationLimits::default()),
+            Err(PublicationError::InvalidDefinition {
+                code: "invalid_metric_temporal_applicability" | "missing_or_ambiguous_field",
+                ..
+            })
+        ));
+    }
+}
 #[test]
 fn root_digest_is_canonical_and_updates_share_unchanged_records() {
     let names = (0..300).map(|i| format!("r{i}")).collect::<Vec<_>>();

@@ -75,6 +75,7 @@ pub fn router_with_compilation_limit(
         .route("/v1/compile/semantic", post(compile_semantic))
         .route("/v1/compile/query", post(compile_query))
         .route("/v1/compile/graph", post(compile_graph))
+        .route("/v1/compile/graph-intent", post(compile_graph_intent))
         .route("/v1/compile/intent", post(compile_intent))
         .layer(DefaultBodyLimit::max(16 * 1024))
         .with_state(Arc::new(state)))
@@ -153,6 +154,25 @@ async fn compile_graph(
     let _permit = s.admit()?;
     Ok(Json(
         semantic_db::compiler::typed::compile_graph(&s.engine, query, s.options()).await,
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GraphIntentRequest {
+    intent: semantic_db::plan::graph::GraphIntentQuery,
+    #[serde(default)]
+    request_context: Option<semantic_db::compiler::typed::RequestContext>,
+}
+async fn compile_graph_intent(
+    State(s): State<Arc<HttpState>>,
+    Json(request): Json<GraphIntentRequest>,
+) -> Result<Json<semantic_db::compiler::typed::TypedCompilation>, HttpError> {
+    let _permit = s.admit()?;
+    let mut options = s.options();
+    options.request_context = request.request_context;
+    Ok(Json(
+        semantic_db::compiler::typed::compile_graph_intent(&s.engine, request.intent, options)
+            .await,
     ))
 }
 async fn compile_query(

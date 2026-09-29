@@ -57,10 +57,23 @@ on success. It supports deterministic DataFusion planning, parameterized engine
 execution, and engine read-consistency/cache options. HTTP uses the existing
 admission and metrics controls at `/v1/compile/graph`; no model is required.
 
-The initial graph execution fixtures pass through both SQL and direct DataFusion
-paths as part of 43 typed compiler tests. See `query_graph_sets_preserve_duplicates_nulls_parameter_slots_and_requirement_coverage`
+Legacy structured graphs intentionally carry no request-span guarantee.
+`GraphIntentQuery` adds a versioned evidence envelope with the exact original
+request. Typed targets cover every graph node, row-leaf requirement,
+set/composition output, final ordering position and final limit. The compiler
+rejects missing, duplicate and orphan targets; validates nonempty ordered UTF-8
+spans; and checks node/leaf source text exactly. Scoped record identities use
+JSON-Pointer escaping, so adversarial node and requirement IDs cannot collide.
+`/v1/compile/graph-intent` accepts `{intent, request_context?}` without a model.
+Model proposals can return `status:graph_intent` in the same interpretation call.
+Replay retains the exact graph evidence and rejects caller replacement.
+
+The graph execution fixtures pass through both SQL and direct DataFusion paths as
+part of 48 typed compiler tests at the latest focused checkpoint. See
+`query_graph_sets_preserve_duplicates_nulls_parameter_slots_and_requirement_coverage`
 and `fact_composition_aggregates_before_alignment_and_distinguishes_missing_from_null_groups`
-in the typed compiler tests. Model-produced graph proposals pass scoped context hydration and binding tests.
+and the `graph_intent_*` tests in the typed compiler suite. Model-produced graph
+proposals pass scoped context hydration and binding tests.
 Generated CTE names avoid catalog objects, and a separate expansion budget rejects
 shared graphs whose backend expansion would grow exponentially. Bounded graph capture/replay additionally pins pipeline, catalog, host context and
 artifact identity while revalidating the replay caller's scope. Its focused
