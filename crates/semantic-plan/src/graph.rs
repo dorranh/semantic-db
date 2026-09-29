@@ -1,0 +1,110 @@
+//! Versioned, untrusted relational composition proposals. Each leaf re-enters
+//! ordinary semantic binding; graph edges name output slots, never SQL aliases.
+use crate::typed::{Direction, NullOrder, RowQuery};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphQuery {
+    pub version: u32,
+    pub nodes: Vec<QueryNode>,
+    pub root: String,
+    pub ordering: Vec<GraphOrder>,
+    pub limit: Option<u32>,
+    pub unresolved: Vec<String>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryNode {
+    pub id: String,
+    pub source_text: String,
+    pub operation: GraphOperation,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum GraphOperation {
+    Rows {
+        query: RowQuery,
+    },
+    Set {
+        left: String,
+        right: String,
+        operator: SetOperator,
+        duplicates: Duplicates,
+        columns: Vec<SetColumn>,
+    },
+    Compose {
+        left: String,
+        right: String,
+        relationship_relation: String,
+        relationship: String,
+        role: String,
+        domain: GroupDomain,
+        null_alignment: NullAlignment,
+        keys: Vec<SetColumn>,
+        outputs: Vec<CompositionOutput>,
+    },
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetColumn {
+    pub id: String,
+    pub left: String,
+    pub right: String,
+    pub alias: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompositionOutput {
+    pub id: String,
+    pub side: Side,
+    pub slot: String,
+    pub alias: String,
+    pub missing: MissingGroup,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphOrder {
+    pub slot: String,
+    pub direction: Direction,
+    pub nulls: NullOrder,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SetOperator {
+    Union,
+    Intersect,
+    Except,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Duplicates {
+    All,
+    Distinct,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Side {
+    Left,
+    Right,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupDomain {
+    Union,
+    Intersection,
+    Left,
+    Right,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NullAlignment {
+    Match,
+    NeverMatch,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MissingGroup {
+    Null,
+    Zero,
+}

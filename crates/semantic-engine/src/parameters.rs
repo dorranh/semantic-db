@@ -1,7 +1,7 @@
 //! Transport-independent parameter binding. SQL values are never interpolated.
 use crate::{Engine, QueryExecution, QueryOptions, Result, query::execute_frame};
 use datafusion::{
-    arrow::datatypes::{DataType, SchemaRef, TimeUnit},
+    arrow::datatypes::{DataType, IntervalUnit, SchemaRef, TimeUnit},
     common::{
         ScalarValue,
         tree_node::{TreeNode, TreeNodeRecursion},
@@ -43,6 +43,20 @@ impl Engine {
                         let entry = types.entry(parameter.id.clone()).or_default();
                         if entry.is_none() {
                             *entry = Some(cast.field.data_type().clone());
+                        }
+                    }
+                    if let Expr::ScalarFunction(function) = expr
+                        && (function.func.inner().as_ref() as &dyn std::any::Any)
+                            .is::<datafusion::functions::core::arrow_cast::ArrowCastFunc>()
+                        && let [
+                            Expr::Placeholder(parameter),
+                            Expr::Literal(ScalarValue::Utf8(Some(name)), _),
+                        ] = function.args.as_slice()
+                        && let Ok(ty) = name.parse::<DataType>()
+                    {
+                        let entry = types.entry(parameter.id.clone()).or_default();
+                        if entry.is_none() {
+                            *entry = Some(ty);
                         }
                     }
                     Ok(TreeNodeRecursion::Continue)
@@ -131,16 +145,22 @@ impl Engine {
                         Err(e) => return ControlFlow::Break(e),
                     };
                     if let Some(Some(ty)) = hints.get(index - 1) {
-                        let ty = match sql_type(ty) {
-                            Ok(v) => v,
+                        let sql = match cast_sql(&*expr, ty) {
+                            Ok(sql) => sql,
                             Err(e) => return ControlFlow::Break(e),
                         };
-                        *expr = ast::Expr::Cast {
-                            kind: ast::CastKind::Cast,
-                            expr: Box::new(expr.clone()),
-                            data_type: ty,
-                            format: None,
-                            array: false,
+                        *expr = match datafusion::sql::sqlparser::parser::Parser::new(
+                            &datafusion::sql::sqlparser::dialect::GenericDialect {},
+                        )
+                        .try_with_sql(&sql)
+                        .and_then(|mut p| p.parse_expr())
+                        {
+                            Ok(expr) => expr,
+                            Err(_) => {
+                                return ControlFlow::Break(failure(
+                                    "parameter type expression could not be planned",
+                                ));
+                            }
                         };
                     }
                 }
@@ -161,14 +181,47 @@ pub(crate) fn position(id: &str) -> datafusion::error::Result<usize> {
         .ok_or_else(|| failure("parameters must be numbered $1 through $65535"))
 }
 
+/// Generated casts preserve Arrow types that have no equivalent SQL type name.
+/// `expression` comes from the parsed SQL AST or a quoted generated identifier;
+/// values are still placeholders, never interpolated parameter contents.
+pub(crate) fn cast_sql(
+    expression: impl std::fmt::Display,
+    ty: &DataType,
+) -> datafusion::error::Result<String> {
+    let arrow = match ty {
+        DataType::FixedSizeBinary(16) => Some("FixedSizeBinary(16)"),
+        DataType::Time64(TimeUnit::Microsecond) => Some("Time64(Microsecond)"),
+        _ => None,
+    };
+    match arrow {
+        Some(name) => Ok(format!("arrow_cast({expression}, '{name}')")),
+        None => Ok(format!("CAST({expression} AS {})", sql_type(ty)?)),
+    }
+}
+
 pub(crate) fn sql_type(ty: &DataType) -> datafusion::error::Result<ast::DataType> {
     use ast::DataType as T;
     Ok(match ty {
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => T::Text,
+        DataType::Decimal128(p, s) if *p > 0 && *p <= 38 && *s >= 0 && *s as u8 <= *p => {
+            T::Decimal(ast::ExactNumberInfo::PrecisionAndScale(
+                *p as u64, *s as i64,
+            ))
+        }
+        DataType::Binary => T::Bytea,
+        DataType::Interval(IntervalUnit::MonthDayNano) => T::Interval {
+            fields: None,
+            precision: None,
+        },
+        DataType::List(item) => T::Array(ast::ArrayElemTypeDef::SquareBracket(
+            Box::new(sql_type(item.data_type())?),
+            None,
+        )),
         DataType::Boolean => T::Boolean,
         DataType::Int16 => T::SmallInt(None),
         DataType::Int32 => T::Int(None),
         DataType::Int64 => T::BigInt(None),
+        DataType::UInt64 => T::BigIntUnsigned(None),
         DataType::Float32 => T::Real,
         DataType::Float64 => T::Double(ast::ExactNumberInfo::None),
         DataType::Date32 => T::Date,
@@ -273,5 +326,46 @@ mod temporal_tests {
             ScalarValue::try_from_array(rows[0].column(0), 0).unwrap(),
             value
         );
+    }
+}
+
+#[cfg(test)]
+mod extended_tests {
+    use super::*;
+    use datafusion::arrow::datatypes::IntervalMonthDayNanoType;
+    #[tokio::test]
+    async fn extended_parameter_types_preserve_values_and_nulls() {
+        let engine = Engine::new();
+        for value in [
+            ScalarValue::Decimal128(Some(1234), 12, 2),
+            ScalarValue::Binary(Some(vec![0, 255])),
+            ScalarValue::FixedSizeBinary(16, Some(vec![1; 16])),
+            ScalarValue::Time64Microsecond(Some(123456)),
+            ScalarValue::IntervalMonthDayNano(Some(IntervalMonthDayNanoType::make_value(
+                1, 2, 3000,
+            ))),
+            ScalarValue::List(ScalarValue::new_list(
+                &[ScalarValue::Int64(Some(1)), ScalarValue::Int64(None)],
+                &DataType::Int64,
+                true,
+            )),
+            ScalarValue::FixedSizeBinary(16, None),
+        ] {
+            let rows = engine
+                .execute_parameters(
+                    "SELECT $1 AS value",
+                    vec![value.clone()],
+                    QueryOptions::default(),
+                )
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            assert_eq!(
+                ScalarValue::try_from_array(rows[0].column(0), 0).unwrap(),
+                value
+            );
+        }
     }
 }

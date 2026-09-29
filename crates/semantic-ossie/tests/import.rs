@@ -302,14 +302,11 @@ fn rejects_unsupported_semantics_and_binding_errors_with_paths() {
             code,
         );
     }
-    for key in ["metrics", "relationships", "custom_extensions"] {
+    for key in ["metrics", "custom_extensions"] {
         let mut input = simple();
         input["semantic_model"][0][key] = match key {
             "metrics" => {
                 json!([{"name":"total","expression":{"dialects":[{"dialect":"ANSI_SQL","expression":"COUNT(*)"}]}}])
-            }
-            "relationships" => {
-                json!([{"name":"self","from":"items","to":"items","from_columns":["id"],"to_columns":["id"]}])
             }
             _ => json!([{"vendor_name":"VENDOR","data":"{}"}]),
         };
@@ -485,5 +482,94 @@ fn offline_inspection_rejects_opaque_without_a_provider() {
             .unwrap_err()
             .to_string()
             .contains("unsupported_datatype")
+    );
+}
+
+#[test]
+fn omitted_time_fact_stays_absent_and_source_references_are_retained() {
+    let mut value = simple();
+    value["semantic_model"][0]["datasets"][0]["fields"][0]["dimension"] = json!({});
+    let document = OssieDocument::parse(&value.to_string()).unwrap();
+    let imported = document.load(None, &bindings()).unwrap();
+    let semantics = imported
+        .engine
+        .catalog()
+        .relation("items")
+        .unwrap()
+        .semantics
+        .as_ref()
+        .unwrap();
+    assert_eq!(semantics.fields["id"].is_time, None);
+    assert_eq!(
+        semantics.fields["id"].source_refs[0].path,
+        "/semantic_model/0/datasets/0/fields/0"
+    );
+    assert!(
+        document
+            .normalized()
+            .pointer("/semantic_model/0/datasets/0/fields/0/dimension/is_time")
+            .is_none()
+    );
+    assert_eq!(
+        semantics.source_refs[0].artifact_revision,
+        document.archive().revision()
+    );
+}
+
+#[tokio::test]
+async fn foreign_key_profiles_retain_role_origins_and_never_treat_cardinality_as_verified() {
+    let mut input = simple();
+    input["semantic_model"][0]["relationships"] = json!([{"name":"same_item","from":"items","to":"items","from_columns":["id"],"to_columns":["id"],"ai_context":{"synonyms":["related identity"]}}]);
+    let document = OssieDocument::parse(&input.to_string()).unwrap();
+    let imported = document.load(None, &bindings()).unwrap();
+    let relation = imported.engine.catalog().relation("items").unwrap();
+    let relationship = &relation.semantics.as_ref().unwrap().relationships["same_item"];
+    assert_eq!(relationship.role, "same_item");
+    assert!(!relationship.null_keys_match);
+    assert!(!relationship.source_refs.is_empty());
+    assert_eq!(
+        relationship.ai_context.as_ref().unwrap().synonyms,
+        ["related identity"]
+    );
+    let semantic_catalog::FactResolution::Known { contributors, .. } = &relationship.cardinality
+    else {
+        panic!("authored fact")
+    };
+    assert_eq!(
+        contributors[0].authority,
+        semantic_catalog::Authority::Authored
+    );
+    assert!(contributors[0].evidence.is_empty());
+    assert!(
+        imported
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "relationship_profile")
+    );
+    let query = serde_json::from_value(json!({"version":1,"input":{"relation":"items","instance":"r"},"requirements":[{"id":"lookup","source_text":"related ID","operation":{"kind":"lookup","relationship":"same_item","role":"same_item","instance":"other","field":"id","alias":"related_id","missing":"null"}}],"unresolved":[]})).unwrap();
+    let result =
+        semantic_compiler::typed::compile_semantic(&imported.engine, query, Default::default())
+            .await;
+    assert_eq!(result.record.execution_obligations.len(), 1);
+    let semantic_compiler::typed::TypedOutcome::Compiled { query } = result.outcome else {
+        panic!("lookup should compile")
+    };
+    assert!(
+        query
+            .execute(&imported.engine, Default::default())
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("uniqueness obligation failed")
+    );
+    input["semantic_model"][0]["relationships"][0]["to"] = json!("missing");
+    error_code(
+        OssieDocument::parse(&input.to_string())
+            .unwrap()
+            .load(None, &bindings()),
+        "relationship_endpoint",
     );
 }

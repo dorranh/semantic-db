@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod typed;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SemanticPlan {
     pub request: String,
@@ -53,3 +55,5 @@ pub enum GroundingOutcome {
         reason: String,
     },
 }
+
+pub mod graph;

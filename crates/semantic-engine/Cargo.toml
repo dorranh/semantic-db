@@ -16,6 +16,7 @@ semantic-catalog.workspace = true
 datafusion.workspace = true
 datafusion-federation.workspace = true
 thiserror.workspace = true
+async-trait.workspace = true
 
 futures.workspace = true
 async-stream.workspace = true

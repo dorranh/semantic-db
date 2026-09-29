@@ -1,6 +1,12 @@
 //! Deterministic SQL execution with a descriptive relation catalog.
 
+mod checked_sum;
+mod compiler_functions;
+pub use checked_sum::semantic_sum_v1;
 mod contracts;
+pub use compiler_functions::{semantic_assert_single_v1, semantic_ratio_i64_v1};
+mod deferred;
+pub use deferred::{DeferredBackend, DeferredOptions, DeferredProviderReport};
 mod reads;
 mod writes;
 pub use contracts::*;
@@ -52,6 +58,8 @@ pub trait RelationBackend: Send + Sync {
 
 #[derive(Debug, Error)]
 pub enum EngineError {
+    #[error(transparent)]
+    CatalogPublication(#[from] semantic_catalog::PublicationError),
     #[error(transparent)]
     DataFusion(#[from] DataFusionError),
     #[error(transparent)]
@@ -131,8 +139,12 @@ impl Engine {
             .with_optimizer_rules(federation::optimizer_rules())
             .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
             .build();
+        let context = SessionContext::new_with_state(state);
+        context.register_udf((*semantic_ratio_i64_v1()).clone());
+        context.register_udf((*semantic_assert_single_v1()).clone());
+        context.register_udaf((*semantic_sum_v1()).clone());
         Ok(Self {
-            context: SessionContext::new_with_state(state),
+            context,
             catalog: Catalog::default(),
             providers: BTreeMap::new(),
             descriptors: BTreeMap::new(),
@@ -206,6 +218,9 @@ impl Engine {
                 }
             }
         }
+        engine
+            .catalog
+            .validate(&semantic_catalog::PublicationLimits::default())?;
         Ok(engine)
     }
 
@@ -335,19 +350,38 @@ impl Engine {
             }
             pending.insert(relation.name.clone(), dependencies);
         }
-        let mut ready = BTreeSet::new();
+        let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut indegree = BTreeMap::new();
+        for (name, dependencies) in &pending {
+            indegree.insert(name.clone(), dependencies.len());
+            for dependency in dependencies {
+                dependents
+                    .entry(dependency.clone())
+                    .or_default()
+                    .push(name.clone());
+            }
+        }
+        let mut ready: BTreeSet<_> = indegree
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(name, _)| name.clone())
+            .collect();
         let mut order = Vec::new();
-        while !pending.is_empty() {
-            let next = pending
-                .iter()
-                .find(|(_, dependencies)| dependencies.iter().all(|name| ready.contains(name)))
-                .map(|(name, _)| name.clone());
-            let Some(name) = next else {
-                return Err(EngineError::CyclicViews(pending.into_keys().collect()));
-            };
+        while let Some(name) = ready.pop_first() {
             pending.remove(&name);
-            ready.insert(name.clone());
+            if let Some(children) = dependents.get(&name) {
+                for child in children {
+                    let count = indegree.get_mut(child).expect("known dependent");
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.insert(child.clone());
+                    }
+                }
+            }
             order.push(name);
+        }
+        if !pending.is_empty() {
+            return Err(EngineError::CyclicViews(pending.into_keys().collect()));
         }
         Ok(order)
     }

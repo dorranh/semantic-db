@@ -107,8 +107,19 @@ struct SqlArgs {
     query_timeout_seconds: u64,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum CompilerMode {
+    SqlCompatibility,
+    TypedFull,
+    TypedRetrieved,
+    TypedAuto,
+}
+
 #[derive(ClapArgs)]
 struct AskArgs {
+    /// Choose SQL compatibility or the deterministic typed compiler/context mode.
+    #[arg(long, value_enum, default_value_t = CompilerMode::SqlCompatibility)]
+    compiler_mode: CompilerMode,
     #[command(flatten)]
     project: RequiredProject,
     /// Natural-language request to compile and execute.
@@ -412,6 +423,17 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
     let mut engine = load_engine(Some(path), &registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
     let compiler = Compiler::new(config::provider()?);
+    if args.compiler_mode != CompilerMode::SqlCompatibility {
+        return run_typed_ask(
+            &engine,
+            &compiler,
+            &args.request,
+            args.compile_only,
+            &ReadMode::new(&args.read, false, args.read_report),
+            args.compiler_mode,
+        )
+        .await;
+    }
     run_ask(
         &engine,
         &compiler,
@@ -664,6 +686,104 @@ async fn run_write(engine: &Engine, sql: &str, explain: bool) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.success() {
         return Err(format!("write outcome: {:?}", result.outcome).into());
+    }
+    Ok(())
+}
+
+async fn run_typed_ask(
+    engine: &Engine,
+    compiler: &Compiler<OpenAiProvider>,
+    request: &str,
+    compile_only: bool,
+    read_mode: &ReadMode,
+    mode: CompilerMode,
+) -> Result<()> {
+    use semantic_compiler::typed::{CompileOptions, SelectionMode, TypedOutcome};
+    let mut options = CompileOptions::default();
+    options.selection_mode = match mode {
+        CompilerMode::TypedFull => SelectionMode::Full,
+        CompilerMode::TypedRetrieved => SelectionMode::Retrieved,
+        CompilerMode::TypedAuto => SelectionMode::Auto,
+        CompilerMode::SqlCompatibility => unreachable!(),
+    };
+    let compilation = compiler.compile_typed(engine, request, options).await;
+    if compile_only {
+        println!("{}", serde_json::to_string_pretty(&compilation)?);
+        return Ok(());
+    }
+    match compilation.outcome {
+        TypedOutcome::Compiled { query } => {
+            println!("SQL:\n{}", query.sql().statement());
+            println!(
+                "Parameters: {}",
+                serde_json::to_string(query.sql().parameters())?
+            );
+            let (batches, report) = if read_mode.custom {
+                let result = query
+                    .execute_read(engine, read_mode.options(engine))
+                    .await?
+                    .collect()
+                    .await?;
+                (result.batches, read_mode.report.then_some(result.report))
+            } else {
+                (
+                    query
+                        .execute(engine, engine.query_options().clone())
+                        .await?
+                        .collect()
+                        .await?,
+                    None,
+                )
+            };
+            println!("{}", pretty_format_batches(&batches)?);
+            println!(
+                "{} row(s)",
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>()
+            );
+            if let Some(report) = report {
+                eprintln!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
+        TypedOutcome::CompiledGraph { query } => {
+            println!("SQL:\n{}", query.sql().statement());
+            println!(
+                "Parameters: {}",
+                serde_json::to_string(query.sql().parameters())?
+            );
+            let (batches, report) = if read_mode.custom {
+                let result = query
+                    .execute_read(engine, read_mode.options(engine))
+                    .await?
+                    .collect()
+                    .await?;
+                (result.batches, read_mode.report.then_some(result.report))
+            } else {
+                (
+                    query
+                        .execute(engine, engine.query_options().clone())
+                        .await?
+                        .collect()
+                        .await?,
+                    None,
+                )
+            };
+            println!("{}", pretty_format_batches(&batches)?);
+            println!(
+                "{} row(s)",
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>()
+            );
+            if let Some(report) = report {
+                eprintln!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
+        TypedOutcome::NeedsClarification { question, .. } => {
+            println!("Needs clarification: {question}")
+        }
+        TypedOutcome::Unsupported { reason } => println!("Unsupported: {reason}"),
+        TypedOutcome::Unresolved { diagnostic } => println!("Unresolved: {diagnostic}"),
+        TypedOutcome::Rejected { diagnostic } | TypedOutcome::ProviderFailure { diagnostic } => {
+            return Err(diagnostic.into());
+        }
     }
     Ok(())
 }

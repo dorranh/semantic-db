@@ -37,6 +37,7 @@ pub struct ReadReport {
     pub caches: Vec<semantic_runtime::CacheObservation>,
     pub satisfied_receipts: Vec<CommitReceipt>,
     pub completion: ReadCompletion,
+    pub metrics: semantic_runtime::QueryMetrics,
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct ReadExplanation {
@@ -116,6 +117,7 @@ impl Stream for GuardedRead {
             }
             _ => (),
         };
+        self.report.lock().unwrap().metrics = self.context.metrics();
         result
     }
 }
@@ -127,6 +129,7 @@ impl RecordBatchStream for GuardedRead {
 impl Drop for GuardedRead {
     fn drop(&mut self) {
         let mut report = self.report.lock().unwrap();
+        report.metrics = self.context.metrics();
         if report.completion == ReadCompletion::Pending {
             report.completion = if self.context.is_cancelled() {
                 ReadCompletion::Cancelled
@@ -358,6 +361,7 @@ impl Engine {
             caches: execution.context.cache_observations(),
             satisfied_receipts: options.after_commits,
             completion: ReadCompletion::Pending,
+            metrics: execution.context.metrics(),
         }));
         let stream = Box::pin(GuardedRead {
             schema: execution.stream.schema(),

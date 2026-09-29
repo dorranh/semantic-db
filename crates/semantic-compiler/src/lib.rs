@@ -1,10 +1,10 @@
-//! A first catalog-aware LLM compiler. The model proposes a grounding outcome;
-//! deterministic validation checks its shape, evidence references, and SQL plan.
-//! Domain correctness still needs curated metadata and semantic evaluation.
+//! Catalog-aware compilation with separate typed and SQL compatibility modes.
+//! [`typed::compile_rows`] binds structured queries without a model;
+//! [`Compiler::compile_typed`] interprets requests into the same checked slice.
+//! The original SQL proposal API retains its weaker grounding guarantees.
 
 pub mod provider;
-
-use std::collections::BTreeSet;
+pub mod typed;
 
 use semantic_catalog::{Catalog, Relation, RelationKind};
 use semantic_engine::Engine;
@@ -53,6 +53,16 @@ impl<P: ModelProvider> Compiler<P> {
     /// Plan valid proposals without executing rows. Unresolved outcomes return
     /// immediately and are never repaired into a guessed interpretation.
     pub async fn compile(
+        &self,
+        engine: &Engine,
+        request: &str,
+    ) -> Result<Compilation, CompilerError> {
+        self.compile_sql_compatibility(engine, request).await
+    }
+
+    /// Explicit name for the original model-written SQL mode. SQL planning and
+    /// evidence checks do not establish preservation of request requirements.
+    pub async fn compile_sql_compatibility(
         &self,
         engine: &Engine,
         request: &str,
@@ -162,17 +172,18 @@ async fn validate_outcome(engine: &Engine, outcome: &GroundingOutcome) -> Result
             if query.sql.trim().is_empty() || query.evidence.is_empty() {
                 return Err("Grounded output requires SQL and nonempty grounding evidence.".into());
             }
-            let mut references = BTreeSet::new();
-            for relation in engine.catalog().relations() {
-                references.insert(relation.name.clone());
-                for field in relation.schema.fields() {
-                    references.insert(format!("{}.{}", relation.name, field.name()));
-                }
-            }
+            let snapshot = engine.catalog().snapshot();
             for evidence in &query.evidence {
                 if evidence.phrase.trim().is_empty()
                     || evidence.interpretation.trim().is_empty()
-                    || !references.contains(&evidence.catalog_reference)
+                    || !(snapshot.relation(&evidence.catalog_reference).is_some()
+                        || evidence.catalog_reference.split_once('.').is_some_and(
+                            |(relation, field)| {
+                                snapshot
+                                    .relation(relation)
+                                    .is_some_and(|r| r.field(field).is_some())
+                            },
+                        ))
                 {
                     return Err("Evidence requires nonempty phrases/interpretations and existing relation or relation.column references.".into());
                 }

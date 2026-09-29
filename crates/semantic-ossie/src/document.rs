@@ -89,11 +89,20 @@ fn digest(text: &str) -> String {
 pub struct OssieDocument {
     original: String,
     value: Value,
+    archive: semantic_catalog::SourceArchive,
+    normalized: semantic_catalog::SourceNode,
 }
 
 impl OssieDocument {
     /// Parse YAML or JSON with duplicate-key rejection and offline schema validation.
     pub fn parse(text: &str) -> Result<Self, ImportError> {
+        if text.len() > 16 * 1024 * 1024 {
+            return Err(ImportError::diagnostic(
+                "source_normalization",
+                "/",
+                "source byte budget exceeded",
+            ));
+        }
         let options = serde_saphyr::options! {
             strict_booleans: true,
         };
@@ -115,10 +124,26 @@ impl OssieDocument {
         if !diagnostics.is_empty() {
             return Err(ImportError::Diagnostics(diagnostics));
         }
+        let archive = semantic_catalog::SourceArchive::new(
+            text.as_bytes(),
+            "ossie/yaml",
+            SPEC_VERSION,
+            env!("CARGO_PKG_VERSION"),
+        );
+        let normalized = crate::source::normalize(text, &archive)?;
         Ok(Self {
             original: text.into(),
             value,
+            archive,
+            normalized,
         })
+    }
+
+    pub fn archive(&self) -> &semantic_catalog::SourceArchive {
+        &self.archive
+    }
+    pub fn normalized(&self) -> &semantic_catalog::SourceNode {
+        &self.normalized
     }
 
     pub fn original_text(&self) -> &str {
@@ -222,7 +247,7 @@ impl OssieDocument {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
         unsupported(&model.metrics, "metrics", &path, &mut errors);
-        unsupported(&model.relationships, "relationships", &path, &mut errors);
+
         unsupported(
             &model.custom_extensions,
             "custom_extensions",
@@ -261,6 +286,15 @@ impl OssieDocument {
                 );
             }
             let mut semantics = RelationSemantics {
+                source_refs: self
+                    .normalized
+                    .pointer(&p)
+                    .map(|n| n.origins.clone())
+                    .unwrap_or_default(),
+                capability: Some(semantic_catalog::Capability::Executable {
+                    profile: "ossie/column-projection".into(),
+                    revision: "1".into(),
+                }),
                 model_description: model.description.clone(),
                 model_ai_context: model_ai.clone(),
                 ai_context: ai_context(
@@ -349,15 +383,15 @@ impl OssieDocument {
                 semantics.fields.insert(
                     field.name.clone(),
                     FieldSemantics {
+                        source_refs: self
+                            .normalized
+                            .pointer(&fp)
+                            .map(|n| n.origins.clone())
+                            .unwrap_or_default(),
                         description: field.description.clone(),
                         logical_type: field.datatype.clone(),
                         label: field.label.clone(),
-                        is_time: field.dimension.as_ref().map(|d| {
-                            d.is_time.unwrap_or(matches!(
-                                field.datatype.as_deref(),
-                                Some("Date" | "Time" | "DateTime" | "DateTimeTz")
-                            ))
-                        }),
+                        is_time: field.dimension.as_ref().and_then(|d| d.is_time),
                         ai_context: ai_context(
                             &field.ai_context,
                             &format!("{fp}/ai_context"),
@@ -386,6 +420,126 @@ impl OssieDocument {
                 );
             }
             definitions.push((dataset.clone(), p, semantics));
+        }
+        let mut relationship_names = BTreeSet::new();
+        for (index, value) in model.relationships.iter().enumerate() {
+            let rp = format!("{path}/relationships/{index}");
+            let relationship: Relationship =
+                serde_json::from_value(value.clone()).expect("schema-validated relationship");
+            unsupported(
+                &relationship.custom_extensions,
+                "custom_extensions",
+                &rp,
+                &mut errors,
+            );
+            let context = ai_context(
+                &relationship.ai_context,
+                &format!("{rp}/ai_context"),
+                &mut errors,
+            );
+            if relationship.name.trim().is_empty()
+                || !relationship_names.insert(relationship.name.clone())
+            {
+                issue(
+                    &mut errors,
+                    "relationship_name",
+                    format!("{rp}/name"),
+                    "relationship names must be unique and nonempty",
+                );
+                continue;
+            }
+            let endpoints = [
+                (&relationship.from, &relationship.from_columns, "from"),
+                (&relationship.to, &relationship.to_columns, "to"),
+            ];
+            for (name, columns, side) in endpoints {
+                if let Some(dataset) = model.datasets.iter().find(|dataset| &dataset.name == name) {
+                    let fields = dataset
+                        .fields
+                        .iter()
+                        .map(|field| field.name.as_str())
+                        .collect::<BTreeSet<_>>();
+                    if columns
+                        .iter()
+                        .any(|column| !fields.contains(column.as_str()))
+                        || columns.iter().collect::<BTreeSet<_>>().len() != columns.len()
+                    {
+                        issue(
+                            &mut errors,
+                            "relationship_keys",
+                            format!("{rp}/{side}_columns"),
+                            "keys must reference distinct declared semantic fields",
+                        );
+                    }
+                } else {
+                    issue(
+                        &mut errors,
+                        "relationship_endpoint",
+                        format!("{rp}/{side}"),
+                        "relationship endpoint dataset is missing",
+                    );
+                }
+            }
+            if relationship.from_columns.len() != relationship.to_columns.len() {
+                issue(
+                    &mut errors,
+                    "relationship_keys",
+                    &rp,
+                    "foreign key columns must pair one-to-one",
+                );
+                continue;
+            }
+            let id = format!("ossie/{}/relationships/{}", model.name, relationship.name);
+            let source_refs = self
+                .normalized
+                .pointer(&rp)
+                .map(|node| node.origins.clone())
+                .unwrap_or_default();
+            if let Some((_, _, semantics)) = definitions
+                .iter_mut()
+                .find(|(dataset, _, _)| dataset.name == relationship.from)
+            {
+                let cardinality = semantic_catalog::Cardinality::ManyToOne;
+                semantics.relationships.insert(
+                    relationship.name.clone(),
+                    semantic_catalog::RelationshipDefinition {
+                        id: id.clone(),
+                        ai_context: context,
+                        right_relation: relationship.to,
+                        role: relationship.name,
+                        null_keys_match: false,
+                        key_pairs: relationship
+                            .from_columns
+                            .into_iter()
+                            .zip(relationship.to_columns)
+                            .map(
+                                |(left_field, right_field)| semantic_catalog::RelationshipKey {
+                                    left_field,
+                                    right_field,
+                                },
+                            )
+                            .collect(),
+                        cardinality: semantic_catalog::FactResolution::Known {
+                            value: cardinality.clone(),
+                            contributors: vec![semantic_catalog::Fact {
+                                id: format!("{id}/cardinality"),
+                                scope: id,
+                                value: cardinality,
+                                authority: semantic_catalog::Authority::Authored,
+                                origins: source_refs.clone(),
+                                evidence: vec![],
+                            }],
+                        },
+                        source_refs,
+                    },
+                );
+                issue(
+                    &mut warnings,
+                    "relationship_profile",
+                    &rp,
+                    "Ossie foreign-key profile uses exact key equality (null keys do not match) and the relationship name as its role; cardinality remains an unenforced authored declaration",
+                );
+            }
         }
         if !errors.is_empty() {
             return Err(ImportError::Diagnostics(errors));
@@ -481,6 +635,12 @@ impl OssieDocument {
             relation.semantics = Some(semantics);
             engine.register_table(relation, projected)?;
         }
+        engine
+            .catalog()
+            .validate(&semantic_catalog::PublicationLimits::default())
+            .map_err(|error| {
+                ImportError::Engine(semantic_engine::EngineError::CatalogPublication(error))
+            })?;
         Ok(ImportedCatalog { engine, warnings })
     }
 }
@@ -624,6 +784,17 @@ struct Model {
     metrics: Vec<Value>,
     #[serde(default)]
     relationships: Vec<Value>,
+    #[serde(default)]
+    custom_extensions: Vec<Value>,
+}
+#[derive(Clone, Deserialize)]
+struct Relationship {
+    name: String,
+    from: String,
+    to: String,
+    from_columns: Vec<String>,
+    to_columns: Vec<String>,
+    ai_context: Option<Value>,
     #[serde(default)]
     custom_extensions: Vec<Value>,
 }

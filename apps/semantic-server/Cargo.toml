@@ -25,6 +25,7 @@ clap.workspace = true
 dotenvy.workspace = true
 
 [dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
 reqwest.workspace = true
 tokio-postgres.workspace = true
 semantic-catalog.workspace = true

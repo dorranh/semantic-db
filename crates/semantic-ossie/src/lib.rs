@@ -4,6 +4,7 @@
 //! then load a selected model. No source string is executed or fetched implicitly.
 
 mod document;
+mod source;
 
 pub use document::{
     DatasetRequirement, Diagnostic, FieldRequirement, ImportError, ModelInspection, OssieDocument,

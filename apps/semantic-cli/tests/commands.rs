@@ -26,6 +26,7 @@ fn help_is_scoped_to_each_command() {
         ("sql", "--plan"),
         ("sql", "--explain"),
         ("ask", "--compile-only"),
+        ("ask", "--compiler-mode"),
         ("validate", "--connect"),
         ("repl", "--no-history"),
         ("server", "--http-port"),
@@ -50,6 +51,14 @@ fn help_is_scoped_to_each_command() {
     }
     let ask = String::from_utf8(run(&["ask", "--help"]).stdout).unwrap();
     assert!(!ask.contains("views-only"));
+    for mode in [
+        "sql-compatibility",
+        "typed-full",
+        "typed-retrieved",
+        "typed-auto",
+    ] {
+        assert!(ask.contains(mode), "{ask}");
+    }
     for command in ["status", "refresh", "invalidate"] {
         assert!(run(&["cache", command, "--help"]).status.success());
     }

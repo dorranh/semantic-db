@@ -2,11 +2,27 @@
 //!
 //! Arrow schemas are the row-type contract. This catalog does not execute SQL.
 
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::collections::BTreeMap;
 
 pub use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+mod governance;
+pub use governance::*;
+mod source;
+pub use source::*;
+mod canonical;
+mod publication;
+pub use canonical::{canonical_digest, canonical_json};
+mod search;
+pub use publication::{
+    CatalogMutation, CatalogStore, PublicationError, PublicationLimits, PublicationReport,
+};
+mod snapshot;
+mod tree;
+pub use search::{SearchHit, SearchIndex, SearchObject, SearchOptions, SearchReport};
+pub use snapshot::{CatalogSnapshot, ObjectRef, SnapshotRelation};
 
 /// Authored hints for grounding. These are evidence, not executable rules or
 /// instructions that may override the compiler's behavior.
@@ -22,6 +38,7 @@ pub struct AiContext {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct FieldSemantics {
+    pub source_refs: Vec<SourceRef>,
     pub description: Option<String>,
     pub logical_type: Option<String>,
     pub label: Option<String>,
@@ -46,6 +63,15 @@ pub struct SemanticOrigin {
 /// Keys are declarations only: registration does not scan rows to enforce them.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RelationSemantics {
+    pub value_mappings: BTreeMap<String, ValueMapping>,
+    pub metrics: BTreeMap<String, MetricDefinition>,
+    pub ratio_metrics: BTreeMap<String, RatioDefinition>,
+    pub relationships: BTreeMap<String, RelationshipDefinition>,
+    pub row_policies: Vec<RowPolicy>,
+    pub source_refs: Vec<SourceRef>,
+    /// None retains the legacy application-registered executable contract.
+    pub capability: Option<Capability>,
+    pub facts: BTreeMap<String, FactResolution<serde_json::Value>>,
     pub model_description: Option<String>,
     pub model_ai_context: Option<AiContext>,
     pub ai_context: Option<AiContext>,
@@ -147,7 +173,9 @@ pub enum CatalogError {
 
 #[derive(Debug, Default, Clone)]
 pub struct Catalog {
-    relations: BTreeMap<String, Relation>,
+    root: tree::Root,
+    analysis: std::sync::OnceLock<std::sync::Arc<publication::DependencyAnalysis>>,
+    snapshot: std::sync::OnceLock<std::sync::Arc<CatalogSnapshot>>,
 }
 
 impl Catalog {
@@ -163,30 +191,41 @@ impl Catalog {
     }
 
     pub fn relation(&self, name: &str) -> Option<&Relation> {
-        self.relations.get(name)
+        self.root.get(name).map(|entry| entry.definition())
     }
 
     pub fn relations(&self) -> impl Iterator<Item = &Relation> {
-        self.relations.values()
+        self.root.iter().map(|entry| entry.definition())
+    }
+
+    /// Publish immutable metadata once per catalog generation. Later readers
+    /// share the same handle; registration leaves already pinned snapshots intact.
+    pub fn snapshot(&self) -> std::sync::Arc<CatalogSnapshot> {
+        self.snapshot
+            .get_or_init(|| std::sync::Arc::new(CatalogSnapshot::new(self.root.clone())))
+            .clone()
     }
 
     /// Reject replacement so callers cannot silently invalidate view lineage.
     pub fn register(&mut self, relation: Relation) -> Result<(), CatalogError> {
-        match self.relations.entry(relation.name.clone()) {
-            Entry::Vacant(entry) => {
-                entry.insert(relation);
-                Ok(())
-            }
-            Entry::Occupied(entry) => Err(CatalogError::DuplicateRelation(entry.key().clone())),
+        if self.relation(&relation.name).is_some() {
+            return Err(CatalogError::DuplicateRelation(relation.name));
         }
+        self.root = self.root.insert(
+            relation.name.clone(),
+            std::sync::Arc::new(SnapshotRelation::new(relation)),
+        );
+        self.snapshot.take();
+        self.analysis.take();
+        Ok(())
     }
 }
 
 impl IntoIterator for Catalog {
     type Item = Relation;
-    type IntoIter = std::collections::btree_map::IntoValues<String, Relation>;
+    type IntoIter = std::vec::IntoIter<Relation>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.relations.into_values()
+        self.relations().cloned().collect::<Vec<_>>().into_iter()
     }
 }

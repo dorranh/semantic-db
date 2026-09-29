@@ -4611,6 +4611,7 @@ name = "semantic-catalog"
 version = "0.1.0"
 dependencies = [
  "arrow-schema",
+ "semantic-plan",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4661,6 +4662,8 @@ name = "semantic-compiler"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
+ "chrono-tz",
  "datafusion",
  "reqwest 0.12.28",
  "semantic-catalog",
@@ -4696,6 +4699,7 @@ name = "semantic-engine"
 version = "0.1.0"
 dependencies = [
  "async-stream",
+ "async-trait",
  "datafusion",
  "datafusion-federation",
  "futures",
@@ -4820,6 +4824,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-postgres",
+ "tower",
 ]
 
 [[package]]
