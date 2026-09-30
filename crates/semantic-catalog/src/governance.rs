@@ -1,6 +1,6 @@
 //! Executable authored contracts. Prose never populates these definitions implicitly.
-use crate::{DataType, ObjectRef, Presence, SourceRef};
-use semantic_plan::typed::{AggregateFunction, CalendarUnit, Comparison, Literal};
+use crate::{DataType, ObjectRef, Presence, SourceRef, Unit};
+use semantic_plan::typed::{AggregateFunction, CalendarUnit, Comparison, Literal, RowPredicate};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -14,7 +14,37 @@ pub struct ValueMapping {
     pub field: String,
     pub description: String,
     pub codes: std::collections::BTreeMap<String, String>,
+    pub enum_domain: Option<crate::EnumDomain>,
     pub source_refs: Vec<SourceRef>,
+}
+
+/// An executable relation-scoped business predicate. Its field names are
+/// authored against this relation; binding supplies the query occurrence.
+/// CompareParameter names infer their exact type from the authored field and
+/// receive typed values from ConceptFilter arguments at compile time.
+/// Prose, aliases and examples never become executable conditions implicitly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConceptDefinition {
+    pub id: String,
+    pub description: String,
+    pub aliases: Vec<String>,
+    /// Other same-relation concept keys that compete for this concept's
+    /// name and aliases. This declares ambiguity, not logical equivalence.
+    #[serde(default)]
+    pub alternatives: Vec<String>,
+    pub predicate: RowPredicate<String>,
+    pub source_refs: Vec<SourceRef>,
+}
+impl ConceptDefinition {
+    pub fn reference(&self) -> ObjectRef {
+        ObjectRef {
+            id: self.id.clone(),
+            revision: crate::canonical_digest(
+                &serde_json::to_value(self).expect("concept definition serializes"),
+            ),
+        }
+    }
 }
 impl ValueMapping {
     pub fn reference(&self) -> ObjectRef {
@@ -44,7 +74,7 @@ pub struct MetricDefinition {
     pub function: AggregateFunction,
     pub field: Option<String>,
     pub distinct: bool,
-    pub source_grain: Vec<String>,
+    pub source_grain: crate::SourceGrain,
     /// An explicit whitelist. Empty means only the global aggregate is permitted.
     pub compatible_dimensions: BTreeSet<String>,
     #[serde(default)]
@@ -55,10 +85,14 @@ pub struct MetricDefinition {
     /// separate representation even if an author supplies this annotation.
     #[serde(default)]
     pub sum_rollup_dimensions: Option<BTreeSet<String>>,
+    /// Versioned sufficient state. The executor must implement this exact
+    /// merge/finalize contract before accepting the metric for execution.
+    #[serde(default)]
+    pub state: Option<crate::MetricStateContract>,
     /// Applied inside this aggregate, never to other metrics in the same query.
     pub row_filters: Vec<GovernedFilter>,
     pub result_type: DataType,
-    pub unit: Presence<String>,
+    pub unit: Presence<Unit>,
     /// Exact temporal applicability for this executable profile. `Null` means
     /// explicitly unrestricted, while `Missing` remains unknown.
     #[serde(default)]
@@ -173,7 +207,7 @@ pub struct RatioDefinition {
     pub numerator: String,
     pub denominator: String,
     pub zero: semantic_plan::typed::ZeroDivision,
-    pub unit: Presence<String>,
+    pub unit: Presence<Unit>,
     pub source_refs: Vec<SourceRef>,
 }
 impl RatioDefinition {

@@ -6,6 +6,193 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+use super::dependency_cache::{
+    AnalysisCache, AnalysisCacheError, AnalysisCacheIdentity, AnalysisCacheLimits, LookupDependency,
+};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+type InitialContext = (ContextState, String, ContextManifest);
+
+pub(crate) struct ContextCache {
+    cache: AnalysisCache<InitialContext>,
+    full_single_relation_selection: AnalysisCache<ContextState>,
+}
+
+pub(super) enum ContextReuse {
+    Miss,
+    SameSnapshot,
+    SelectionRerendered,
+}
+
+impl ContextCache {
+    pub(crate) fn new() -> Self {
+        Self {
+            cache: AnalysisCache::new(AnalysisCacheLimits {
+                max_entries: 32,
+                max_bytes: 16 * 1024 * 1024,
+                max_lookups: 1,
+                max_active_keys: 32,
+            })
+            .expect("fixed context cache limits"),
+            full_single_relation_selection: AnalysisCache::new(AnalysisCacheLimits {
+                max_entries: 32,
+                max_bytes: 16 * 1024 * 1024,
+                max_lookups: 1,
+                max_active_keys: 32,
+            })
+            .expect("fixed selection cache limits"),
+        }
+    }
+
+    pub(super) async fn initial(
+        &self,
+        snapshot: &CatalogSnapshot,
+        request: &str,
+        options: &CompileOptions,
+        work: &mut Work,
+    ) -> Result<(ContextState, (String, ContextManifest), ContextReuse), CompileDiagnostic> {
+        options.check()?;
+        let selection_input = serde_json::json!({
+            "request": request,
+            "selection": options.selection_mode,
+            "budgets": {
+                "max_input_bytes": options.max_input_bytes,
+                "max_context_bytes": options.max_context_bytes,
+                "max_context_fields": options.max_context_fields,
+                "max_context_relations": options.max_context_relations,
+                "max_context_edges": options.max_context_edges,
+                "initial_fields_per_relation": options.initial_fields_per_relation,
+                "small_relation_fields": options.small_relation_fields,
+                "max_index_objects": options.max_index_objects,
+                "max_index_bytes": options.max_index_bytes,
+                "max_search_postings": options.max_search_postings,
+                "max_search_candidates": options.max_search_candidates,
+                "max_search_terms": options.max_search_terms,
+            },
+        });
+        let identity = AnalysisCacheIdentity {
+            stage: "initial_context_v1".into(),
+            input_digest: semantic_catalog::canonical_digest(&serde_json::json!({
+                "snapshot": snapshot.id(),
+                "input": selection_input.clone(),
+            })),
+            access_scope_revision: semantic_catalog::canonical_digest(&serde_json::json!(
+                options.allowed_relations
+            )),
+            parameter_digest: semantic_catalog::canonical_digest(&serde_json::json!(
+                options.request_context
+            )),
+            renderer_revision: "context-render-v1".into(),
+            function_revision: "context-functions-v1".into(),
+            acceptance_revision: "strict-v1".into(),
+        };
+        // Ranked retrieval has namespace/index competitors. Only exact Full
+        // selection with one explicitly allowed relation has a complete
+        // relation-level dependency, including the missing-name result.
+        let selected_name = (options.selection_mode == SelectionMode::Full)
+            .then_some(options.allowed_relations.as_ref())
+            .flatten()
+            .filter(|relations| relations.len() == 1)
+            .and_then(|relations| relations.iter().next());
+        let selection_identity = AnalysisCacheIdentity {
+            stage: "full_single_relation_selection_v1".into(),
+            input_digest: semantic_catalog::canonical_digest(&selection_input),
+            ..identity.clone()
+        };
+        let built = AtomicBool::new(false);
+        let built_for_build = &built;
+        let selection_hit = AtomicBool::new(false);
+        let selection_hit_for_build = &selection_hit;
+        let selection_cache = &self.full_single_relation_selection;
+        let work_for_build = &mut *work;
+        let result = self
+            .cache
+            .get_or_build(snapshot, identity, move || async move {
+                built_for_build.store(true, Ordering::Relaxed);
+                let state = if let Some(name) = selected_name {
+                    let selection_built = AtomicBool::new(false);
+                    let selection_built_for_build = &selection_built;
+                    let selection_work = &mut *work_for_build;
+                    let selected = selection_cache
+                        .get_or_build(snapshot, selection_identity, move || async move {
+                            selection_built_for_build.store(true, Ordering::Relaxed);
+                            let state =
+                                ContextState::initial(snapshot, request, options, selection_work)?;
+                            let bytes = serde_json::to_vec(&state)
+                                .expect("selection state serializes")
+                                .len();
+                            Ok::<_, CompileDiagnostic>((
+                                state,
+                                vec![LookupDependency::Relation {
+                                    name: name.as_str().to_owned(),
+                                }],
+                                bytes,
+                            ))
+                        })
+                        .await
+                        .map_err(cache_error)?;
+                    if !selection_built.load(Ordering::Relaxed) {
+                        selection_hit_for_build.store(true, Ordering::Relaxed);
+                    }
+                    (*selected).clone()
+                } else {
+                    ContextState::initial(snapshot, request, options, work_for_build)?
+                };
+                let (payload, manifest) =
+                    state.render(snapshot, request, options, work_for_build)?;
+                let bytes = payload.len()
+                    + serde_json::to_vec(&manifest)
+                        .expect("context manifest serializes")
+                        .len();
+                Ok::<_, CompileDiagnostic>((
+                    (state, payload, manifest),
+                    vec![LookupDependency::Snapshot],
+                    bytes,
+                ))
+            })
+            .await
+            .map_err(cache_error)?;
+        options.check()?;
+        let hit = !built.load(Ordering::Relaxed);
+        if hit {
+            work.context_relations += result.2.included.len();
+            work.context_fields += result
+                .2
+                .included
+                .iter()
+                .map(|object| object.fields.len())
+                .sum::<usize>();
+            work.context_bytes += result.1.len();
+        }
+        let reuse = if hit {
+            ContextReuse::SameSnapshot
+        } else if selection_hit.load(Ordering::Relaxed) {
+            ContextReuse::SelectionRerendered
+        } else {
+            ContextReuse::Miss
+        };
+        Ok((
+            result.0.clone(),
+            (result.1.clone(), result.2.clone()),
+            reuse,
+        ))
+    }
+}
+
+fn cache_error(error: AnalysisCacheError<CompileDiagnostic>) -> CompileDiagnostic {
+    match error {
+        AnalysisCacheError::Build(error) => error,
+        AnalysisCacheError::Dependencies(_) => diagnostic(
+            "cache_configuration",
+            "Context cache dependency limit failed",
+        ),
+        AnalysisCacheError::Admission => diagnostic(
+            "admission_closed",
+            "Too many distinct context analyses are already in progress",
+        ),
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SelectionMode {
@@ -42,13 +229,15 @@ pub struct ContextManifest {
     pub semantic_sufficiency_proven: bool,
     pub payload_digest: String,
     pub payload_bytes: usize,
+    /// Mechanical evidence audit; it never proves semantic sufficiency.
+    pub audit: super::ContextAudit,
 }
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize)]
 struct Selection {
     fields: BTreeSet<String>,
     reasons: BTreeSet<String>,
 }
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub(super) struct ContextState {
     mode: SelectionMode,
     selected: BTreeMap<String, Selection>,
@@ -433,9 +622,90 @@ impl ContextState {
                     });
                     queue.push_back(relationship.right_relation.clone());
                 }
+                for allocation in semantics.allocations.values() {
+                    options.check()?;
+                    let needed = allocation.source_entity_fields.len() + 3;
+                    if dependencies.len() >= options.max_context_edges
+                        || needed + fields.len() > options.max_context_edges
+                    {
+                        return Err(diagnostic(
+                            "context_limit",
+                            "Allocation dependency closure exceeds the work budget",
+                        ));
+                    }
+                    fields.extend(allocation.source_entity_fields.iter().cloned());
+                    fields.insert(allocation.source_amount_field.clone());
+                    fields.insert(allocation.expected_membership_count_field.clone());
+                    fields.insert(allocation.expected_weight_total_field.clone());
+                    self.add_relation(
+                        snapshot,
+                        &allocation.bridge_relation,
+                        true,
+                        "allocation_bridge",
+                        options,
+                    )?;
+                    dependencies.push(ContextDependency {
+                        from: name.clone(),
+                        to: allocation.bridge_relation.clone(),
+                        satisfied: true,
+                    });
+                    queue.push_back(allocation.bridge_relation.clone());
+                }
+                for rate in semantics.currency_rates.values() {
+                    options.check()?;
+                    if dependencies.len() >= options.max_context_edges
+                        || fields.len() + 3 > options.max_context_edges
+                    {
+                        return Err(diagnostic(
+                            "context_limit",
+                            "Currency rate dependency closure exceeds the work budget",
+                        ));
+                    }
+                    fields.insert(rate.source_amount_field.clone());
+                    fields.insert(rate.source_currency_field.clone());
+                    fields.insert(rate.source_time_field.clone());
+                    self.add_relation(
+                        snapshot,
+                        &rate.rate_relation,
+                        true,
+                        "currency_rate_relation",
+                        options,
+                    )?;
+                    dependencies.push(ContextDependency {
+                        from: name.clone(),
+                        to: rate.rate_relation.clone(),
+                        satisfied: true,
+                    });
+                    queue.push_back(rate.rate_relation.clone());
+                }
+                for calendar in semantics.business_calendars.values() {
+                    options.check()?;
+                    if dependencies.len() >= options.max_context_edges
+                        || fields.len() + 1 > options.max_context_edges
+                    {
+                        return Err(diagnostic(
+                            "context_limit",
+                            "Business calendar dependency closure exceeds the work budget",
+                        ));
+                    }
+                    fields.insert(calendar.source_date_field.clone());
+                    self.add_relation(
+                        snapshot,
+                        &calendar.calendar_relation,
+                        true,
+                        "business_calendar_relation",
+                        options,
+                    )?;
+                    dependencies.push(ContextDependency {
+                        from: name.clone(),
+                        to: calendar.calendar_relation.clone(),
+                        satisfied: true,
+                    });
+                    queue.push_back(calendar.calendar_relation.clone());
+                }
                 for metric in semantics.metrics.values() {
                     options.check()?;
-                    if metric.source_grain.len() + metric.row_filters.len() + fields.len()
+                    if metric.source_grain.keys.len() + metric.row_filters.len() + fields.len()
                         > options.max_context_edges
                     {
                         return Err(diagnostic(
@@ -443,13 +713,40 @@ impl ContextState {
                             "Metric dependency closure exceeds the work budget",
                         ));
                     }
-                    fields.extend(metric.source_grain.iter().cloned());
+                    fields.extend(metric.source_grain.keys.iter().map(|key| key.field.clone()));
                     fields.extend(metric.field.iter().cloned());
                     fields.extend(metric.row_filters.iter().map(|filter| filter.field.clone()));
                     if let semantic_catalog::Presence::Value(temporal) = &metric.temporal {
                         fields.insert(temporal.field.clone());
                     }
                 }
+                if let Some(identity) = &semantics.entity_identity {
+                    if identity.source_grain.keys.len() + fields.len() > options.max_context_edges {
+                        return Err(diagnostic(
+                            "context_limit",
+                            "Entity key dependency closure exceeds the work budget",
+                        ));
+                    }
+                    fields.extend(
+                        identity
+                            .source_grain
+                            .keys
+                            .iter()
+                            .map(|key| key.field.clone()),
+                    );
+                }
+                if semantics.conversions.len() + fields.len() > options.max_context_edges {
+                    return Err(diagnostic(
+                        "context_limit",
+                        "Conversion dependency closure exceeds the work budget",
+                    ));
+                }
+                fields.extend(
+                    semantics
+                        .conversions
+                        .values()
+                        .map(|conversion| conversion.field.clone()),
+                );
                 for policy in &semantics.row_policies {
                     options.check()?;
                     if policy.filters.len() + fields.len() > options.max_context_edges {
@@ -489,8 +786,8 @@ impl ContextState {
                             "Dependency closure edge budget exhausted",
                         ));
                     }
-                    // Until checked view field lineage exists, hydrate complete
-                    // dependency contracts rather than dropping governing facts.
+                    // Even with checked output lineage, hydrate the complete
+                    // dependency contract so nested governance remains visible.
                     self.add_relation(snapshot, dependency, true, "view_dependency", options)?;
                     dependencies.push(ContextDependency {
                         from: name.clone(),
@@ -508,6 +805,7 @@ impl ContextState {
         fn visit(predicate: &RowPredicate, fields: &mut BTreeSet<String>) {
             match predicate {
                 RowPredicate::Compare { field, .. }
+                | RowPredicate::CompareParameter { field, .. }
                 | RowPredicate::CompareMapped { field, .. }
                 | RowPredicate::IsNull { field, .. } => {
                     fields.insert(field.field.clone());
@@ -536,6 +834,7 @@ impl ContextState {
                     }
                 }
                 RowOperation::CalendarFilter { field, .. }
+                | RowOperation::CalendarGroup { field, .. }
                 | RowOperation::Project { field, .. }
                 | RowOperation::Order { field, .. }
                 | RowOperation::Group { field, .. }
@@ -600,14 +899,22 @@ impl ContextState {
         }
         #[derive(Serialize)]
         struct ScopedSemantics<'a> {
+            view_coverage: &'a Option<semantic_catalog::ViewTemporalCoverage>,
+            view_lineage: &'a Option<semantic_catalog::ViewOutputLineage>,
             model_description: &'a Option<String>,
             model_ai_context: &'a Option<semantic_catalog::AiContext>,
             ai_context: &'a Option<semantic_catalog::AiContext>,
             declared_primary_key: &'a [String],
             declared_unique_keys: &'a [Vec<String>],
+            entity_identity: &'a Option<semantic_catalog::EntityIdentity>,
             origin: &'a Option<semantic_catalog::SemanticOrigin>,
             capability: &'a Option<semantic_catalog::Capability>,
             facts: &'a BTreeMap<String, semantic_catalog::FactResolution<serde_json::Value>>,
+            concepts: &'a BTreeMap<String, semantic_catalog::ConceptDefinition>,
+            conversions: &'a BTreeMap<String, semantic_catalog::UnitConversion>,
+            business_calendars: &'a BTreeMap<String, semantic_catalog::BusinessCalendarRule>,
+            allocations: &'a BTreeMap<String, semantic_catalog::AllocationContract>,
+            currency_rates: &'a BTreeMap<String, semantic_catalog::CurrencyRateRule>,
             metrics: &'a BTreeMap<String, semantic_catalog::MetricDefinition>,
             value_mappings: &'a BTreeMap<String, semantic_catalog::ValueMapping>,
             ratio_metrics: &'a BTreeMap<String, semantic_catalog::RatioDefinition>,
@@ -660,14 +967,22 @@ impl ContextState {
                 description: &relation.description,
                 grain: &relation.grain,
                 semantics: relation.semantics.as_ref().map(|s| ScopedSemantics {
+                    view_coverage: &s.view_coverage,
+                    view_lineage: &s.view_lineage,
                     model_description: &s.model_description,
                     model_ai_context: &s.model_ai_context,
                     ai_context: &s.ai_context,
                     declared_primary_key: &s.declared_primary_key,
                     declared_unique_keys: &s.declared_unique_keys,
+                    entity_identity: &s.entity_identity,
                     origin: &s.origin,
                     capability: &s.capability,
                     facts: &s.facts,
+                    concepts: &s.concepts,
+                    conversions: &s.conversions,
+                    business_calendars: &s.business_calendars,
+                    allocations: &s.allocations,
+                    currency_rates: &s.currency_rates,
                     metrics: &s.metrics,
                     value_mappings: &s.value_mappings,
                     ratio_metrics: &s.ratio_metrics,
@@ -689,7 +1004,18 @@ impl ContextState {
                 reasons: selection.reasons.clone(),
             });
         }
-        let payload = bounded_json(&context, options.max_context_bytes).map_err(|_| {
+        // Reserve the fixed protocol and the full configured output allowance
+        // before selecting context. Auto mode can then try retrieved context
+        // when a full catalog cannot fit one model call's host byte envelope.
+        let per_call_context_bytes = options
+            .max_model_call_bytes
+            .saturating_sub(options.max_model_output_bytes)
+            .saturating_sub(include_str!("prompt.txt").len());
+        let payload = bounded_json(
+            &context,
+            options.max_context_bytes.min(per_call_context_bytes),
+        )
+        .map_err(|_| {
             diagnostic(
                 "context_limit",
                 "Required context facts exceed the byte budget",
@@ -703,7 +1029,7 @@ impl ContextState {
                 serde_json::to_vec(&options.allowed_relations).expect("scope serialization")
             )
         );
-        let manifest = ContextManifest {
+        let mut manifest = ContextManifest {
             version: 1,
             snapshot_id: snapshot.id().into(),
             selection_mode: self.mode,
@@ -716,7 +1042,16 @@ impl ContextState {
             semantic_sufficiency_proven: false,
             payload_digest,
             payload_bytes: payload.len(),
+            audit: super::ContextAudit::pending(),
         };
+        let audit = super::audit_context_manifest(snapshot, &manifest, &payload);
+        if !audit.complete {
+            return Err(diagnostic(
+                "partial_catalog",
+                "Rendered context has incomplete pinned facts or dependencies",
+            ));
+        }
+        manifest.audit = audit;
         Ok((payload, manifest))
     }
 }

@@ -7,7 +7,9 @@
 
 mod builtin;
 pub mod conformance;
+mod deferred;
 mod files;
+pub use deferred::DeferredProject;
 
 use datafusion::catalog::TableProvider;
 use futures::future::BoxFuture;
@@ -207,6 +209,8 @@ impl Registry {
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     pub cache: Option<semantic_engine::CacheOptions>,
+    #[serde(default)]
+    pub deferred_read_only: bool,
     pub ossie: Option<PathBuf>,
     #[serde(default)]
     pub app_tables: BTreeMap<String, SourceConfig>,
@@ -253,6 +257,10 @@ pub struct ConnectionConfig {
 pub struct SourceConfig {
     pub materialization: Option<semantic_engine::MaterializationPolicy>,
     pub connection: String,
+    /// Full physical Arrow contract captured from a source for offline binding.
+    /// Deferred loading requires this; ordinary `load` may infer a live schema.
+    #[serde(default)]
+    pub recorded_schema: Option<arrow_schema::Schema>,
     #[serde(flatten)]
     pub options: Options,
 }
@@ -264,6 +272,21 @@ pub struct Project {
     views: BTreeMap<String, ViewInspection>,
 }
 impl Project {
+    pub fn deferred_read_only(&self) -> bool {
+        self.config.deferred_read_only
+    }
+
+    /// Bind recorded schemas offline and resolve a live provider only when a
+    /// selected relation is scanned. The returned state owns registry/secrets.
+    pub async fn load_deferred_read_only(
+        self,
+        registry: Arc<Registry>,
+        secrets: Arc<SecretResolver<'static>>,
+        options: semantic_engine::DeferredOptions,
+    ) -> Result<DeferredProject> {
+        deferred::load(self, registry, secrets, options).await
+    }
+
     /// Model, view SQL and local source paths are relative to this configuration file.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
@@ -543,24 +566,49 @@ impl Project {
                 }
             }
         }
-        let mut ordered = Vec::new();
-        while !pending.is_empty() {
-            let next = pending
+        let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut indegree = BTreeMap::new();
+        for (name, view) in &pending {
+            let unresolved = view
+                .dependencies
                 .iter()
-                .find(|(_, view)| view.dependencies.iter().all(|name| ready.contains(name)))
-                .map(|(name, _)| name.clone());
-            let Some(name) = next else {
-                return Err(SourceError::configuration(
-                    "cyclic_views",
-                    "/views",
-                    format!(
-                        "cyclic dependencies; blocked views: {}",
-                        pending.keys().cloned().collect::<Vec<_>>().join(", ")
-                    ),
-                ));
-            };
-            ready.insert(name.clone());
-            ordered.push(pending.remove(&name).expect("selected pending view"));
+                .filter(|dependency| !ready.contains(*dependency))
+                .count();
+            indegree.insert(name.clone(), unresolved);
+            for dependency in &view.dependencies {
+                dependents
+                    .entry(dependency.clone())
+                    .or_default()
+                    .push(name.clone());
+            }
+        }
+        ready = indegree
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(name, _)| name.clone())
+            .collect();
+        let mut ordered = Vec::with_capacity(pending.len());
+        while let Some(name) = ready.pop_first() {
+            ordered.push(pending.remove(&name).expect("ready view"));
+            if let Some(children) = dependents.get(&name) {
+                for child in children {
+                    let count = indegree.get_mut(child).expect("known dependent");
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.insert(child.clone());
+                    }
+                }
+            }
+        }
+        if !pending.is_empty() {
+            return Err(SourceError::configuration(
+                "cyclic_views",
+                "/views",
+                format!(
+                    "cyclic dependencies; blocked views: {}",
+                    pending.keys().cloned().collect::<Vec<_>>().join(", ")
+                ),
+            ));
         }
         Ok(ordered)
     }

@@ -33,6 +33,7 @@ pub struct Compilation {
 pub struct Compiler<P> {
     provider: P,
     max_repairs: usize,
+    context_cache: typed::ContextCache,
 }
 
 impl<P: ModelProvider> Compiler<P> {
@@ -40,6 +41,7 @@ impl<P: ModelProvider> Compiler<P> {
         Self {
             provider,
             max_repairs: 1,
+            context_cache: typed::ContextCache::new(),
         }
     }
 

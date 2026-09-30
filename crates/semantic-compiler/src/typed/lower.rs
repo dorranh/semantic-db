@@ -14,15 +14,33 @@ use semantic_plan::typed::{
 };
 use serde::Serialize;
 
-use super::{CompileDiagnostic, bind::*, diagnostic};
+use super::{
+    CompileDiagnostic,
+    bind::*,
+    diagnostic,
+    scalar::{CheckedDecimalZeroFinalizer, CheckedPredicate},
+};
 
 /// Internal, version-tagged relational artifact. No public deserialization or
 /// mutation: replay starts from the untrusted proposal and validates again.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct RelationalPlan {
     version: u32,
+    pass_id: &'static str,
+    pass_version: u32,
     comparison_profile: &'static str,
     nodes: Vec<Node>,
+}
+impl std::fmt::Debug for RelationalPlan {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RelationalPlan")
+            .field("version", &self.version)
+            .field("pass_id", &self.pass_id)
+            .field("pass_version", &self.pass_version)
+            .field("node_count", &self.nodes.len())
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 struct Node {
@@ -34,8 +52,29 @@ struct Node {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum Operator {
+    Allocate {
+        allocation: Box<BoundAllocation>,
+    },
+    CurrencyRate {
+        rate: Box<BoundCurrencyRate>,
+    },
+    BusinessCalendar {
+        calendar: Box<BoundBusinessCalendar>,
+    },
     Lookup {
         lookup: Box<BoundLookup>,
+    },
+    Convert {
+        conversions: Vec<BoundConversion>,
+    },
+    CalendarGroup {
+        buckets: Vec<CalendarBucketExpression>,
+    },
+    CalendarFill {
+        month: BoundField,
+        count: BoundField,
+        months: Vec<i64>,
+        fill: i64,
     },
     Window {
         windows: Vec<WindowExpression>,
@@ -57,6 +96,10 @@ enum Operator {
     Filter {
         predicate: BoundPredicate,
     },
+    OutputFilter {
+        stage: OutputFilterStage,
+        predicate: CheckedPredicate,
+    },
     Sort {
         keys: Vec<SortKey>,
     },
@@ -64,6 +107,7 @@ enum Operator {
         columns: Vec<Projection>,
     },
     Fetch {
+        offset: u32,
         count: u32,
     },
 }
@@ -87,6 +131,11 @@ struct Grouping {
 #[derive(Debug, Clone, Serialize)]
 struct Aggregation {
     function: AggregateFunction,
+    mean_state: bool,
+    weighted: Option<BoundWeightedState>,
+    zero_finalizer: Option<CheckedDecimalZeroFinalizer>,
+    exact_distinct: bool,
+    snapshot: Option<BoundSnapshotState>,
     field: Option<BoundField>,
     distinct: bool,
     output: BoundField,
@@ -102,18 +151,32 @@ struct RatioExpression {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct CalendarBucketExpression {
+    source: BoundField,
+    output: BoundField,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct WindowExpression {
     window: BoundWindow,
     output: BoundField,
 }
+mod allocation;
+mod business_calendar;
+mod calendar_fill;
+mod currency_rate;
 mod lookup;
+mod values;
+mod verify;
 mod window;
 
 #[tracing::instrument(name = "semantic.lower", skip_all)]
 pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnostic> {
     let mut plan = RelationalPlan {
         version: 1,
-        comparison_profile: "datafusion-55/sql-null-logic/utf8-binary",
+        pass_id: verify::PASS_ID,
+        pass_version: verify::PASS_VERSION,
+        comparison_profile: verify::COMPARISON_PROFILE,
         nodes: Vec::new(),
     };
     plan.push(
@@ -124,6 +187,11 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
         },
     );
     let mut windows = Vec::new();
+    let mut conversions = Vec::new();
+    let mut conversion_ids = Vec::new();
+    let mut calendar_buckets = Vec::new();
+    let mut calendar_bucket_ids = Vec::new();
+    let mut calendar_fill = None;
     let mut window_ids = Vec::new();
     let mut ratios = Vec::new();
     let mut ratio_ids = Vec::new();
@@ -135,6 +203,9 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
     let mut ordering = Vec::new();
     let mut ordering_ids = Vec::new();
     let mut limit = None;
+    let mut allocation = None;
+    let mut currency_rate = None;
+    let mut business_calendar = None;
     let mut aggregate_filters = Vec::new();
     let mut window_filters = Vec::new();
     for requirement in &bound.requirements {
@@ -167,6 +238,99 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
                         output: output.clone(),
                     });
                 }
+            }
+            BoundOperation::PathLookup { lookups, alias } => {
+                for (hop, lookup) in lookups.iter().enumerate() {
+                    plan.push(
+                        (hop == 0)
+                            .then(|| requirement.id.clone())
+                            .into_iter()
+                            .collect(),
+                        Operator::Lookup {
+                            lookup: Box::new(lookup.clone()),
+                        },
+                    );
+                }
+                projections.push(Projection {
+                    field: lookups.last().expect("bound two-hop path").output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::Allocate {
+                allocation: bound_allocation,
+                target_aliases,
+                amount_alias,
+            } => {
+                allocation = Some((requirement.id.clone(), bound_allocation.clone()));
+                projections.extend(
+                    bound_allocation
+                        .target_outputs
+                        .iter()
+                        .zip(target_aliases)
+                        .map(|(field, alias)| Projection {
+                            field: field.clone(),
+                            alias: alias.clone(),
+                        }),
+                );
+                projections.push(Projection {
+                    field: bound_allocation.amount_output.clone(),
+                    alias: amount_alias.clone(),
+                });
+            }
+            BoundOperation::CurrencyConvert { rate, alias } => {
+                currency_rate = Some((requirement.id.clone(), rate.clone()));
+                projections.push(Projection {
+                    field: rate.output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::BusinessCalendar { calendar, alias } => {
+                business_calendar = Some((requirement.id.clone(), calendar.clone()));
+                projections.push(Projection {
+                    field: calendar.output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::Convert { conversion, alias } => {
+                conversion_ids.push(requirement.id.clone());
+                conversions.push(conversion.clone());
+                projections.push(Projection {
+                    field: conversion.output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::CalendarGroup {
+                source,
+                output,
+                alias,
+            } => {
+                calendar_bucket_ids.push(requirement.id.clone());
+                calendar_buckets.push(CalendarBucketExpression {
+                    source: source.clone(),
+                    output: output.clone(),
+                });
+                groups.push(Grouping {
+                    field: output.clone(),
+                    output: output.clone(),
+                });
+                projections.push(Projection {
+                    field: output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::CalendarFill {
+                month,
+                count,
+                months,
+                fill,
+            } => {
+                calendar_fill = Some((
+                    requirement.id.clone(),
+                    month.clone(),
+                    count.clone(),
+                    months.clone(),
+                    *fill,
+                ));
             }
             BoundOperation::Window {
                 window,
@@ -201,6 +365,11 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
                     };
                     aggregates.push(Aggregation {
                         function: input.function,
+                        mean_state: false,
+                        weighted: None,
+                        zero_finalizer: None,
+                        exact_distinct: false,
+                        snapshot: None,
                         field: input.field.clone(),
                         distinct: input.distinct,
                         filter: input.filter.clone(),
@@ -245,6 +414,10 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
             }
             BoundOperation::Aggregate {
                 function,
+                mean_state,
+                weighted,
+                exact_distinct,
+                snapshot,
                 field,
                 distinct,
                 alias,
@@ -252,8 +425,18 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
                 filter,
             } => {
                 aggregate_ids.push(requirement.id.clone());
+                let zero_finalizer = weighted
+                    .as_ref()
+                    .filter(|state| state.zero == semantic_catalog::ZeroWeight::Zero)
+                    .map(|_| CheckedDecimalZeroFinalizer::new(&output.field))
+                    .transpose()?;
                 aggregates.push(Aggregation {
                     function: *function,
+                    mean_state: *mean_state,
+                    weighted: weighted.clone(),
+                    zero_finalizer,
+                    exact_distinct: *exact_distinct,
+                    snapshot: snapshot.clone(),
                     field: field.clone(),
                     distinct: *distinct,
                     output: output.clone(),
@@ -290,23 +473,69 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
                     nulls: *nulls,
                 });
             }
-            BoundOperation::Limit { count } => limit = Some((requirement.id.clone(), *count)),
+            BoundOperation::Limit { count } => limit = Some((requirement.id.clone(), 0, *count)),
+            BoundOperation::Page { offset, fetch } => {
+                limit = Some((requirement.id.clone(), *offset, *fetch))
+            }
         }
+    }
+    if let Some((id, allocation)) = allocation {
+        plan.push(vec![id], Operator::Allocate { allocation });
+    }
+    if let Some((id, rate)) = currency_rate {
+        plan.push(vec![id], Operator::CurrencyRate { rate });
+    }
+    if let Some((id, calendar)) = business_calendar {
+        plan.push(vec![id], Operator::BusinessCalendar { calendar });
+    }
+    if !conversions.is_empty() {
+        plan.push(conversion_ids, Operator::Convert { conversions });
+    }
+    if !calendar_buckets.is_empty() {
+        plan.push(
+            calendar_bucket_ids,
+            Operator::CalendarGroup {
+                buckets: calendar_buckets,
+            },
+        );
     }
     if !groups.is_empty() || !aggregates.is_empty() {
         plan.push(aggregate_ids, Operator::Aggregate { groups, aggregates });
+    }
+    if let Some((id, month, count, months, fill)) = calendar_fill {
+        plan.push(
+            vec![id],
+            Operator::CalendarFill {
+                month,
+                count,
+                months,
+                fill,
+            },
+        );
     }
     if !ratios.is_empty() {
         plan.push(ratio_ids, Operator::Derive { ratios });
     }
     for (id, predicate) in aggregate_filters {
-        plan.push(vec![id], Operator::Filter { predicate });
+        plan.push(
+            vec![id],
+            Operator::OutputFilter {
+                stage: OutputFilterStage::AfterAggregate,
+                predicate: CheckedPredicate::output(&predicate)?,
+            },
+        );
     }
     if !windows.is_empty() {
         plan.push(window_ids, Operator::Window { windows });
     }
     for (id, predicate) in window_filters {
-        plan.push(vec![id], Operator::Filter { predicate });
+        plan.push(
+            vec![id],
+            Operator::OutputFilter {
+                stage: OutputFilterStage::AfterWindow,
+                predicate: CheckedPredicate::output(&predicate)?,
+            },
+        );
     }
     if !ordering.is_empty() {
         plan.push(ordering_ids, Operator::Sort { keys: ordering });
@@ -317,44 +546,51 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
             columns: projections,
         },
     );
-    if let Some((id, count)) = limit {
-        plan.push(vec![id], Operator::Fetch { count });
+    if let Some((id, offset, count)) = limit {
+        plan.push(vec![id], Operator::Fetch { offset, count });
     }
-    // Each accepted requirement must survive exactly once; a missing predicate
-    // cannot be excused by a field appearing in the output/evidence.
+    // A dedicated boundary verifier checks stage order and requirement coverage
+    // before either backend can consume the internal plan.
     let expected: BTreeSet<_> = bound.requirements.iter().map(|r| r.id.as_str()).collect();
-    let mut actual = BTreeSet::new();
-    for (index, node) in plan.nodes.iter().enumerate() {
-        if node.id != index || node.input != index.checked_sub(1) {
-            return Err(diagnostic(
-                "invalid_relational_plan",
-                "Invalid relational node linkage",
-            ));
-        }
-        for id in &node.requirements {
-            if !actual.insert(id.as_str()) {
-                return Err(diagnostic(
-                    "requirement_coverage",
-                    "A requirement was lowered more than once",
-                ));
-            }
-        }
-    }
-    if actual != expected {
-        return Err(diagnostic(
-            "requirement_coverage",
-            "Lowering did not preserve all requirements",
-        ));
-    }
+    verify::verify(&plan, &expected)?;
     Ok(plan)
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct SqlArtifact {
     dialect: &'static str,
+    target: &'static str,
+    execution_profile_revision: &'static str,
     snapshot_id: String,
     statement: String,
     parameters: Vec<Literal>,
+    parameter_types: Vec<String>,
+    expected_output: Vec<SqlOutputField>,
+}
+impl std::fmt::Debug for SqlArtifact {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SqlArtifact")
+            .field("dialect", &self.dialect)
+            .field("target", &self.target)
+            .field("parameter_count", &self.parameters.len())
+            .field("output_count", &self.expected_output.len())
+            .finish_non_exhaustive()
+    }
+}
+#[derive(Clone, PartialEq, Eq, Serialize)]
+pub struct SqlOutputField {
+    pub name: String,
+    pub data_type: String,
+    pub nullable: bool,
+}
+impl std::fmt::Debug for SqlOutputField {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SqlOutputField")
+            .field("nullable", &self.nullable)
+            .finish_non_exhaustive()
+    }
 }
 impl SqlArtifact {
     pub(super) fn generated(
@@ -362,12 +598,32 @@ impl SqlArtifact {
         statement: String,
         parameters: Vec<Literal>,
     ) -> Self {
+        let parameter_types = parameters
+            .iter()
+            .map(|value| scalar(value).data_type().to_string())
+            .collect();
         Self {
             dialect: "datafusion-55",
+            target: "local:datafusion-55",
+            execution_profile_revision: semantic_engine::MVP_EXECUTION_PROFILE_REVISION,
             snapshot_id: snapshot_id.into(),
             statement,
             parameters,
+            parameter_types,
+            expected_output: Vec::new(),
         }
+    }
+    pub fn target(&self) -> &str {
+        self.target
+    }
+    pub fn execution_profile_revision(&self) -> &str {
+        self.execution_profile_revision
+    }
+    pub fn parameter_types(&self) -> &[String] {
+        &self.parameter_types
+    }
+    pub fn expected_output(&self) -> &[SqlOutputField] {
+        &self.expected_output
     }
     pub fn statement(&self) -> &str {
         &self.statement
@@ -380,6 +636,17 @@ impl SqlArtifact {
     }
     pub(super) fn values(&self) -> Vec<ScalarValue> {
         self.parameters.iter().map(scalar).collect()
+    }
+    fn with_expected_output(mut self, columns: &[Projection]) -> Self {
+        self.expected_output = columns
+            .iter()
+            .map(|column| SqlOutputField {
+                name: column.alias.clone(),
+                data_type: column.field.field.data_type().to_string(),
+                nullable: column.field.field.is_nullable(),
+            })
+            .collect();
+        self
     }
 }
 
@@ -407,7 +674,44 @@ impl RelationalPlan {
                 unreachable!()
             };
             match &node.operator {
+                Operator::Allocate { allocation } => {
+                    allocation::emit_allocation(query, allocation, &mut parameters)
+                }
+                Operator::CurrencyRate { rate } => {
+                    currency_rate::emit_currency_rate(query, rate, &mut parameters)
+                }
+                Operator::BusinessCalendar { calendar } => {
+                    business_calendar::emit(query, calendar, &mut parameters)
+                }
                 Operator::Lookup { lookup } => lookup::emit_lookup(query, lookup, &mut parameters),
+                Operator::Convert { conversions } => {
+                    select.projection = vec![ast::SelectItem::Wildcard(Default::default())];
+                    select
+                        .projection
+                        .extend(conversions.iter().map(|conversion| {
+                            ast::SelectItem::ExprWithAlias {
+                                expr: sql_conversion(conversion),
+                                alias: ident(conversion.output.field.name()),
+                            }
+                        }));
+                    wrap_query(query);
+                }
+                Operator::CalendarGroup { buckets } => {
+                    select.projection = vec![ast::SelectItem::Wildcard(Default::default())];
+                    select.projection.extend(buckets.iter().map(|bucket| {
+                        ast::SelectItem::ExprWithAlias {
+                            expr: sql_utc_month(bucket),
+                            alias: ident(bucket.output.field.name()),
+                        }
+                    }));
+                    wrap_query(query);
+                }
+                Operator::CalendarFill {
+                    month,
+                    count,
+                    months,
+                    fill,
+                } => calendar_fill::emit(query, month, count, months, *fill, &mut parameters),
                 Operator::Window { windows } => {
                     select.projection = vec![ast::SelectItem::Wildcard(Default::default())];
                     select.projection.extend(windows.iter().map(|window| {
@@ -466,6 +770,13 @@ impl RelationalPlan {
                         Some(left) => binary(left, ast::BinaryOperator::And, expr),
                     });
                 }
+                Operator::OutputFilter { predicate, .. } => {
+                    let expr = predicate.sql("src", &mut parameters);
+                    select.selection = Some(match select.selection.take() {
+                        None => expr,
+                        Some(left) => binary(left, ast::BinaryOperator::And, expr),
+                    });
+                }
                 Operator::Project { columns } => {
                     select.projection = columns
                         .iter()
@@ -492,24 +803,33 @@ impl RelationalPlan {
                         interpolate: None,
                     })
                 }
-                Operator::Fetch { count } => {
+                Operator::Fetch { offset, count } => {
                     query.limit_clause = Some(ast::LimitClause::LimitOffset {
                         limit: Some(ast::Expr::Value(
                             ast::Value::Number(count.to_string(), false).into(),
                         )),
-                        offset: None,
+                        offset: (*offset > 0).then(|| ast::Offset {
+                            value: ast::Expr::Value(
+                                ast::Value::Number(offset.to_string(), false).into(),
+                            ),
+                            rows: ast::OffsetRows::None,
+                        }),
                         limit_by: Vec::new(),
                     })
                 }
             }
         }
         isolate_sort_aliases(query);
-        SqlArtifact {
-            dialect: "datafusion-55",
-            snapshot_id: snapshot_id.into(),
-            statement: statements[0].to_string(),
-            parameters,
-        }
+        let columns = self
+            .nodes
+            .iter()
+            .find_map(|node| match &node.operator {
+                Operator::Project { columns } => Some(columns.as_slice()),
+                _ => None,
+            })
+            .expect("verified projection");
+        SqlArtifact::generated(snapshot_id, statements[0].to_string(), parameters)
+            .with_expected_output(columns)
     }
 
     pub(super) async fn plan_direct(
@@ -534,7 +854,52 @@ impl RelationalPlan {
             frame = Some(
                 match &node.operator {
                     Operator::Scan { .. } => unreachable!(),
+                    Operator::Allocate { allocation } => {
+                        allocation::plan_allocation(input, engine, allocation).await
+                    }
+                    Operator::CurrencyRate { rate } => {
+                        currency_rate::plan_currency_rate(input, engine, rate).await
+                    }
+                    Operator::BusinessCalendar { calendar } => {
+                        business_calendar::plan(input, engine, calendar).await
+                    }
                     Operator::Lookup { lookup } => lookup::plan_lookup(input, engine, lookup).await,
+                    Operator::Convert { conversions } => {
+                        let mut output = input;
+                        for conversion in conversions {
+                            output = output
+                                .with_column(
+                                    conversion.output.field.name(),
+                                    semantic_engine::semantic_scale_i64_v1().call(vec![
+                                        df_field(&conversion.source),
+                                        lit(conversion.numerator),
+                                        lit(conversion.denominator),
+                                        lit(conversion.half_even),
+                                    ]),
+                                )
+                                .map_err(backend_error)?;
+                        }
+                        Ok(output)
+                    }
+                    Operator::CalendarGroup { buckets } => {
+                        let mut output = input;
+                        for bucket in buckets {
+                            output = output
+                                .with_column(
+                                    bucket.output.field.name(),
+                                    semantic_engine::semantic_utc_month_us_v1()
+                                        .call(vec![df_field(&bucket.source)]),
+                                )
+                                .map_err(backend_error)?;
+                        }
+                        Ok(output)
+                    }
+                    Operator::CalendarFill {
+                        month,
+                        count,
+                        months,
+                        fill,
+                    } => calendar_fill::plan(input, month, count, months, *fill),
                     Operator::Window { windows } => {
                         let mut output = input;
                         for window in windows {
@@ -565,7 +930,7 @@ impl RelationalPlan {
                     }
                     Operator::Related { relationship } => {
                         let mut right = engine
-                            .plan_generated_sql(&related_scan(relationship, None))
+                            .plan_generated_sql(&related_scan(relationship, &[]))
                             .await
                             .map_err(backend_error)?;
                         if let Some(predicate) = &relationship.predicate {
@@ -605,6 +970,7 @@ impl RelationalPlan {
                             .collect::<Vec<_>>(),
                     ),
                     Operator::Filter { predicate } => input.filter(df_predicate(predicate)),
+                    Operator::OutputFilter { predicate, .. } => input.filter(predicate.direct()),
                     Operator::Sort { keys } => input.sort(
                         keys.iter()
                             .map(|k| {
@@ -621,7 +987,9 @@ impl RelationalPlan {
                             .map(|p| df_field(&p.field).alias(&p.alias))
                             .collect::<Vec<_>>(),
                     ),
-                    Operator::Fetch { count } => input.limit(0, Some(*count as usize)),
+                    Operator::Fetch { offset, count } => {
+                        input.limit(*offset as usize, Some(*count as usize))
+                    }
                 }
                 .map_err(backend_error)?,
             );
@@ -680,12 +1048,51 @@ impl RelationalPlan {
         let mut fields = BTreeSet::new();
         for node in &self.nodes {
             match &node.operator {
-                Operator::Lookup { lookup } => fields.extend(
-                    lookup
-                        .relationship
-                        .keys
+                Operator::Allocate { allocation } => {
+                    fields.extend(
+                        allocation
+                            .source_key
+                            .iter()
+                            .map(|key| key.field.name().as_str()),
+                    );
+                    fields.extend([
+                        allocation.source_amount.field.name().as_str(),
+                        allocation.expected_count.field.name().as_str(),
+                        allocation.expected_weight.field.name().as_str(),
+                    ]);
+                }
+                Operator::CurrencyRate { rate } => fields.extend([
+                    rate.source_amount.field.name().as_str(),
+                    rate.source_currency.field.name().as_str(),
+                    rate.source_time.field.name().as_str(),
+                ]),
+                Operator::BusinessCalendar { calendar } => {
+                    fields.insert(calendar.source_date.field.name().as_str());
+                }
+                Operator::Lookup { lookup } => {
+                    fields.extend(
+                        lookup
+                            .relationship
+                            .keys
+                            .iter()
+                            .filter(|(left, _)| left.instance != "$output")
+                            .map(|(left, _)| left.field.name().as_str()),
+                    );
+                    if let Some(as_of) = &lookup.as_of {
+                        if as_of.fact_time.instance != "$output" {
+                            fields.insert(as_of.fact_time.field.name().as_str());
+                        }
+                    }
+                }
+                Operator::Convert { conversions } => fields.extend(
+                    conversions
                         .iter()
-                        .map(|(left, _)| left.field.name().as_str()),
+                        .map(|conversion| conversion.source.field.name().as_str()),
+                ),
+                Operator::CalendarGroup { buckets } => fields.extend(
+                    buckets
+                        .iter()
+                        .map(|bucket| bucket.source.field.name().as_str()),
                 ),
                 Operator::Window { windows } => {
                     for window in windows {
@@ -720,6 +1127,13 @@ impl RelationalPlan {
                         if let Some(predicate) = &aggregate.filter {
                             predicate_fields(predicate, &mut fields);
                         }
+                        if let Some(weighted) = &aggregate.weighted {
+                            fields.insert(weighted.weight.field.name().as_str());
+                        }
+                        if let Some(snapshot) = &aggregate.snapshot {
+                            fields.insert(snapshot.time.field.name().as_str());
+                            fields.insert(snapshot.tie.field.name().as_str());
+                        }
                     }
                     fields.extend(
                         aggregates
@@ -728,6 +1142,7 @@ impl RelationalPlan {
                     );
                 }
                 Operator::Filter { predicate } => predicate_fields(predicate, &mut fields),
+                Operator::OutputFilter { .. } => {}
                 Operator::Sort { keys } => fields.extend(
                     keys.iter()
                         .filter(|k| k.field.instance != "$output")
@@ -1065,11 +1480,21 @@ fn sql_aggregate(aggregate: &Aggregation, parameters: &mut Vec<Literal>) -> ast:
     else {
         unreachable!()
     };
-    function.name = ast::ObjectName::from(vec![ast::Ident::new(match aggregate.function {
-        AggregateFunction::Count => "count",
-        AggregateFunction::Sum => "semantic_sum_v1",
-        AggregateFunction::Min => "min",
-        AggregateFunction::Max => "max",
+    function.name = ast::ObjectName::from(vec![ast::Ident::new(if aggregate.snapshot.is_some() {
+        "semantic_snapshot_balance_i64_v1"
+    } else if aggregate.exact_distinct {
+        "semantic_exact_count_i64_v1"
+    } else if aggregate.weighted.is_some() {
+        "semantic_weighted_mean_i64_v1"
+    } else if aggregate.mean_state {
+        "semantic_mean_i64_v1"
+    } else {
+        match aggregate.function {
+            AggregateFunction::Count => "count",
+            AggregateFunction::Sum => "semantic_sum_v1",
+            AggregateFunction::Min => "min",
+            AggregateFunction::Max => "max",
+        }
     })]);
     let ast::FunctionArguments::List(arguments) = &mut function.args else {
         unreachable!()
@@ -1084,34 +1509,78 @@ fn sql_aggregate(aggregate: &Aggregation, parameters: &mut Vec<Literal>) -> ast:
             .map(sql_field)
             .unwrap_or_else(|| ast::Expr::Value(ast::Value::Number("1".into(), false).into())),
     ))];
+    if let Some(weighted) = &aggregate.weighted {
+        arguments
+            .args
+            .push(ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                sql_field(&weighted.weight),
+            )));
+    }
+    if let Some(snapshot) = &aggregate.snapshot {
+        for field in [&snapshot.time, &snapshot.tie] {
+            arguments
+                .args
+                .push(ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                    sql_field(field),
+                )));
+        }
+    }
     function.filter = aggregate
         .filter
         .as_ref()
         .map(|p| Box::new(sql_predicate(p, parameters)));
-    ast::Expr::Function(function.clone())
+    let result = ast::Expr::Function(function.clone());
+    if let Some(finalizer) = &aggregate.zero_finalizer {
+        finalizer.sql(result)
+    } else {
+        result
+    }
 }
 fn df_aggregate(aggregate: &Aggregation) -> Expr {
     use datafusion::functions_aggregate::{count, min_max};
-    let function = match aggregate.function {
-        AggregateFunction::Count => count::count_udaf(),
-        AggregateFunction::Sum => semantic_engine::semantic_sum_v1(),
-        AggregateFunction::Min => min_max::min_udaf(),
-        AggregateFunction::Max => min_max::max_udaf(),
+    let function = if aggregate.snapshot.is_some() {
+        semantic_engine::semantic_snapshot_balance_i64_v1()
+    } else if aggregate.exact_distinct {
+        semantic_engine::semantic_exact_count_i64_v1()
+    } else if aggregate.weighted.is_some() {
+        semantic_engine::semantic_weighted_mean_i64_v1()
+    } else if aggregate.mean_state {
+        semantic_engine::semantic_mean_i64_v1()
+    } else {
+        match aggregate.function {
+            AggregateFunction::Count => count::count_udaf(),
+            AggregateFunction::Sum => semantic_engine::semantic_sum_v1(),
+            AggregateFunction::Min => min_max::min_udaf(),
+            AggregateFunction::Max => min_max::max_udaf(),
+        }
     };
-    Expr::AggregateFunction(datafusion::logical_expr::expr::AggregateFunction::new_udf(
-        function,
-        vec![
-            aggregate
-                .field
-                .as_ref()
-                .map(df_field)
-                .unwrap_or_else(|| lit(1i64)),
-        ],
-        aggregate.distinct,
-        aggregate.filter.as_ref().map(|p| Box::new(df_predicate(p))),
-        vec![],
-        None,
-    ))
+    let mut args = vec![
+        aggregate
+            .field
+            .as_ref()
+            .map(df_field)
+            .unwrap_or_else(|| lit(1i64)),
+    ];
+    if let Some(weighted) = &aggregate.weighted {
+        args.push(df_field(&weighted.weight));
+    }
+    if let Some(snapshot) = &aggregate.snapshot {
+        args.extend([df_field(&snapshot.time), df_field(&snapshot.tie)]);
+    }
+    let result =
+        Expr::AggregateFunction(datafusion::logical_expr::expr::AggregateFunction::new_udf(
+            function,
+            args,
+            aggregate.distinct,
+            aggregate.filter.as_ref().map(|p| Box::new(df_predicate(p))),
+            vec![],
+            None,
+        ));
+    if let Some(finalizer) = &aggregate.zero_finalizer {
+        finalizer.direct(result)
+    } else {
+        result
+    }
 }
 
 fn sql_relationship(relationship: &BoundRelationship, parameters: &mut Vec<Literal>) -> ast::Expr {
@@ -1151,7 +1620,7 @@ fn sql_relationship(relationship: &BoundRelationship, parameters: &mut Vec<Liter
         negated: relationship.mode == ExistenceMode::Absent,
     }
 }
-fn related_scan(relationship: &BoundRelationship, extra: Option<&BoundField>) -> String {
+fn related_scan(relationship: &BoundRelationship, extras: &[&BoundField]) -> String {
     fn collect(predicate: &BoundPredicate, fields: &mut BTreeSet<String>) {
         match predicate {
             BoundPredicate::Compare { field, .. } | BoundPredicate::IsNull { field, .. } => {
@@ -1175,7 +1644,7 @@ fn related_scan(relationship: &BoundRelationship, extra: Option<&BoundField>) ->
     if let Some(predicate) = &relationship.predicate {
         collect(predicate, &mut fields);
     }
-    if let Some(field) = extra {
+    for field in extras {
         fields.insert(field.field.name().clone());
     }
     let mut skeleton = Parser::parse_sql(&GenericDialect {}, "SELECT x FROM t AS rhs")
@@ -1229,5 +1698,58 @@ fn sql_ratio(ratio: &RatioExpression) -> ast::Expr {
     .into_iter()
     .map(|expr| ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)))
     .collect();
+    ast::Expr::Function(function.clone())
+}
+
+fn sql_conversion(conversion: &BoundConversion) -> ast::Expr {
+    let mut skeleton = Parser::parse_sql(
+        &GenericDialect {},
+        "SELECT semantic_scale_i64_v1(x,1,1,false)",
+    )
+    .expect("static conversion function");
+    let ast::Statement::Query(query) = &mut skeleton[0] else {
+        unreachable!()
+    };
+    let ast::SetExpr::Select(select) = query.body.as_mut() else {
+        unreachable!()
+    };
+    let ast::SelectItem::UnnamedExpr(ast::Expr::Function(function)) = &mut select.projection[0]
+    else {
+        unreachable!()
+    };
+    let ast::FunctionArguments::List(arguments) = &mut function.args else {
+        unreachable!()
+    };
+    arguments.args = vec![
+        sql_field(&conversion.source),
+        ast::Expr::Value(ast::Value::Number(conversion.numerator.to_string(), false).into()),
+        ast::Expr::Value(ast::Value::Number(conversion.denominator.to_string(), false).into()),
+        ast::Expr::Value(ast::Value::Boolean(conversion.half_even).into()),
+    ]
+    .into_iter()
+    .map(|expr| ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)))
+    .collect();
+    ast::Expr::Function(function.clone())
+}
+
+fn sql_utc_month(bucket: &CalendarBucketExpression) -> ast::Expr {
+    let mut skeleton = Parser::parse_sql(&GenericDialect {}, "SELECT semantic_utc_month_us_v1(x)")
+        .expect("static UTC month function");
+    let ast::Statement::Query(query) = &mut skeleton[0] else {
+        unreachable!()
+    };
+    let ast::SetExpr::Select(select) = query.body.as_mut() else {
+        unreachable!()
+    };
+    let ast::SelectItem::UnnamedExpr(ast::Expr::Function(function)) = &mut select.projection[0]
+    else {
+        unreachable!()
+    };
+    let ast::FunctionArguments::List(arguments) = &mut function.args else {
+        unreachable!()
+    };
+    arguments.args = vec![ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+        sql_field(&bucket.source),
+    ))];
     ast::Expr::Function(function.clone())
 }

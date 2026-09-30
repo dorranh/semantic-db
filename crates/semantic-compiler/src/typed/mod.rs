@@ -3,20 +3,43 @@
 mod bind;
 mod cache;
 pub use cache::{CompilationCacheOptions, CompilationCacheStats, CompilationSession};
+mod calendar_spine;
 mod capture;
 mod context;
+pub(crate) use context::ContextCache;
+mod context_manifest;
+mod dependency_cache;
+pub use context_manifest::{
+    ContextAudit, ContextFact, ContextGap, ContextGapKind, audit_context_manifest,
+};
+pub use dependency_cache::{
+    AnalysisCache, AnalysisCacheError, AnalysisCacheIdentity, AnalysisCacheLimits,
+    AnalysisCacheStats, CandidateKind, DependencySet, LookupDependency,
+};
+mod diagnostic;
+pub use diagnostic::{
+    DiagnosticDetails, DiagnosticKind, DiagnosticStage, DiagnosticTerminal, NextAction,
+    Recoverability, diagnostic_details,
+};
 mod intent;
 pub use capture::{
     CaptureLimits, CaptureRecorder, ModelTranscript, RecordingProvider, TranscriptProvider,
 };
 mod literal;
 mod metrics;
+mod observation;
+mod prepared;
+mod scalar;
 pub use intent::compile_intent;
 pub use metrics::{CompilerMetrics, CompilerMetricsSnapshot, LATENCY_BUCKETS_US};
+pub use observation::{Observation, ObservationOutcome, ObservationQueue, ObservationQueueError};
+pub use prepared::{ParameterDeclaration, PreparedReferenceContext, PreparedRows, PreparedType};
 mod lower;
 mod replay;
 mod temporal;
-pub use replay::{PIPELINE_REVISION, ReplayBundle};
+pub use replay::{
+    PIPELINE_REVISION, ReplayBundle, RuleDecision, StageArtifact, StageReplayOutcome,
+};
 pub use temporal::{Calendar, ContextOrigin, RequestContext, TemporalResolution};
 mod graph;
 pub use graph::{CompiledGraph, GraphReplayBundle, compile_graph, compile_graph_intent};
@@ -41,7 +64,7 @@ use crate::{
     provider::{Message, ModelProvider, Role},
 };
 pub use bind::BoundQuery;
-pub use context::{ContextManifest, SelectionMode};
+pub use context::{ContextDependency, ContextManifest, ContextObject, SelectionMode};
 pub use lower::{RelationalPlan, SqlArtifact};
 
 #[derive(Debug, Clone)]
@@ -79,6 +102,8 @@ pub struct CompileOptions {
     pub max_context_fields: usize,
     pub max_model_output_bytes: usize,
     pub max_sql_bytes: usize,
+    pub max_page_offset: u32,
+    pub max_page_fetch: u32,
     pub selection_mode: SelectionMode,
     pub allowed_relations: Option<std::collections::BTreeSet<String>>,
     pub max_context_relations: usize,
@@ -93,6 +118,9 @@ pub struct CompileOptions {
     pub max_expansions: usize,
     pub max_context_requests: usize,
     pub max_model_calls: usize,
+    /// Per-call byte envelope for the complete messages plus reserved output.
+    /// This is a conservative host byte bound, not a provider token count.
+    pub max_model_call_bytes: usize,
     pub max_total_model_input_bytes: usize,
     pub max_total_model_output_bytes: usize,
     deadline: Option<Instant>,
@@ -113,6 +141,8 @@ impl Default for CompileOptions {
             max_context_fields: 10_000,
             max_model_output_bytes: 64 * 1024,
             max_sql_bytes: 128 * 1024,
+            max_page_offset: 1_000_000,
+            max_page_fetch: 1_000_000,
             selection_mode: SelectionMode::Full,
             allowed_relations: None,
             max_context_relations: 128,
@@ -127,6 +157,7 @@ impl Default for CompileOptions {
             max_expansions: 2,
             max_context_requests: 8,
             max_model_calls: 8,
+            max_model_call_bytes: 512 * 1024,
             max_total_model_input_bytes: 2 * 1024 * 1024,
             max_total_model_output_bytes: 256 * 1024,
             deadline: None,
@@ -152,16 +183,28 @@ impl CompileOptions {
     }
 }
 
-#[derive(Debug, Clone, Serialize, thiserror::Error)]
+#[derive(Clone, Serialize, thiserror::Error)]
 #[error("{code}: {message}")]
 pub struct CompileDiagnostic {
     pub code: String,
     pub message: String,
+    pub details: DiagnosticDetails,
+}
+impl std::fmt::Debug for CompileDiagnostic {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CompileDiagnostic")
+            .field("code", &self.code)
+            .field("stage", &self.details.stage)
+            .field("kind", &self.details.kind)
+            .finish_non_exhaustive()
+    }
 }
 fn diagnostic(code: &str, message: &str) -> CompileDiagnostic {
     CompileDiagnostic {
         code: code.into(),
         message: message.into(),
+        details: diagnostic_details(code),
     }
 }
 
@@ -192,7 +235,7 @@ pub struct StageRecord {
     pub code: String,
     pub elapsed_micros: u128,
 }
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 pub struct CompilationRecord {
     pub compilation_id: String,
     pub compiler_build: &'static str,
@@ -218,6 +261,19 @@ pub struct CompilationRecord {
     pub contexts: Vec<ContextManifest>,
     pub model_attempts: Vec<ModelAttempt>,
     pub token_accounting: TokenAccounting,
+}
+impl std::fmt::Debug for CompilationRecord {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CompilationRecord")
+            .field("version", &self.version)
+            .field("mode", &self.mode)
+            .field("outcome", &self.outcome)
+            .field("stage_count", &self.stages.len())
+            .field("requirement_count", &self.requirement_dispositions.len())
+            .field("definition_count", &self.definition_refs.len())
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Debug, Serialize)]
 pub struct RequirementDisposition {
@@ -310,13 +366,23 @@ impl CompilationRecord {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 pub struct TypedCompilation {
     pub version: u32,
     pub outcome: TypedOutcome,
     pub record: CompilationRecord,
 }
-#[derive(Debug, Serialize)]
+impl std::fmt::Debug for TypedCompilation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TypedCompilation")
+            .field("version", &self.version)
+            .field("outcome", &self.outcome)
+            .field("record", &self.record)
+            .finish()
+    }
+}
+#[derive(Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum TypedOutcome {
     CompiledGraph {
@@ -342,8 +408,30 @@ pub enum TypedOutcome {
         diagnostic: CompileDiagnostic,
     },
 }
+impl std::fmt::Debug for TypedOutcome {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CompiledGraph { .. } => formatter.write_str("CompiledGraph"),
+            Self::Compiled { .. } => formatter.write_str("Compiled"),
+            Self::NeedsClarification { .. } => formatter.write_str("NeedsClarification"),
+            Self::Unsupported { .. } => formatter.write_str("Unsupported"),
+            Self::Unresolved { diagnostic } => formatter
+                .debug_tuple("Unresolved")
+                .field(&diagnostic.code)
+                .finish(),
+            Self::Rejected { diagnostic } => formatter
+                .debug_tuple("Rejected")
+                .field(&diagnostic.code)
+                .finish(),
+            Self::ProviderFailure { diagnostic } => formatter
+                .debug_tuple("ProviderFailure")
+                .field(&diagnostic.code)
+                .finish(),
+        }
+    }
+}
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct CompiledQuery {
     request_evidence: Option<semantic_plan::typed::RequestEvidence>,
     request_context: Option<RequestContext>,
@@ -354,6 +442,16 @@ pub struct CompiledQuery {
     required_relations: BTreeSet<String>,
     restricted_scope: bool,
     sql: SqlArtifact,
+}
+impl std::fmt::Debug for CompiledQuery {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CompiledQuery")
+            .field("has_request_evidence", &self.request_evidence.is_some())
+            .field("relation_count", &self.required_relations.len())
+            .field("output_count", &self.sql.expected_output().len())
+            .finish_non_exhaustive()
+    }
 }
 impl CompiledQuery {
     pub fn intent(&self) -> &RowQuery {
@@ -480,6 +578,22 @@ fn bound_required_relations(bound: &BoundQuery) -> BTreeSet<String> {
             bind::BoundOperation::Lookup { lookup, .. } => {
                 relations.insert(lookup.relationship.right.id.clone());
             }
+            bind::BoundOperation::PathLookup { lookups, .. } => {
+                relations.extend(
+                    lookups
+                        .iter()
+                        .map(|lookup| lookup.relationship.right.id.clone()),
+                );
+            }
+            bind::BoundOperation::Allocate { allocation, .. } => {
+                relations.insert(allocation.bridge.id.clone());
+            }
+            bind::BoundOperation::CurrencyConvert { rate, .. } => {
+                relations.insert(rate.rate_relation.id.clone());
+            }
+            bind::BoundOperation::BusinessCalendar { calendar, .. } => {
+                relations.insert(calendar.calendar_relation.id.clone());
+            }
             _ => {}
         }
     }
@@ -498,6 +612,7 @@ pub async fn compile_rows(
     options: CompileOptions,
 ) -> TypedCompilation {
     let options = options.start();
+    let mut request_guard = options.metrics.as_ref().map(|metrics| metrics.begin());
     let start = Instant::now();
     let mut record = CompilationRecord::new("structured_rows_v1");
     let result = {
@@ -505,7 +620,7 @@ pub async fn compile_rows(
             options.check()?;
             let snapshot = engine.catalog().snapshot();
             record.snapshot_id = Some(snapshot.id().into());
-            compile_bound(engine, &snapshot, query, &options, &mut record)
+            compile_bound(engine, &snapshot, query, &options, &mut record, None)
                 .await
                 .map(|query| TypedOutcome::Compiled {
                     query: Box::new(query),
@@ -517,7 +632,11 @@ pub async fn compile_rows(
             result = tokio::time::timeout(options.timeout, work) => result.unwrap_or_else(|_| Err(diagnostic("deadline", "Compilation deadline exhausted"))),
         }
     };
-    finish(result, record, start, options.metrics.as_deref())
+    let completed = finish(result, record, start, options.metrics.as_deref());
+    if let Some(guard) = &mut request_guard {
+        guard.complete();
+    }
+    completed
 }
 
 fn finish(
@@ -545,24 +664,10 @@ fn finish(
     }
     record.stage("complete", start, &result);
     record.elapsed_micros = start.elapsed().as_micros();
-    let outcome = result.unwrap_or_else(|error| {
-        if error.code.ends_with("limit")
-            || matches!(
-                error.code.as_str(),
-                "deadline"
-                    | "cancelled"
-                    | "unresolved_terms"
-                    | "unresolved_value"
-                    | "unresolved_time_context"
-                    | "unresolved_alternatives"
-            )
-        {
-            TypedOutcome::Unresolved { diagnostic: error }
-        } else if error.code == "provider_failure" {
-            TypedOutcome::ProviderFailure { diagnostic: error }
-        } else {
-            TypedOutcome::Rejected { diagnostic: error }
-        }
+    let outcome = result.unwrap_or_else(|error| match error.details.terminal {
+        DiagnosticTerminal::Unresolved => TypedOutcome::Unresolved { diagnostic: error },
+        DiagnosticTerminal::ProviderFailure => TypedOutcome::ProviderFailure { diagnostic: error },
+        DiagnosticTerminal::Rejected => TypedOutcome::Rejected { diagnostic: error },
     });
     record.outcome = match &outcome {
         TypedOutcome::Compiled { .. } | TypedOutcome::CompiledGraph { .. } => "compiled",
@@ -579,7 +684,13 @@ fn finish(
         "compilation completed"
     );
     if let Some(metrics) = metrics {
-        metrics.observe(&record);
+        let terminal_code = match &outcome {
+            TypedOutcome::Unresolved { diagnostic }
+            | TypedOutcome::Rejected { diagnostic }
+            | TypedOutcome::ProviderFailure { diagnostic } => Some(diagnostic.code.as_str()),
+            _ => None,
+        };
+        metrics.observe(&record, terminal_code);
     }
     TypedCompilation {
         version: 1,
@@ -594,6 +705,7 @@ async fn compile_bound(
     query: RowQuery,
     options: &CompileOptions,
     record: &mut CompilationRecord,
+    session: Option<&CompilationSession<'_>>,
 ) -> Result<CompiledQuery, CompileDiagnostic> {
     // Repairs start a fresh proof record; earlier failed artifacts are not the
     // current proposal's evidence. Stage/call accounting remains cumulative.
@@ -606,10 +718,22 @@ async fn compile_bound(
     record.execution_obligations.clear();
     record.requirement_dispositions.clear();
     let start = Instant::now();
-    let result = preflight(&query, options)
-        .and_then(|_| bind::bind(snapshot, &query, options, &mut record.work));
+    let result = async {
+        preflight(&query, options)?;
+        if let Some(session) = session {
+            session
+                .bind_analysis(snapshot, &query, options, &mut record.work)
+                .await
+        } else {
+            bind::bind(snapshot, &query, options, &mut record.work).map(|bound| (bound, false))
+        }
+    }
+    .await;
     record.stage("bind", start, &result);
-    let bound = result?;
+    let (bound, binding_reused) = result?;
+    if binding_reused {
+        record.cache_status = "binding_hit_revalidated";
+    }
     if let Some(evidence) = &options.request_evidence {
         record.request_digest = Some(semantic_catalog::canonical_digest(&serde_json::json!(
             evidence.original_request
@@ -782,6 +906,7 @@ impl<P: ModelProvider> Compiler<P> {
         options: CompileOptions,
     ) -> TypedCompilation {
         let options = options.start();
+        let mut request_guard = options.metrics.as_ref().map(|metrics| metrics.begin());
         let start = Instant::now();
         let mut record = CompilationRecord::new(match options.selection_mode {
             SelectionMode::Full => "model_rows_v1_full_context",
@@ -796,7 +921,11 @@ impl<P: ModelProvider> Compiler<P> {
                 result = tokio::time::timeout(options.timeout, work) => result.unwrap_or_else(|_| Err(diagnostic("deadline", "Compilation deadline exhausted"))),
             }
         };
-        finish(result, record, start, options.metrics.as_deref())
+        let completed = finish(result, record, start, options.metrics.as_deref());
+        if let Some(guard) = &mut request_guard {
+            guard.complete();
+        }
+        completed
     }
 
     async fn interpret_rows(
@@ -841,14 +970,21 @@ impl<P: ModelProvider> Compiler<P> {
             });
         }
         let start = Instant::now();
-        let initial = context::ContextState::initial(&snapshot, request, options, &mut record.work)
-            .and_then(|state| {
-                state
-                    .render(&snapshot, request, options, &mut record.work)
-                    .map(|bundle| (state, bundle))
-            });
+        let initial = self
+            .context_cache
+            .initial(&snapshot, request, options, &mut record.work)
+            .await;
         record.stage("context", start, &initial);
-        let (mut state, (payload, manifest)) = initial?;
+        let (mut state, (payload, manifest), context_reuse) = initial?;
+        match context_reuse {
+            context::ContextReuse::SameSnapshot => {
+                record.cache_status = "context_hit_same_snapshot";
+            }
+            context::ContextReuse::SelectionRerendered => {
+                record.cache_status = "selection_hit_re_rendered";
+            }
+            context::ContextReuse::Miss => {}
+        }
         record.contexts.push(manifest);
         record.prompt_digest = Some(semantic_catalog::canonical_digest(&serde_json::json!(
             include_str!("prompt.txt")
@@ -873,6 +1009,16 @@ impl<P: ModelProvider> Compiler<P> {
                 ));
             }
             let input_bytes = messages.iter().map(|m| m.content.len()).sum::<usize>();
+            if input_bytes
+                > options
+                    .max_model_call_bytes
+                    .saturating_sub(options.max_model_output_bytes)
+            {
+                return Err(diagnostic(
+                    "model_context_limit",
+                    "Model-call messages and reserved output exceed the per-call byte envelope",
+                ));
+            }
             if input_bytes
                 > options
                     .max_total_model_input_bytes
@@ -1049,7 +1195,7 @@ impl<P: ModelProvider> Compiler<P> {
                             }]);
                             Ok(None)
                         } else {
-                            compile_bound(engine, &snapshot, query, &attempt_options, record)
+                            compile_bound(engine, &snapshot, query, &attempt_options, record, None)
                                 .await
                                 .map(|query| {
                                     Some(TypedOutcome::Compiled {
@@ -1183,6 +1329,46 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: Requi
                 relation: lookup.relationship.right.clone(),
                 status: "pending_each_execution",
             });
+        } else if let bind::BoundOperation::PathLookup { lookups, .. } = &requirement.operation {
+            for lookup in lookups {
+                record
+                    .definition_refs
+                    .push(lookup.relationship.right.clone());
+                record.execution_obligations.push(ExecutionObligation {
+                    rule: lookup.obligation,
+                    relationship: lookup.relationship.definition.clone(),
+                    relation: lookup.relationship.right.clone(),
+                    status: "pending_each_execution",
+                });
+            }
+        } else if let bind::BoundOperation::Allocate { allocation, .. } = &requirement.operation {
+            record.definition_refs.push(allocation.bridge.clone());
+            record.execution_obligations.push(ExecutionObligation {
+                rule: allocation.obligation,
+                relationship: allocation.definition.clone(),
+                relation: allocation.bridge.clone(),
+                status: "pending_each_execution",
+            });
+        } else if let bind::BoundOperation::CurrencyConvert { rate, .. } = &requirement.operation {
+            record.definition_refs.push(rate.rate_relation.clone());
+            record.execution_obligations.push(ExecutionObligation {
+                rule: rate.obligation,
+                relationship: rate.definition.clone(),
+                relation: rate.rate_relation.clone(),
+                status: "pending_each_execution",
+            });
+        } else if let bind::BoundOperation::BusinessCalendar { calendar, .. } =
+            &requirement.operation
+        {
+            record
+                .definition_refs
+                .push(calendar.calendar_relation.clone());
+            record.execution_obligations.push(ExecutionObligation {
+                rule: calendar.obligation,
+                relationship: calendar.definition.clone(),
+                relation: calendar.calendar_relation.clone(),
+                status: "pending_each_execution",
+            });
         }
     }
     record
@@ -1207,7 +1393,29 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: Requi
             result: "bound",
             rule: match &requirement.operation {
                 bind::BoundOperation::Lookup { .. } => "lookup.same_query_uniqueness_obligation.v1",
+                bind::BoundOperation::PathLookup { lookups, .. }
+                    if lookups.iter().any(|lookup| lookup.as_of.is_some()) =>
+                {
+                    "path_lookup.as_of_half_open_same_query_unique.v1"
+                }
+                bind::BoundOperation::PathLookup { .. } => {
+                    "path_lookup.two_hop_same_query_unique.v1"
+                }
+                bind::BoundOperation::Allocate { .. } => {
+                    "allocation.same_query_population_conservation.v1"
+                }
+                bind::BoundOperation::CurrencyConvert { .. } => {
+                    "currency_rate.same_query_exactly_one.v1"
+                }
+                bind::BoundOperation::BusinessCalendar { .. } => {
+                    "business_calendar.same_query_exactly_one.v1"
+                }
+                bind::BoundOperation::Convert { .. } => "conversion.authored_exact_rational.v1",
                 bind::BoundOperation::CalendarFilter { .. } => "calendar.half_open_local_period.v1",
+                bind::BoundOperation::CalendarGroup { .. } => "calendar.observed_utc_month.v1",
+                bind::BoundOperation::CalendarFill { .. } => {
+                    "calendar.explicit_utc_month_count_zero.v1"
+                }
                 bind::BoundOperation::Window { .. } => "window.explicit_peer_frame.v1",
                 bind::BoundOperation::Ratio { .. } => "ratio.integer_decimal18_truncate.v1",
                 bind::BoundOperation::Project { .. } => "project.exact_field.v1",
@@ -1220,6 +1428,7 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: Requi
                 }
                 bind::BoundOperation::Order { .. } => "sort.explicit_null_order.v1",
                 bind::BoundOperation::Limit { .. } => "fetch.after_sort.v1",
+                bind::BoundOperation::Page { .. } => "page.explicit_offset_fetch.v1",
             },
         })
         .collect();

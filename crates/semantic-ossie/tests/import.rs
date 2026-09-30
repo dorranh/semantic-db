@@ -302,7 +302,10 @@ fn rejects_unsupported_semantics_and_binding_errors_with_paths() {
             code,
         );
     }
-    for key in ["metrics", "custom_extensions"] {
+    for (key, expected_code) in [
+        ("metrics", "invalid_extension"),
+        ("custom_extensions", "unsupported_feature"),
+    ] {
         let mut input = simple();
         input["semantic_model"][0][key] = match key {
             "metrics" => {
@@ -314,7 +317,7 @@ fn rejects_unsupported_semantics_and_binding_errors_with_paths() {
             OssieDocument::parse(&input.to_string())
                 .unwrap()
                 .load(None, &bindings()),
-            "unsupported_feature",
+            expected_code,
         );
     }
     let mut input = simple();
@@ -531,15 +534,10 @@ async fn foreign_key_profiles_retain_role_origins_and_never_treat_cardinality_as
         relationship.ai_context.as_ref().unwrap().synonyms,
         ["related identity"]
     );
-    let semantic_catalog::FactResolution::Known { contributors, .. } = &relationship.cardinality
-    else {
-        panic!("authored fact")
-    };
-    assert_eq!(
-        contributors[0].authority,
-        semantic_catalog::Authority::Authored
-    );
-    assert!(contributors[0].evidence.is_empty());
+    assert!(matches!(
+        &relationship.cardinality,
+        semantic_catalog::FactResolution::Unknown
+    ));
     assert!(
         imported
             .warnings

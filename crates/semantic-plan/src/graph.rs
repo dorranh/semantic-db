@@ -1,6 +1,7 @@
 //! Versioned, untrusted relational composition proposals. Each leaf re-enters
 //! ordinary semantic binding; graph edges name output slots, never SQL aliases.
-use crate::typed::{Direction, NullOrder, RowQuery};
+use crate::meaning::Unit;
+use crate::typed::{Direction, NullOrder, OutputPredicate, RowQuery, ZeroDivision};
 use serde::{Deserialize, Serialize};
 
 /// Evidence is separate from the legacy graph proposal: a structured graph can
@@ -100,6 +101,106 @@ pub enum GraphOperation {
         keys: Vec<SetColumn>,
         outputs: Vec<CompositionOutput>,
     },
+    /// Project selected upstream slots and derive exact ratios after composition.
+    Calculate {
+        input: String,
+        passthrough: Vec<GraphProjection>,
+        ratios: Vec<GraphRatio>,
+    },
+    /// Project upstream slots and select exact, same-typed literals by a
+    /// checked output predicate. SQL UNKNOWN takes the ELSE branch.
+    Conditional {
+        input: String,
+        passthrough: Vec<GraphProjection>,
+        outputs: Vec<GraphConditional>,
+    },
+    /// Widen exact Int64 slots to Decimal128(38,0), keeping nulls and meaning.
+    Cast {
+        input: String,
+        passthrough: Vec<GraphProjection>,
+        casts: Vec<GraphCast>,
+    },
+    /// Emit typed Boolean null checks over source Int64 output slots.
+    NullTest {
+        input: String,
+        passthrough: Vec<GraphProjection>,
+        tests: Vec<GraphNullTest>,
+    },
+    /// Compare two scoped Int64 slots and emit a nullable Boolean value.
+    CompareSlots {
+        input: String,
+        passthrough: Vec<GraphProjection>,
+        comparisons: Vec<GraphSlotComparison>,
+    },
+    /// Filter already calculated output slots before final ordering and limit.
+    Filter {
+        input: String,
+        predicate: OutputPredicate,
+    },
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphProjection {
+    pub id: String,
+    pub slot: String,
+    pub alias: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphRatio {
+    pub id: String,
+    pub numerator: String,
+    pub denominator: String,
+    /// A requested result unit must match the authored operands' checked quotient.
+    #[serde(default)]
+    pub required_unit: Option<Unit>,
+    pub zero: ZeroDivision,
+    pub alias: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphConditional {
+    pub id: String,
+    pub alias: String,
+    pub when: OutputPredicate,
+    pub then_value: crate::typed::Literal,
+    pub else_value: crate::typed::Literal,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphCast {
+    pub id: String,
+    pub slot: String,
+    pub target: GraphCastTarget,
+    pub alias: String,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GraphCastTarget {
+    #[serde(rename = "decimal128_38_0")]
+    Decimal128Scale0,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphNullTest {
+    pub id: String,
+    pub slot: String,
+    pub operator: GraphNullOperator,
+    pub alias: String,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GraphNullOperator {
+    IsNull,
+    IsNotNull,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphSlotComparison {
+    pub id: String,
+    pub left: String,
+    pub right: String,
+    pub operator: crate::typed::Comparison,
+    pub alias: String,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

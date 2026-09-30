@@ -44,8 +44,8 @@ async fn compiler_functions_stay_local_while_safe_aggregate_is_federated() {
     use async_trait::async_trait;
     use datafusion::{
         arrow::{
-            array::Int64Array,
-            datatypes::{DataType, Field, Schema, SchemaRef},
+            array::{Int64Array, TimestampMicrosecondArray},
+            datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
             record_batch::RecordBatch,
         },
         common::TableReference,
@@ -104,12 +104,20 @@ async fn compiler_functions_stay_local_while_safe_aggregate_is_federated() {
     let schema = Arc::new(Schema::new(vec![
         Field::new("n", DataType::Int64, false),
         Field::new("d", DataType::Int64, false),
+        Field::new(
+            "observed_at",
+            DataType::Timestamp(TimeUnit::Microsecond, Some("UTC".into())),
+            false,
+        ),
+        Field::new("tie_key", DataType::Int64, false),
     ]));
     let batch = RecordBatch::try_new(
         schema.clone(),
         vec![
             Arc::new(Int64Array::from(vec![1, 1])),
             Arc::new(Int64Array::from(vec![3, 3])),
+            Arc::new(TimestampMicrosecondArray::from(vec![0, 1]).with_timezone("UTC")),
+            Arc::new(Int64Array::from(vec![1, 2])),
         ],
     )
     .unwrap();
@@ -208,6 +216,72 @@ async fn compiler_functions_stay_local_while_safe_aggregate_is_federated() {
     assert!(
         !sql.contains("semantic_sum_v1"),
         "checked window aggregate shipped remotely: {sql}"
+    );
+
+    // Newly enabled compiler operations also retain their local, versioned
+    // semantics when their input comes from a federated table.
+    for (query, expected, function) in [
+        (
+            "SELECT semantic_scale_i64_v1(SUM(n),1::bigint,2::bigint,false) FROM amounts",
+            ScalarValue::Decimal128(Some(1_000_000_000_000_000_000), 38, 18),
+            "semantic_scale_i64_v1",
+        ),
+        (
+            "SELECT semantic_weighted_mean_i64_v1(n,d) FROM amounts",
+            ScalarValue::Decimal128(Some(1_000_000_000_000_000_000), 38, 18),
+            "semantic_weighted_mean_i64_v1",
+        ),
+        (
+            "SELECT semantic_exact_count_i64_v1(n) FROM amounts",
+            ScalarValue::Int64(Some(1)),
+            "semantic_exact_count_i64_v1",
+        ),
+        (
+            "SELECT semantic_snapshot_balance_i64_v1(n,observed_at,tie_key) FROM amounts",
+            ScalarValue::Int64(Some(1)),
+            "semantic_snapshot_balance_i64_v1",
+        ),
+    ] {
+        queries.lock().unwrap().clear();
+        let result = engine.query(query).await.unwrap();
+        assert_eq!(
+            ScalarValue::try_from_array(result[0].column(0), 0).unwrap(),
+            expected,
+            "{query}"
+        );
+        let remote_sql = queries.lock().unwrap().join("\n").to_lowercase();
+        // A local-only aggregate may use the adaptor's local fallback table;
+        // the scalar conversion can still push its ordinary SUM input down.
+        if function == "semantic_scale_i64_v1" {
+            assert!(!remote_sql.is_empty(), "no remote read for {query}");
+        }
+        assert!(
+            !remote_sql.contains(function),
+            "local contract shipped remotely: {remote_sql}"
+        );
+    }
+
+    queries.lock().unwrap().clear();
+    let dates = engine
+        .query("SELECT semantic_local_date_us_v1(observed_at,'Europe/Zurich') FROM amounts ORDER BY observed_at")
+        .await
+        .unwrap();
+    let actual = dates
+        .iter()
+        .flat_map(|batch| {
+            (0..batch.num_rows())
+                .map(|row| ScalarValue::try_from_array(batch.column(0), row).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(actual, vec![ScalarValue::Date32(Some(0)); 2]);
+    assert!(
+        !queries
+            .lock()
+            .unwrap()
+            .join("\n")
+            .to_lowercase()
+            .contains("semantic_local_date_us_v1"),
+        "local calendar function shipped remotely"
     );
 }
 

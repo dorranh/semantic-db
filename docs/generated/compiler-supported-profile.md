@@ -1,9 +1,12 @@
 # Semantic compiler supported profile
 
-Status: implemented MVP profile as of 2026-09-29. This document describes the
-contracts enforced by the compiler and its offline tests; it is not a claim of
-general SQL or natural-language completeness. The compatibility SQL compiler is
-a separate mode.
+Status: implemented MVP profile at its release checkpoint. The compiler has
+since gained additional bounded profiles; their current implementation and
+verification status are tracked in the
+[full requirement audit](compiler-full-requirement-audit.md). This document
+describes the earlier MVP boundary and its offline tests, not a claim of general
+SQL or natural-language completeness. The compatibility SQL compiler is a
+separate mode.
 
 The typed compiler uses the strict acceptance profile. A query is accepted only
 when its references, exact physical types, governed definitions, output scope,

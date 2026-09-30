@@ -1,8 +1,13 @@
-use std::{collections::BTreeSet, fmt, sync::OnceLock};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    sync::{Arc, OnceLock},
+};
 
 use datafusion::{common::Column, logical_expr::Expr, prelude::SessionContext};
 use semantic_catalog::{
-    AiContext, DataType, FieldSemantics, Relation, RelationSemantics, SemanticOrigin,
+    AiContext, DataType, FieldSemantics, Relation, RelationKind, RelationSemantics, SemanticOrigin,
+    ViewOutputLineage,
 };
 use semantic_engine::Engine;
 use serde::Deserialize;
@@ -11,6 +16,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{ImportedCatalog, SourceBindings};
+
+#[path = "executable_profile.rs"]
+mod executable_profile;
 
 pub const SPEC_VERSION: &str = "0.2.0.dev0";
 pub const SCHEMA_COMMIT: &str = "28365cd638f3833765c5b940ada5b8cbc65f1c42";
@@ -246,14 +254,6 @@ impl OssieDocument {
         let path = format!("/semantic_model/{index}");
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
-        unsupported(&model.metrics, "metrics", &path, &mut errors);
-
-        unsupported(
-            &model.custom_extensions,
-            "custom_extensions",
-            &path,
-            &mut errors,
-        );
         let model_ai = ai_context(
             &model.ai_context,
             &format!("{path}/ai_context"),
@@ -335,12 +335,25 @@ impl OssieDocument {
                         "Opaque has no executable physical-type mapping",
                     );
                 }
-                unsupported(
+                let meanings = executable_profile::field_meanings(
                     &field.custom_extensions,
-                    "custom_extensions",
                     &fp,
+                    field.datatype.as_deref(),
                     &mut errors,
                 );
+                let mut source_refs = self
+                    .normalized
+                    .pointer(&fp)
+                    .map(|node| node.origins.clone())
+                    .unwrap_or_default();
+                for index in 0..field.custom_extensions.len() {
+                    source_refs.extend(
+                        self.normalized
+                            .pointer(&format!("{fp}/custom_extensions/{index}"))
+                            .map(|node| node.origins.clone())
+                            .unwrap_or_default(),
+                    );
+                }
                 let mut dialects = BTreeSet::new();
                 for dialect in &field.expression.dialects {
                     if !dialects.insert(&dialect.dialect) {
@@ -383,13 +396,14 @@ impl OssieDocument {
                 semantics.fields.insert(
                     field.name.clone(),
                     FieldSemantics {
-                        source_refs: self
-                            .normalized
-                            .pointer(&fp)
-                            .map(|n| n.origins.clone())
-                            .unwrap_or_default(),
+                        source_refs,
                         description: field.description.clone(),
                         logical_type: field.datatype.clone(),
+                        unit: meanings.unit,
+                        comparison_profile: meanings.comparison_profile,
+                        enum_domain: None,
+                        reference_system: meanings.reference_system,
+                        calendar_reference: meanings.calendar_reference,
                         label: field.label.clone(),
                         is_time: field.dimension.as_ref().and_then(|d| d.is_time),
                         ai_context: ai_context(
@@ -480,12 +494,14 @@ impl OssieDocument {
                     );
                 }
             }
-            if relationship.from_columns.len() != relationship.to_columns.len() {
+            if relationship.from_columns.is_empty()
+                || relationship.from_columns.len() != relationship.to_columns.len()
+            {
                 issue(
                     &mut errors,
                     "relationship_keys",
                     &rp,
-                    "foreign key columns must pair one-to-one",
+                    "foreign key columns must contain at least one one-to-one pair",
                 );
                 continue;
             }
@@ -499,7 +515,6 @@ impl OssieDocument {
                 .iter_mut()
                 .find(|(dataset, _, _)| dataset.name == relationship.from)
             {
-                let cardinality = semantic_catalog::Cardinality::ManyToOne;
                 semantics.relationships.insert(
                     relationship.name.clone(),
                     semantic_catalog::RelationshipDefinition {
@@ -519,17 +534,7 @@ impl OssieDocument {
                                 },
                             )
                             .collect(),
-                        cardinality: semantic_catalog::FactResolution::Known {
-                            value: cardinality.clone(),
-                            contributors: vec![semantic_catalog::Fact {
-                                id: format!("{id}/cardinality"),
-                                scope: id,
-                                value: cardinality,
-                                authority: semantic_catalog::Authority::Authored,
-                                origins: source_refs.clone(),
-                                evidence: vec![],
-                            }],
-                        },
+                        cardinality: semantic_catalog::FactResolution::Unknown,
                         source_refs,
                     },
                 );
@@ -537,16 +542,18 @@ impl OssieDocument {
                     &mut warnings,
                     "relationship_profile",
                     &rp,
-                    "Ossie foreign-key profile uses exact key equality (null keys do not match) and the relationship name as its role; cardinality remains an unenforced authored declaration",
+                    "Ossie foreign-key profile uses exact key equality (null keys do not match) and the relationship name as its role; cardinality is unknown until enforceable evidence is supplied",
                 );
             }
         }
+        let views = executable_profile::apply(self, &model, &path, &mut definitions, &mut errors);
         if !errors.is_empty() {
             return Err(ImportError::Diagnostics(errors));
         }
         Ok(PreparedModel {
             name: model.name,
             definitions,
+            views,
             warnings,
         })
     }
@@ -558,11 +565,74 @@ impl OssieDocument {
     ) -> Result<ImportedCatalog, ImportError> {
         let PreparedModel {
             definitions,
+            views,
             warnings,
             ..
         } = prepared;
         let mut errors = Vec::new();
+        // Check the bound physical key types before registering any relation. Authored
+        // logical datatypes can be broader than the actual Arrow representation.
+        for (left, path, semantics) in &definitions {
+            for relationship in semantics.relationships.values() {
+                let Some((right, _, right_semantics)) = definitions
+                    .iter()
+                    .find(|(dataset, _, _)| dataset.name == relationship.right_relation)
+                else {
+                    continue; // inspect already reports invalid endpoints
+                };
+                let left_schema = bindings.providers[&left.source].schema();
+                let right_schema = bindings.providers[&right.source].schema();
+                for key in &relationship.key_pairs {
+                    let left_type = left
+                        .fields
+                        .iter()
+                        .find(|field| field.name == key.left_field)
+                        .and_then(source_column)
+                        .and_then(|column| left_schema.field_with_name(&column).ok());
+                    let right_type = right
+                        .fields
+                        .iter()
+                        .find(|field| field.name == key.right_field)
+                        .and_then(source_column)
+                        .and_then(|column| right_schema.field_with_name(&column).ok());
+                    if let (Some(left_type), Some(right_type)) = (left_type, right_type)
+                        && left_type.data_type() != right_type.data_type()
+                    {
+                        issue(
+                            &mut errors,
+                            "relationship_key_type",
+                            path,
+                            "relationship key pairs must have identical physical types",
+                        );
+                    }
+                    let left_system = semantics
+                        .fields
+                        .get(&key.left_field)
+                        .and_then(|field| field.reference_system.as_ref());
+                    let right_system = right_semantics
+                        .fields
+                        .get(&key.right_field)
+                        .and_then(|field| field.reference_system.as_ref());
+                    if !semantic_catalog::reference_systems_compatible(left_system, right_system) {
+                        issue(
+                            &mut errors,
+                            "relationship_reference_system",
+                            relationship
+                                .source_refs
+                                .first()
+                                .map_or(path.as_str(), |source| source.path.as_str()),
+                            "relationship keys have different or incomplete authored reference systems",
+                        );
+                    }
+                }
+            }
+        }
+        if !errors.is_empty() {
+            return Err(ImportError::Diagnostics(errors));
+        }
         let mut engine = Engine::new();
+        let mut registered: BTreeMap<String, Arc<dyn semantic_engine::TableProvider>> =
+            BTreeMap::new();
         for (dataset, path, semantics) in definitions {
             let provider = bindings.providers[&dataset.source].clone();
             let schema = provider.schema();
@@ -592,6 +662,26 @@ impl OssieDocument {
                         ),
                     ),
                     Ok(physical) => {
+                        if semantics
+                            .fields
+                            .get(&field.name)
+                            .and_then(|meaning| meaning.unit.as_ref())
+                            .is_some()
+                            && !matches!(
+                                physical.data_type(),
+                                DataType::Int16
+                                    | DataType::Int32
+                                    | DataType::Int64
+                                    | DataType::Decimal128(_, _)
+                            )
+                        {
+                            issue(
+                                &mut errors,
+                                "invalid_field_unit",
+                                &p,
+                                "field unit requires exact supported numeric physical type",
+                            );
+                        }
                         if let Some(logical) = &field.datatype
                             && !compatible(logical, physical.data_type())
                         {
@@ -605,6 +695,55 @@ impl OssieDocument {
                                 ),
                             );
                         }
+                    }
+                }
+            }
+            for conversion in semantics.conversions.values() {
+                let field = dataset
+                    .fields
+                    .iter()
+                    .find(|field| field.name == conversion.field.as_str())
+                    .expect("validated conversion field");
+                let column = source_column(field).expect("validated conversion expression");
+                if schema
+                    .field_with_name(&column)
+                    .is_ok_and(|physical| physical.data_type() != &DataType::Int64)
+                {
+                    issue(
+                        &mut errors,
+                        "invalid_conversion_contract",
+                        conversion
+                            .source_refs
+                            .first()
+                            .map_or(path.as_str(), |source| source.path.as_str()),
+                        "exact conversion requires an Int64 physical source field",
+                    );
+                }
+            }
+            if let Some(identity) = &semantics.entity_identity {
+                let extension_path = identity
+                    .source_refs
+                    .first()
+                    .map_or(path.as_str(), |reference| reference.path.as_str());
+                for key in &identity.source_grain.keys {
+                    let Some(field) = dataset
+                        .fields
+                        .iter()
+                        .find(|field| field.name == key.field.as_str())
+                    else {
+                        continue; // inspect already rejected undeclared entity keys
+                    };
+                    let column = source_column(field).expect("validated entity key expression");
+                    if schema
+                        .field_with_name(&column)
+                        .is_ok_and(|physical| physical.is_nullable())
+                    {
+                        issue(
+                            &mut errors,
+                            "entity_key_nullable",
+                            extension_path,
+                            "an authored entity key requires a nonnull physical field",
+                        );
                     }
                 }
             }
@@ -633,7 +772,84 @@ impl OssieDocument {
             let mut relation = Relation::base(&dataset.name, projected.schema(), &dataset.source);
             relation.description = dataset.description.clone();
             relation.semantics = Some(semantics);
-            engine.register_table(relation, projected)?;
+            engine.register_table(relation, projected.clone())?;
+            registered.insert(dataset.name, projected);
+        }
+        for view in views {
+            let source = registered.get(&view.source_dataset).ok_or_else(|| {
+                ImportError::diagnostic(
+                    "invalid_view_lineage",
+                    &view.path,
+                    "view source was not registered earlier in this import",
+                )
+            })?;
+            let source_reference = engine
+                .catalog()
+                .snapshot()
+                .relation(&view.source_dataset)
+                .ok_or_else(|| {
+                    ImportError::diagnostic(
+                        "invalid_view_lineage",
+                        &view.path,
+                        "view source is absent from the catalog snapshot",
+                    )
+                })?
+                .reference()
+                .clone();
+            if view
+                .expected_source_revision
+                .as_ref()
+                .is_some_and(|expected| expected != &source_reference.revision)
+            {
+                return Err(ImportError::diagnostic(
+                    "invalid_view_lineage",
+                    &view.path,
+                    "authored expected source revision is stale",
+                ));
+            }
+            let mut projection = Vec::with_capacity(view.columns.len());
+            for (output, input) in &view.columns {
+                if source.schema().field_with_name(input).is_err() {
+                    return Err(ImportError::diagnostic(
+                        "invalid_view_lineage",
+                        &view.path,
+                        "view lineage references an absent source field",
+                    ));
+                }
+                projection.push(Expr::Column(Column::new_unqualified(input)).alias(output));
+            }
+            let projected = SessionContext::new()
+                .read_table(source.clone())?
+                .select(projection)?
+                .into_view();
+            let lineage = ViewOutputLineage {
+                source: source_reference,
+                columns: view.columns,
+                source_refs: view.source_refs.clone(),
+            };
+            let sql = lineage.canonical_sql(&projected.schema()).ok_or_else(|| {
+                ImportError::diagnostic(
+                    "invalid_view_lineage",
+                    &view.path,
+                    "view lineage cannot form a canonical direct projection",
+                )
+            })?;
+            let mut relation = Relation::view(&view.name, projected.schema(), &sql);
+            relation.kind = RelationKind::View {
+                sql,
+                dependencies: vec![view.source_dataset],
+            };
+            relation.semantics = Some(RelationSemantics {
+                view_lineage: Some(lineage),
+                source_refs: view.source_refs,
+                capability: Some(semantic_catalog::Capability::Executable {
+                    profile: "ossie/view-direct-projection".into(),
+                    revision: "1".into(),
+                }),
+                ..Default::default()
+            });
+            engine.register_view_projection(relation, projected.clone())?;
+            registered.insert(view.name, projected);
         }
         engine
             .catalog()
@@ -671,6 +887,7 @@ pub struct FieldRequirement {
 struct PreparedModel {
     name: String,
     definitions: Vec<(Dataset, String, RelationSemantics)>,
+    views: Vec<executable_profile::PreparedView>,
     warnings: Vec<Diagnostic>,
 }
 

@@ -146,6 +146,27 @@ async fn unhydrated_proposals_expand_and_reconsider_before_binding() {
     assert!(!calls[0][1].content.contains("f900"));
     assert!(calls[1][1].content.contains("f900"));
     assert!(calls[1].last().unwrap().content.contains("Reconsider"));
+
+    let first_call_bytes = calls[0]
+        .iter()
+        .map(|message| message.content.len())
+        .sum::<usize>();
+    let second_call_bytes = calls[1]
+        .iter()
+        .map(|message| message.content.len())
+        .sum::<usize>();
+    assert!(second_call_bytes > first_call_bytes);
+    drop(calls);
+    let (compiler, limited_calls) =
+        make_compiler(vec![proposal("wide", "f900"), proposal("wide", "f900")]);
+    let mut options = retrieved();
+    options.max_model_call_bytes = first_call_bytes + options.max_model_output_bytes;
+    let result = compiler.compile_typed(&engine, "wide", options).await;
+    assert!(matches!(
+        result.outcome,
+        TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "context_limit"
+    ));
+    assert_eq!(limited_calls.lock().unwrap().len(), 1);
 }
 #[tokio::test]
 async fn explicit_search_and_inventory_expansion_share_one_budget() {
@@ -243,4 +264,81 @@ async fn auto_falls_back_to_retrieved_and_model_input_budget_includes_protocol()
         matches!(compiler.compile_typed(&engine,"wide",options).await.outcome,TypedOutcome::Unresolved {ref diagnostic} if diagnostic.code=="model_input_limit")
     );
     assert!(calls.lock().unwrap().is_empty());
+
+    let (compiler, calls) = make_compiler(vec![]);
+    let mut options = retrieved();
+    options.max_model_call_bytes = options.max_model_output_bytes;
+    assert!(matches!(
+        compiler.compile_typed(&engine, "wide", options).await.outcome,
+        TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "context_limit"
+    ));
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn auto_uses_retrieved_context_when_full_catalog_exceeds_model_call_envelope() {
+    let engine = fixture();
+    let (compiler, calls) = make_compiler(vec![proposal("wide", "rare_signal")]);
+    let result = compiler
+        .compile_typed(&engine, "rare_signal", retrieved())
+        .await;
+    assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
+    let retrieved_input_bytes = calls.lock().unwrap()[0]
+        .iter()
+        .map(|message| message.content.len())
+        .sum::<usize>();
+
+    let (compiler, calls) = make_compiler(vec![proposal("wide", "rare_signal")]);
+    let mut options = retrieved();
+    options.selection_mode = SelectionMode::Auto;
+    options.max_context_bytes = 1024 * 1024;
+    options.max_model_call_bytes = retrieved_input_bytes + options.max_model_output_bytes;
+    let result = compiler
+        .compile_typed(&engine, "rare_signal", options)
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::Compiled { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert_eq!(
+        result.record.contexts[0].selection_mode,
+        SelectionMode::Retrieved
+    );
+    assert_eq!(calls.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn repair_conversation_rechecks_the_complete_model_call_envelope() {
+    let engine = fixture();
+    let replies = vec![json!({}), proposal("wide", "rare_signal")];
+    let (compiler, calls) = make_compiler(replies.clone());
+    let result = compiler
+        .compile_typed(&engine, "rare_signal", retrieved())
+        .await;
+    assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    let first_call_bytes = calls[0]
+        .iter()
+        .map(|message| message.content.len())
+        .sum::<usize>();
+    let second_call_bytes = calls[1]
+        .iter()
+        .map(|message| message.content.len())
+        .sum::<usize>();
+    assert!(second_call_bytes > first_call_bytes);
+    drop(calls);
+
+    let (compiler, limited_calls) = make_compiler(replies);
+    let mut options = retrieved();
+    options.max_model_call_bytes = first_call_bytes + options.max_model_output_bytes;
+    let result = compiler
+        .compile_typed(&engine, "rare_signal", options)
+        .await;
+    assert!(matches!(
+        result.outcome,
+        TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "model_context_limit"
+    ));
+    assert_eq!(limited_calls.lock().unwrap().len(), 1);
 }

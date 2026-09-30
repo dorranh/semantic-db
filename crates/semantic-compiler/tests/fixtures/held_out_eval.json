@@ -1,0 +1,95 @@
+{
+  "profile": "held-out-evaluation-v1",
+  "claim": "Independent expected outcomes and rows. Scripted runs measure compiler orchestration, not live-model interpretation accuracy.",
+  "cases": [
+    {
+      "id": "active_orders",
+      "request": "List active orders",
+      "competing_alias": true,
+      "policy": false,
+      "required_facts": [{"relation": "orders", "kind": "concepts", "id": "active"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"orders","instance":"o"},"requirements":[{"id":"active","source_text":"active","operation":{"kind":"concept_filter","concept":"active"}},{"id":"id","source_text":"order IDs","operation":{"kind":"project","field":{"instance":"o","field":"id"},"alias":"id"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"compiled","rows":[["1"],["3"]]},"retrieved":{"outcome":"compiled","rows":[["1"],["3"]]}}
+    },
+    {
+      "id": "competing_alias_rejects",
+      "request": "List open orders",
+      "competing_alias": true,
+      "policy": false,
+      "required_facts": [{"relation": "orders", "kind": "concepts", "id": "active"},{"relation": "orders", "kind": "concepts", "id": "pending"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"orders","instance":"o"},"requirements":[{"id":"open","source_text":"open","operation":{"kind":"concept_filter","concept":"open"}},{"id":"id","source_text":"order IDs","operation":{"kind":"project","field":{"instance":"o","field":"id"},"alias":"id"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"rejected","diagnostic":"ambiguous_concept"},"retrieved":{"outcome":"rejected","diagnostic":"ambiguous_concept"}}
+    },
+    {
+      "id": "governed_visibility",
+      "request": "List all order IDs",
+      "competing_alias": false,
+      "policy": true,
+      "required_facts": [{"relation": "orders", "kind": "row_policy", "id": "0"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"orders","instance":"o"},"requirements":[{"id":"id","source_text":"all order IDs","operation":{"kind":"project","field":{"instance":"o","field":"id"},"alias":"id"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"compiled","rows":[["1"],["3"]]},"retrieved":{"outcome":"compiled","rows":[["1"],["3"]]}}
+    },
+    {
+      "id": "unknown_status_refusal",
+      "request": "Show the moonbeam status of orders",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [{"relation": "orders", "kind": "relation", "id": "orders"}],
+      "scripted_output": {"status":"unsupported","reason":"No authored moonbeam status"},
+      "expected": {"full":{"outcome":"unsupported"},"retrieved":{"outcome":"unresolved","diagnostic":"partial_catalog"}}
+    },
+    {
+      "id": "zurich_dst_calendar",
+      "fixture": "calendar_dst",
+      "request": "Show the authored fiscal period for events across the Zurich daylight-saving transition",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [{"relation":"events","kind":"business_calendars","id":"fiscal"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"events","instance":"e"},"requirements":[{"id":"period","source_text":"fiscal period","operation":{"kind":"business_calendar","calendar":"fiscal","field":"fiscal_period","alias":"period"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"compiled","rows":[["28"],["29"],["30"]]},"retrieved":{"outcome":"compiled","rows":[["28"],["29"],["30"]]}}
+    },
+    {
+      "id": "policy_hidden_calendar_duplicate",
+      "fixture": "calendar_hidden_duplicate",
+      "request": "Show fiscal periods while excluding the hidden duplicate calendar row",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [{"relation":"events","kind":"business_calendars","id":"fiscal"},{"relation":"fiscal_days","kind":"row_policy","id":"0"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"events","instance":"e"},"requirements":[{"id":"period","source_text":"fiscal period","operation":{"kind":"business_calendar","calendar":"fiscal","field":"fiscal_period","alias":"period"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"compiled","rows":[["28"],["29"],["30"]]},"retrieved":{"outcome":"compiled","rows":[["28"],["29"],["30"]]}}
+    },
+    {
+      "id": "wrong_metric_source_grain",
+      "fixture": "metric_grain",
+      "modes": ["full"],
+      "request": "Show total score as though the source were at day grain",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [{"relation":"scores","kind":"metrics","id":"total_score"}],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"scores","instance":"s"},"requirements":[{"id":"score","source_text":"total score at day grain","operation":{"kind":"metric","name":"total_score","alias":"score","applicability":{"required_unit":{"kind":"named","id":"points"},"required_source_grain":{"entity":null,"keys":[{"relation":"scores","field":"day"}]}}}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"rejected","diagnostic":"metric_grain"},"retrieved":{"outcome":"rejected","diagnostic":"metric_grain"}}
+    },
+    {
+      "id": "unpublished_unit_conversion_refusal",
+      "fixture": "conversion",
+      "modes": ["full"],
+      "request": "Convert whole amounts using an unpublished quarter conversion",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"amounts","instance":"a"},"requirements":[{"id":"converted","source_text":"quarter conversion","operation":{"kind":"convert","conversion":"conversion/quarters","alias":"quarters"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"rejected","diagnostic":"unknown_conversion"},"retrieved":{"outcome":"rejected","diagnostic":"unknown_conversion"}}
+    },
+    {
+      "id": "temporal_path_missing_intermediate_time",
+      "fixture": "temporal_path",
+      "modes": ["full"],
+      "request": "Show the manager label as of the customer's request date",
+      "competing_alias": false,
+      "policy": false,
+      "required_facts": [],
+      "scripted_output": {"status":"query","query":{"version":1,"input":{"relation":"orders","instance":"o"},"requirements":[{"id":"manager","source_text":"manager label as of customer request date","operation":{"kind":"path_lookup","hops":[{"relationship":"bill","role":"bill","instance":"customer","as_of":null},{"relationship":"manager","role":"manager","instance":"manager","as_of":{"fact_time":"requested_at","valid_from":"valid_from","valid_to":"valid_to","timezone":null}}],"field":"label","alias":"manager_label","missing":"null"}}],"unresolved":[]}},
+      "expected": {"full":{"outcome":"rejected","diagnostic":"path_lookup_contract"},"retrieved":{"outcome":"rejected","diagnostic":"path_lookup_contract"}}
+    }
+  ]
+}

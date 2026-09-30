@@ -46,13 +46,22 @@ fn temporal_metric_relation(end: i32) -> Relation {
                 function: AggregateFunction::Sum,
                 field: Some("score".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "scores".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: Default::default(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: None,
+                state: None,
                 row_filters: vec![],
                 result_type: DataType::Int64,
-                unit: Presence::Value("points".into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
                 temporal: Presence::Value(MetricTemporalApplicability {
                     field: "day".into(),
                     grain: CalendarUnit::Month,
@@ -67,6 +76,70 @@ fn temporal_metric_relation(end: i32) -> Relation {
         ..Default::default()
     });
     relation
+}
+
+#[test]
+fn authored_metric_grain_must_use_unique_keys_scoped_to_its_relation() {
+    use semantic_catalog::{EntityId, GrainKey};
+
+    let valid = temporal_metric_relation(19814);
+    Catalog::from_relations([valid.clone(), base("other")])
+        .unwrap()
+        .validate(&PublicationLimits::default())
+        .unwrap();
+
+    for (keys, entity, expected_code) in [
+        (
+            vec![GrainKey {
+                relation: "other".into(),
+                field: "id".into(),
+            }],
+            None,
+            "invalid_metric_source_grain",
+        ),
+        (
+            vec![
+                GrainKey {
+                    relation: "scores".into(),
+                    field: "id".into(),
+                },
+                GrainKey {
+                    relation: "scores".into(),
+                    field: "id".into(),
+                },
+            ],
+            None,
+            "invalid_metric_source_grain",
+        ),
+        (
+            vec![GrainKey {
+                relation: "scores".into(),
+                field: "id".into(),
+            }],
+            Some(EntityId("orders".into())),
+            "invalid_metric_entity_grain",
+        ),
+    ] {
+        let mut invalid = valid.clone();
+        let grain = &mut invalid
+            .semantics
+            .as_mut()
+            .unwrap()
+            .metrics
+            .get_mut("monthly_score")
+            .unwrap()
+            .source_grain;
+        grain.keys = keys;
+        grain.entity = entity;
+        let error = Catalog::from_relations([invalid, base("other")])
+            .unwrap()
+            .validate(&PublicationLimits::default())
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            PublicationError::InvalidDefinition { code, .. } if code == expected_code
+        ));
+    }
 }
 
 #[test]
@@ -438,6 +511,7 @@ fn value_dictionary_edits_publish_atomically_and_invalidate_search_and_semantics
                 field: "code".into(),
                 description: "Country codes".into(),
                 codes: [("UK".into(), "GB".into())].into(),
+                enum_domain: None,
                 source_refs: vec![],
             },
         )]

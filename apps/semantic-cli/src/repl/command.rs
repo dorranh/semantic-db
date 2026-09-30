@@ -7,6 +7,7 @@ pub(super) async fn run(
     line: &str,
     read_mode: &ReadMode,
     progress: &ProgressReporter,
+    experimental_compiler: bool,
 ) -> Result<()> {
     let (command, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
     let rest = rest.trim();
@@ -16,6 +17,7 @@ pub(super) async fn run(
              .schema NAME            Show schema and definition\n\
              .ask REQUEST           Compile and execute natural language\n\
              .plan REQUEST          Compile and show SQL without execution\n\
+             --experimental-compiler uses the typed compiler for Ask input, .ask, and .plan\n\
              .mode sql|ask          Switch input mode (Shift-Tab also switches)\n\
              .cache-status           List published cache generations\n\
              .cache-refresh NAME     Refresh a materialized relation\n\
@@ -102,13 +104,14 @@ pub(super) async fn run(
             if compiler.is_none() {
                 *compiler = Some(Compiler::new(config::provider()?));
             }
-            run_ask(
+            run_ask_request(
                 engine,
                 compiler.as_ref().expect("compiler initialized"),
                 rest,
                 command == ".plan",
                 read_mode,
-                Some(progress),
+                progress,
+                experimental_compiler,
             )
             .await?;
         }
@@ -147,6 +150,7 @@ mod tests {
             ".mode ask",
             &read_mode,
             &progress,
+            false,
         )
         .await
         .unwrap();
@@ -158,7 +162,8 @@ mod tests {
                 &mut mode,
                 ".mode nope",
                 &read_mode,
-                &progress
+                &progress,
+                false,
             )
             .await
             .is_err()
@@ -171,6 +176,7 @@ mod tests {
             ".mode sql",
             &read_mode,
             &progress,
+            false,
         )
         .await
         .unwrap();
@@ -181,6 +187,7 @@ mod tests {
             ".cache-bypass on",
             &read_mode,
             &progress,
+            false,
         )
         .await
         .unwrap();
@@ -194,6 +201,7 @@ mod tests {
                 ".cache-bypass invalid",
                 &read_mode,
                 &progress,
+                false,
             )
             .await
             .is_err()
@@ -206,6 +214,7 @@ mod tests {
             ".cache-bypass off",
             &read_mode,
             &progress,
+            false,
         )
         .await
         .unwrap();
@@ -217,6 +226,7 @@ mod tests {
             ".cache-status",
             &read_mode,
             &progress,
+            false,
         )
         .await
         .unwrap_err();

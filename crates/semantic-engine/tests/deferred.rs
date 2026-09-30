@@ -98,6 +98,7 @@ async fn cache_eviction_and_resolution_concurrency_are_bounded() {
         DeferredOptions {
             max_cached_providers: 1,
             max_concurrent_resolutions: 1,
+            ..DeferredOptions::default()
         },
     )
     .unwrap();

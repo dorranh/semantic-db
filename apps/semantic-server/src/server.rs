@@ -13,7 +13,7 @@ use semantic_db::{
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 /// Options for the local PostgreSQL and HTTP server.
@@ -59,17 +59,18 @@ pub async fn run_with_registry(
         Err(dotenvy::Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
         Err(_) => return Err("could not read .env".into()),
     };
-    let secret = |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned());
-    let mut imported = Project::from_path(&project_path)?
-        .load(&registry, &secret)
-        .await?;
-    imported
-        .engine
-        .set_query_options(semantic_db::QueryOptions {
-            timeout_seconds: args.query_timeout_seconds,
-            ..Default::default()
-        })?;
-    let engine = Arc::new(imported.engine);
+    let secret: Arc<semantic_db::sources::SecretResolver<'static>> =
+        Arc::new(move |name: &str| std::env::var(name).ok().or_else(|| file.get(name).cloned()));
+    let (mut engine, warnings) =
+        load_project_engine(&project_path, registry, secret.clone()).await?;
+    for warning in warnings {
+        eprintln!("Warning: {warning}");
+    }
+    engine.set_query_options(semantic_db::QueryOptions {
+        timeout_seconds: args.query_timeout_seconds,
+        ..Default::default()
+    })?;
+    let engine = Arc::new(engine);
     let compiler = if let Some(key) = secret("OPENAI_API_KEY").filter(|s| !s.is_empty()) {
         let model = secret("OPENAI_MODEL").ok_or("set OPENAI_MODEL when enabling Ask")?;
         let mut config = OpenAiConfig::new(key, model);
@@ -103,4 +104,75 @@ pub async fn run_with_registry(
         _ = tokio::signal::ctrl_c() => {},
     }
     Ok(())
+}
+
+async fn load_project_engine(
+    path: &Path,
+    registry: Registry,
+    secret: Arc<semantic_db::sources::SecretResolver<'static>>,
+) -> Result<(semantic_db::Engine, Vec<String>), Box<dyn std::error::Error>> {
+    let project = Project::from_path(path)?;
+    if project.deferred_read_only() {
+        let loaded = project
+            .load_deferred_read_only(
+                Arc::new(registry),
+                secret,
+                semantic_db::engine::DeferredOptions::default(),
+            )
+            .await?;
+        Ok((
+            loaded.engine,
+            loaded
+                .warnings
+                .into_iter()
+                .map(|warning| warning.to_string())
+                .collect(),
+        ))
+    } else {
+        let loaded = project.load(&registry, secret.as_ref()).await?;
+        Ok((
+            loaded.engine,
+            loaded
+                .warnings
+                .into_iter()
+                .map(|warning| warning.to_string())
+                .collect(),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use semantic_db::arrow::datatypes::{DataType, Field, Schema};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn deferred_server_project_binds_recorded_schema_without_opening_source() {
+        let directory =
+            std::env::temp_dir().join(format!("semantic-server-deferred-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("semantic-db.json");
+        std::fs::write(
+            &path,
+            json!({
+                "deferred_read_only":true,
+                "connections":{"local":{"connector":"csv"}},
+                "app_tables":{"items":{
+                    "connection":"local",
+                    "path":"missing.csv",
+                    "recorded_schema":Schema::new(vec![Field::new("id",DataType::Int64,true)])
+                }}
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let (engine, _) = load_project_engine(&path, Registry::standard(), Arc::new(|_| None))
+            .await
+            .unwrap();
+        assert!(engine.catalog().relation("items").is_some());
+        let error = engine.query("SELECT id FROM items").await.err().unwrap();
+        assert!(error.to_string().contains("missing.csv"));
+        let _ = std::fs::remove_dir_all(directory);
+    }
 }

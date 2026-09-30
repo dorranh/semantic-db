@@ -6,7 +6,7 @@
 
 /// Stable identity recorded by compiler artifacts and connector capability
 /// declarations. Change this value whenever an observable semantic below changes.
-pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-mvp-v1";
+pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v10";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IntegerSumSemantics {
@@ -88,7 +88,7 @@ pub struct FunctionCapability {
     pub placement: FunctionPlacement,
 }
 
-static COMPILER_FUNCTIONS: [FunctionCapability; 4] = [
+static COMPILER_FUNCTIONS: [FunctionCapability; 16] = [
     FunctionCapability {
         name: "semantic_ratio_i64_v1",
         kind: FunctionKind::Scalar,
@@ -100,7 +100,67 @@ static COMPILER_FUNCTIONS: [FunctionCapability; 4] = [
         placement: FunctionPlacement::LocalOnly,
     },
     FunctionCapability {
+        name: "semantic_assert_exactly_one_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_scale_i64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_utc_month_us_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_local_date_us_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_allocation_floor_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_allocation_remainder_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_assert_allocation_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_allocation_share_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
         name: "semantic_sum_v1",
+        kind: FunctionKind::Aggregate,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_mean_i64_v1",
+        kind: FunctionKind::Aggregate,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_weighted_mean_i64_v1",
+        kind: FunctionKind::Aggregate,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_exact_count_i64_v1",
+        kind: FunctionKind::Aggregate,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_snapshot_balance_i64_v1",
         kind: FunctionKind::Aggregate,
         placement: FunctionPlacement::LocalOnly,
     },
@@ -157,7 +217,7 @@ mod tests {
 
     #[test]
     fn every_compiler_function_is_explicitly_local() {
-        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 4);
+        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 16);
         assert!(
             MVP_EXECUTION_PROFILE
                 .compiler_functions()
@@ -171,6 +231,15 @@ mod tests {
             MVP_EXECUTION_PROFILE.compiler_function(FunctionKind::Scalar, "semantic_ratio_i64_v1"),
             Some(FunctionCapability {
                 name: "semantic_ratio_i64_v1",
+                kind: FunctionKind::Scalar,
+                placement: FunctionPlacement::LocalOnly,
+            })
+        );
+        assert_eq!(
+            MVP_EXECUTION_PROFILE
+                .compiler_function(FunctionKind::Scalar, "semantic_assert_exactly_one_v1",),
+            Some(FunctionCapability {
+                name: "semantic_assert_exactly_one_v1",
                 kind: FunctionKind::Scalar,
                 placement: FunctionPlacement::LocalOnly,
             })

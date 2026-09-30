@@ -82,6 +82,68 @@ impl SnapshotRelation {
                     }
                 }
             }
+            if let Some(concepts) = semantics
+                .get_mut("concepts")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for concept in concepts.values_mut() {
+                    if let Some(concept) = concept.as_object_mut() {
+                        concept.remove("source_refs");
+                    }
+                }
+            }
+            if let Some(coverage) = semantics
+                .get_mut("view_coverage")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                coverage.remove("source_refs");
+            }
+            if let Some(lineage) = semantics
+                .get_mut("view_lineage")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                lineage.remove("source_refs");
+            }
+            if let Some(conversions) = semantics
+                .get_mut("conversions")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for conversion in conversions.values_mut() {
+                    if let Some(conversion) = conversion.as_object_mut() {
+                        conversion.remove("source_refs");
+                    }
+                }
+            }
+            if let Some(allocations) = semantics
+                .get_mut("allocations")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for allocation in allocations.values_mut() {
+                    if let Some(allocation) = allocation.as_object_mut() {
+                        allocation.remove("source_refs");
+                    }
+                }
+            }
+            if let Some(currency_rates) = semantics
+                .get_mut("currency_rates")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for rule in currency_rates.values_mut() {
+                    if let Some(rule) = rule.as_object_mut() {
+                        rule.remove("source_refs");
+                    }
+                }
+            }
+            if let Some(calendars) = semantics
+                .get_mut("business_calendars")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for calendar in calendars.values_mut() {
+                    if let Some(calendar) = calendar.as_object_mut() {
+                        calendar.remove("source_refs");
+                    }
+                }
+            }
             if let Some(metrics) = semantics
                 .get_mut("metrics")
                 .and_then(serde_json::Value::as_object_mut)
@@ -132,11 +194,38 @@ impl SnapshotRelation {
         let semantic_revision = digest(&semantic_content);
         let mut definitions = BTreeMap::new();
         if let Some(semantics) = &relation.semantics {
+            if let Some(coverage) = &semantics.view_coverage {
+                definitions.insert(
+                    format!("view_coverage/{}", relation.name),
+                    coverage.reference(&relation.name),
+                );
+            }
+            if let Some(lineage) = &semantics.view_lineage {
+                definitions.insert(
+                    format!("view_lineage/{}", relation.name),
+                    lineage.reference(&relation.name),
+                );
+            }
+            for (name, conversion) in &semantics.conversions {
+                definitions.insert(format!("conversion/{name}"), conversion.reference());
+            }
+            for (name, allocation) in &semantics.allocations {
+                definitions.insert(format!("allocation/{name}"), allocation.reference());
+            }
+            for (name, rule) in &semantics.currency_rates {
+                definitions.insert(format!("currency_rate/{name}"), rule.reference());
+            }
+            for (name, calendar) in &semantics.business_calendars {
+                definitions.insert(format!("business_calendar/{name}"), calendar.reference());
+            }
             for (name, metric) in &semantics.metrics {
                 definitions.insert(format!("metric/{name}"), metric.reference());
             }
             for (name, mapping) in &semantics.value_mappings {
                 definitions.insert(format!("value_mapping/{name}"), mapping.reference());
+            }
+            for (name, concept) in &semantics.concepts {
+                definitions.insert(format!("concept/{name}"), concept.reference());
             }
             for (name, ratio) in &semantics.ratio_metrics {
                 definitions.insert(format!("ratio/{name}"), ratio.reference());

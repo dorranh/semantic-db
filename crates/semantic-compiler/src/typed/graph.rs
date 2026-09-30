@@ -1,6 +1,7 @@
 //! Checked query DAGs. Leaves bind independently to one pinned catalog snapshot;
 //! graph operators consume validated slots and never model-produced expressions.
 use super::*;
+mod calculate;
 mod compose;
 mod intent;
 pub use intent::compile_graph_intent;
@@ -12,7 +13,7 @@ use datafusion::{
     logical_expr::Expr,
     sql::sqlparser::{ast, dialect::GenericDialect, parser::Parser},
 };
-use semantic_catalog::{DataType, Field};
+use semantic_catalog::{DataType, FactResolution, Field, Presence, SlotMeaning};
 use semantic_plan::{graph::*, typed::*};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -21,6 +22,7 @@ struct Slot {
     id: String,
     field: Field,
     origin: Option<(String, String)>,
+    meaning: SlotMeaning,
 }
 #[derive(Debug, Clone, Serialize)]
 struct CheckedNode {
@@ -33,6 +35,24 @@ struct CheckedNode {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum CheckedOperation {
+    Calculate {
+        calculation: Box<calculate::Calculation>,
+    },
+    Conditional {
+        conditional: Box<calculate::Conditional>,
+    },
+    Cast {
+        cast: Box<calculate::Cast>,
+    },
+    NullTest {
+        test: Box<calculate::NullTest>,
+    },
+    CompareSlots {
+        comparison: Box<calculate::SlotComparison>,
+    },
+    Filter {
+        filter: Box<calculate::Filter>,
+    },
     Compose {
         composition: Box<compose::Composition>,
     },
@@ -48,7 +68,7 @@ enum CheckedOperation {
         columns: Vec<SetColumn>,
     },
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct CompiledGraph {
     proposal: GraphQuery,
     snapshot_id: String,
@@ -61,7 +81,25 @@ pub struct CompiledGraph {
     restricted_scope: bool,
     sql: SqlArtifact,
 }
+impl std::fmt::Debug for CompiledGraph {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CompiledGraph")
+            .field("node_count", &self.nodes.len())
+            .field("relation_count", &self.required_relations.len())
+            .field("output_count", &self.sql.expected_output().len())
+            .finish_non_exhaustive()
+    }
+}
 impl CompiledGraph {
+    /// Checked semantic meaning of a root output slot, independent of Arrow type.
+    pub fn slot_meaning(&self, slot_id: &str) -> Option<&SlotMeaning> {
+        self.nodes[self.root]
+            .slots
+            .iter()
+            .find(|slot| slot.id == slot_id)
+            .map(|slot| &slot.meaning)
+    }
     pub fn sql(&self) -> &SqlArtifact {
         &self.sql
     }
@@ -166,6 +204,24 @@ impl CompiledGraph {
         let mut frames: Vec<DataFrame> = Vec::new();
         for node in &self.nodes {
             let frame = match &node.operation {
+                CheckedOperation::Calculate { calculation } => {
+                    calculate::plan_calculation(calculation, frames[calculation.input].clone())?
+                }
+                CheckedOperation::Conditional { conditional } => {
+                    calculate::plan_conditional(conditional, frames[conditional.input].clone())?
+                }
+                CheckedOperation::Cast { cast } => {
+                    calculate::plan_cast(cast, frames[cast.input].clone())?
+                }
+                CheckedOperation::NullTest { test } => {
+                    calculate::plan_null_test(test, frames[test.input].clone())?
+                }
+                CheckedOperation::CompareSlots { comparison } => {
+                    calculate::plan_slot_comparison(comparison, frames[comparison.input].clone())?
+                }
+                CheckedOperation::Filter { filter } => {
+                    calculate::plan_filter(filter, frames[filter.input].clone())?
+                }
                 CheckedOperation::Compose { composition } => compose::plan(
                     composition,
                     frames[composition.left].clone(),
@@ -195,12 +251,16 @@ impl CompiledGraph {
                         (SetOperator::Union, Duplicates::All) => l.union(r),
                         (SetOperator::Union, Duplicates::Distinct) => l.union_distinct(r),
                         (SetOperator::Intersect, Duplicates::All) => {
-                            frames.push(set::bag(l, r, columns, *operator)?);
+                            let frame = set::bag(l, r, columns, *operator)?;
+                            verify_root_output_contract(&node.slots, frame.schema().as_arrow())?;
+                            frames.push(frame);
                             continue;
                         }
                         (SetOperator::Intersect, Duplicates::Distinct) => l.intersect_distinct(r),
                         (SetOperator::Except, Duplicates::All) => {
-                            frames.push(set::bag(l, r, columns, *operator)?);
+                            let frame = set::bag(l, r, columns, *operator)?;
+                            verify_root_output_contract(&node.slots, frame.schema().as_arrow())?;
+                            frames.push(frame);
                             continue;
                         }
                         (SetOperator::Except, Duplicates::Distinct) => l.except_distinct(r),
@@ -208,6 +268,7 @@ impl CompiledGraph {
                     .map_err(lower::backend_error)?
                 }
             };
+            verify_root_output_contract(&node.slots, frame.schema().as_arrow())?;
             frames.push(frame);
         }
         let mut root = frames[self.root].clone();
@@ -278,6 +339,7 @@ pub async fn compile_graph(
     options: CompileOptions,
 ) -> TypedCompilation {
     let options = options.start();
+    let mut request_guard = options.metrics.as_ref().map(|metrics| metrics.begin());
     let start = Instant::now();
     let mut record = CompilationRecord::new("structured_graph_v1");
     let result = {
@@ -288,14 +350,18 @@ pub async fn compile_graph(
             result = tokio::time::timeout(options.timeout, work) => result.unwrap_or_else(|_| Err(diagnostic("deadline", "Compilation deadline exhausted"))),
         }
     };
-    finish(
+    let completed = finish(
         result.map(|query| TypedOutcome::CompiledGraph {
             query: Box::new(query),
         }),
         record,
         start,
         options.metrics.as_deref(),
-    )
+    );
+    if let Some(guard) = &mut request_guard {
+        guard.complete();
+    }
+    completed
 }
 pub(super) fn preflight_graph(
     query: &GraphQuery,
@@ -384,9 +450,17 @@ pub(super) async fn build(
         query
             .nodes
             .iter()
-            .filter(|node| !matches!(&node.operation, GraphOperation::Rows { .. }))
-            .count()
-            .saturating_mul(2),
+            .map(|node| match &node.operation {
+                GraphOperation::Rows { .. } => 0,
+                GraphOperation::Calculate { .. }
+                | GraphOperation::Conditional { .. }
+                | GraphOperation::Cast { .. }
+                | GraphOperation::NullTest { .. }
+                | GraphOperation::CompareSlots { .. }
+                | GraphOperation::Filter { .. } => 1,
+                GraphOperation::Set { .. } | GraphOperation::Compose { .. } => 2,
+            })
+            .sum::<usize>(),
     );
     record.work.graph_outputs_checked = record.work.graph_outputs_checked.saturating_add(
         query
@@ -396,6 +470,28 @@ pub(super) async fn build(
                 GraphOperation::Rows { .. } => 0,
                 GraphOperation::Set { columns, .. } => columns.len(),
                 GraphOperation::Compose { keys, outputs, .. } => keys.len() + outputs.len(),
+                GraphOperation::Calculate {
+                    passthrough,
+                    ratios,
+                    ..
+                } => passthrough.len() + ratios.len(),
+                GraphOperation::Conditional {
+                    passthrough,
+                    outputs,
+                    ..
+                } => passthrough.len() + outputs.len(),
+                GraphOperation::Cast {
+                    passthrough, casts, ..
+                } => passthrough.len() + casts.len(),
+                GraphOperation::NullTest {
+                    passthrough, tests, ..
+                } => passthrough.len() + tests.len(),
+                GraphOperation::CompareSlots {
+                    passthrough,
+                    comparisons,
+                    ..
+                } => passthrough.len() + comparisons.len(),
+                GraphOperation::Filter { .. } => 0,
             })
             .sum(),
     );
@@ -472,6 +568,7 @@ pub(super) async fn build(
                             a.field.is_nullable() || b.field.is_nullable(),
                         ),
                         origin: (a.origin == b.origin).then(|| a.origin.clone()).flatten(),
+                        meaning: aligned_meaning(&a.meaning, &b.meaning)?,
                     });
                 }
                 (
@@ -504,6 +601,112 @@ pub(super) async fn build(
                     },
                     slots,
                     grain,
+                )
+            }
+            GraphOperation::Calculate {
+                input,
+                passthrough,
+                ratios,
+            } => {
+                let source = indexes[input];
+                let (calculation, slots, grain) = calculate::bind_calculation(
+                    source,
+                    &nodes[source],
+                    passthrough,
+                    ratios,
+                    options,
+                )?;
+                (
+                    CheckedOperation::Calculate {
+                        calculation: Box::new(calculation),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::Conditional {
+                input,
+                passthrough,
+                outputs,
+            } => {
+                let source = indexes[input];
+                let (conditional, slots, grain) = calculate::bind_conditional(
+                    source,
+                    &nodes[source],
+                    passthrough,
+                    outputs,
+                    options,
+                )?;
+                (
+                    CheckedOperation::Conditional {
+                        conditional: Box::new(conditional),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::Cast {
+                input,
+                passthrough,
+                casts,
+            } => {
+                let source = indexes[input];
+                let (cast, slots, grain) =
+                    calculate::bind_cast(source, &nodes[source], passthrough, casts, options)?;
+                (
+                    CheckedOperation::Cast {
+                        cast: Box::new(cast),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::NullTest {
+                input,
+                passthrough,
+                tests,
+            } => {
+                let source = indexes[input];
+                let (test, slots, grain) =
+                    calculate::bind_null_test(source, &nodes[source], passthrough, tests, options)?;
+                (
+                    CheckedOperation::NullTest {
+                        test: Box::new(test),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::CompareSlots {
+                input,
+                passthrough,
+                comparisons,
+            } => {
+                let source = indexes[input];
+                let (comparison, slots, grain) = calculate::bind_slot_comparison(
+                    source,
+                    &nodes[source],
+                    passthrough,
+                    comparisons,
+                    options,
+                )?;
+                (
+                    CheckedOperation::CompareSlots {
+                        comparison: Box::new(comparison),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::Filter { input, predicate } => {
+                let source = indexes[input];
+                let filter = calculate::bind_filter(source, &nodes[source], predicate, options)?;
+                (
+                    CheckedOperation::Filter {
+                        filter: Box::new(filter),
+                    },
+                    nodes[source].slots.clone(),
+                    nodes[source].group_keys.clone(),
                 )
             }
         };
@@ -584,24 +787,11 @@ pub(super) async fn build(
         .plan_generated_sql(result.sql.statement())
         .await
         .map_err(lower::backend_error)?;
-    if direct.schema().as_arrow() != emitted.schema().as_arrow() {
-        return Err(diagnostic(
-            "output_contract",
-            "Graph backends disagree on output types",
-        ));
-    }
-    let expected = &result.nodes[root].slots;
-    if direct.schema().fields().len() != expected.len()
-        || expected
-            .iter()
-            .zip(direct.schema().fields())
-            .any(|(a, b)| a.field.name() != b.name() || a.field.data_type() != b.data_type())
-    {
-        return Err(diagnostic(
-            "output_contract",
-            "Graph output differs from its bound slot contract",
-        ));
-    }
+    verify_root_output_contract(&result.nodes[root].slots, direct.schema().as_arrow())?;
+    // The SQL planner may conservatively infer nullable parameterized CASE
+    // outputs while the direct planner proves both literal branches non-null.
+    // Both schemas must satisfy the same bound portable slot contract.
+    verify_root_output_contract(&result.nodes[root].slots, emitted.schema().as_arrow())?;
     record.stage("graph_backend", start, &Ok::<_, CompileDiagnostic>(()));
     for disposition in &mut record.requirement_dispositions {
         disposition.result = "lowered_and_verified";
@@ -611,6 +801,26 @@ pub(super) async fn build(
     ));
     options.check()?;
     Ok(result)
+}
+fn verify_root_output_contract(
+    expected: &[Slot],
+    actual: &datafusion::arrow::datatypes::Schema,
+) -> Result<(), CompileDiagnostic> {
+    if actual.fields().len() != expected.len()
+        || expected.iter().zip(actual.fields()).any(|(slot, field)| {
+            slot.field.name() != field.name()
+                || slot.field.data_type() != field.data_type()
+                // A nullable backend field cannot satisfy a non-null slot
+                // promise. A nullable slot over a non-null field is safe.
+                || (!slot.field.is_nullable() && field.is_nullable())
+        })
+    {
+        return Err(diagnostic(
+            "output_contract",
+            "Graph output differs from its bound slot contract",
+        ));
+    }
+    Ok(())
 }
 fn unique_output<'a>(
     id: &'a str,
@@ -627,6 +837,72 @@ fn unique_output<'a>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod output_contract_tests {
+    use super::*;
+    use datafusion::arrow::datatypes::{Field as ArrowField, Schema};
+
+    #[test]
+    fn root_contract_rejects_unsafe_nonnull_promise() {
+        let mut slot = Slot {
+            id: "value".into(),
+            field: Field::new("value", DataType::Int64, true),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        let nullable = Schema::new(vec![ArrowField::new("value", DataType::Int64, true)]);
+        verify_root_output_contract(&[slot.clone()], &nullable).unwrap();
+
+        slot.field = Field::new("value", DataType::Int64, false);
+        assert_eq!(
+            verify_root_output_contract(&[slot.clone()], &nullable)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+
+        let nonnull = Schema::new(vec![ArrowField::new("value", DataType::Int64, false)]);
+        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
+        slot.field = Field::new("value", DataType::Int64, true);
+        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
+
+        slot.field = Field::new("value", DataType::Utf8, true);
+        assert_eq!(
+            verify_root_output_contract(&[slot], &nonnull)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+    }
+
+    #[test]
+    fn intermediate_mismatch_fails_even_if_final_root_contract_is_valid() {
+        let intermediate_schema =
+            Schema::new(vec![ArrowField::new("middle", DataType::Utf8, true)]);
+        let root_schema = Schema::new(vec![ArrowField::new("result", DataType::Int64, false)]);
+        let root = Slot {
+            id: "root".into(),
+            field: Field::new("result", DataType::Int64, false),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        verify_root_output_contract(&[root], &root_schema).unwrap();
+
+        let intermediate = Slot {
+            id: "middle".into(),
+            field: Field::new("middle", DataType::Utf8, false),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        assert_eq!(
+            verify_root_output_contract(&[intermediate], &intermediate_schema)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+    }
+}
 fn exact_type(ty: &DataType) -> bool {
     matches!(
         ty,
@@ -640,6 +916,82 @@ fn exact_type(ty: &DataType) -> bool {
             | DataType::Date32
             | DataType::Timestamp(_, _)
     )
+}
+fn aligned_meaning(
+    left: &SlotMeaning,
+    right: &SlotMeaning,
+) -> Result<SlotMeaning, CompileDiagnostic> {
+    let unit = match (&left.unit, &right.unit) {
+        (FactResolution::Conflicting { .. }, _)
+        | (_, FactResolution::Conflicting { .. })
+        | (
+            FactResolution::Known {
+                value: Presence::Null,
+                ..
+            },
+            _,
+        )
+        | (
+            _,
+            FactResolution::Known {
+                value: Presence::Null,
+                ..
+            },
+        ) => {
+            return Err(diagnostic(
+                "set_unit",
+                "Set alignment has conflicting or null authored units",
+            ));
+        }
+        (
+            FactResolution::Known {
+                value: Presence::Value(left),
+                contributors: left_facts,
+            },
+            FactResolution::Known {
+                value: Presence::Value(right),
+                contributors: right_facts,
+            },
+        ) if left == right => {
+            let mut contributors = left_facts.clone();
+            contributors.extend(right_facts.iter().cloned());
+            contributors.sort_by(|a, b| (&a.scope, &a.id).cmp(&(&b.scope, &b.id)));
+            contributors.dedup();
+            FactResolution::Known {
+                value: Presence::Value(left.clone()),
+                contributors,
+            }
+        }
+        (
+            FactResolution::Known {
+                value: Presence::Value(_),
+                ..
+            },
+            FactResolution::Known {
+                value: Presence::Value(_),
+                ..
+            },
+        ) => {
+            return Err(diagnostic(
+                "set_unit",
+                "Set alignment requires identical authored units",
+            ));
+        }
+        _ => FactResolution::Unknown,
+    };
+    Ok(SlotMeaning {
+        unit,
+        source_grain: if left.source_grain == right.source_grain {
+            left.source_grain.clone()
+        } else {
+            FactResolution::Unknown
+        },
+        entity: if left.entity == right.entity {
+            left.entity.clone()
+        } else {
+            FactResolution::Unknown
+        },
+    })
 }
 fn leaf_slots(bound: &BoundQuery) -> (Vec<Slot>, Option<BTreeSet<String>>) {
     use bind::BoundOperation as O;
@@ -699,6 +1051,11 @@ fn leaf_slots(bound: &BoundQuery) -> (Vec<Slot>, Option<BTreeSet<String>>) {
                 field.field.is_nullable(),
             ),
             origin,
+            meaning: bound
+                .output_meanings
+                .get(&r.id)
+                .cloned()
+                .unwrap_or_default(),
         });
     }
     (slots, aggregate.then_some(groups))
@@ -728,6 +1085,14 @@ fn topological(
     for (i, n) in query.nodes.iter().enumerate() {
         let children = match &n.operation {
             GraphOperation::Rows { .. } => vec![],
+            GraphOperation::Calculate { input, .. }
+            | GraphOperation::Conditional { input, .. }
+            | GraphOperation::Cast { input, .. }
+            | GraphOperation::NullTest { input, .. }
+            | GraphOperation::CompareSlots { input, .. }
+            | GraphOperation::Filter { input, .. } => {
+                vec![input]
+            }
             GraphOperation::Set { left, right, .. }
             | GraphOperation::Compose { left, right, .. } => vec![left, right],
         };
@@ -875,6 +1240,20 @@ fn emit(
     let mut parameters = Vec::new();
     for (i, node) in nodes.iter().enumerate() {
         let q = match &node.operation {
+            CheckedOperation::Calculate { calculation } => {
+                calculate::emit_calculation(calculation, &names)
+            }
+            CheckedOperation::Conditional { conditional } => {
+                calculate::emit_conditional(conditional, &names, &mut parameters)
+            }
+            CheckedOperation::Cast { cast } => calculate::emit_cast(cast, &names),
+            CheckedOperation::NullTest { test } => calculate::emit_null_test(test, &names),
+            CheckedOperation::CompareSlots { comparison } => {
+                calculate::emit_slot_comparison(comparison, &names)
+            }
+            CheckedOperation::Filter { filter } => {
+                calculate::emit_filter(filter, &names, &mut parameters)
+            }
             CheckedOperation::Compose { composition } => compose::emit(composition, &names),
             CheckedOperation::Rows { plan, .. } => {
                 let sql = plan.emit(snapshot.id());

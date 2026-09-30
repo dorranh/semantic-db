@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 /// Private capture data, never part of normal telemetry. Replay pins definitions
 /// and compiler identity, but does not capture or promise historical source rows.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GraphReplayBundle {
     pub version: u32,
@@ -15,6 +15,15 @@ pub struct GraphReplayBundle {
     pub request_context: Option<RequestContext>,
     #[serde(default)]
     pub request_evidence: Option<GraphRequestEvidence>,
+}
+impl std::fmt::Debug for GraphReplayBundle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("GraphReplayBundle")
+            .field("version", &self.version)
+            .field("has_request_evidence", &self.request_evidence.is_some())
+            .finish_non_exhaustive()
+    }
 }
 impl CompiledGraph {
     pub fn capture_replay(&self, max_bytes: usize) -> Result<GraphReplayBundle, CompileDiagnostic> {

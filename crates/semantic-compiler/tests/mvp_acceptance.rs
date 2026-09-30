@@ -18,8 +18,9 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::{
-    EmptyBehavior, FactResolution, GovernedFilter, MetricDefinition, MetricTemporalApplicability,
-    Presence, Relation, RelationSemantics, RelationshipDefinition, RelationshipKey, RowPolicy,
+    EmptyBehavior, FactResolution, GovernedFilter, GrainKey, MetricDefinition,
+    MetricTemporalApplicability, Presence, Relation, RelationSemantics, RelationshipDefinition,
+    RelationshipKey, RowPolicy, SourceGrain,
 };
 use semantic_compiler::{
     Compiler,
@@ -32,6 +33,16 @@ use semantic_compiler::{
 use semantic_engine::{Engine, QueryOptions};
 use semantic_plan::{graph::*, typed::*};
 use serde_json::{Value, json};
+
+fn scoped_grain(relation: &str, field: &str) -> SourceGrain {
+    SourceGrain {
+        entity: None,
+        keys: vec![GrainKey {
+            relation: relation.into(),
+            field: field.into(),
+        }],
+    }
+}
 
 const ACCEPTANCE: &str = include_str!("fixtures/mvp_acceptance.json");
 
@@ -176,17 +187,26 @@ fn governed_fixture() -> Engine {
                 function: AggregateFunction::Sum,
                 field: Some("score".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "governed".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: ["label".into()].into(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: None,
+                state: None,
                 row_filters: vec![GovernedFilter {
                     field: "active".into(),
                     operator: Comparison::Eq,
                     value: Literal::Boolean(true),
                 }],
                 result_type: DataType::Int64,
-                unit: Presence::Value("points".into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
                 temporal: Presence::Missing,
                 empty_behavior: EmptyBehavior::Null,
                 source_refs: vec![],
@@ -247,8 +267,10 @@ async fn governed_metric_and_row_policy_match_independent_expected_rows() {
                 name: "qualified_score".into(),
                 alias: "qualified".into(),
                 applicability: MetricApplicability {
-                    required_unit: Some("points".into()),
-                    required_source_grain: vec!["id".into()],
+                    required_unit: Some(semantic_catalog::Unit::Named {
+                        id: "points".into(),
+                    }),
+                    required_source_grain: Some(scoped_grain("governed", "id")),
                 },
             },
         ),
@@ -814,13 +836,20 @@ fn competing_metric_fixture(second_unit: &str) -> Engine {
         function: AggregateFunction::Sum,
         field: Some("score".into()),
         distinct: false,
-        source_grain: vec!["id".into()],
+        source_grain: semantic_catalog::SourceGrain {
+            entity: None,
+            keys: vec![semantic_catalog::GrainKey {
+                relation: "scores".into(),
+                field: "id".into(),
+            }],
+        },
         compatible_dimensions: Default::default(),
         compatible_lookup_dimensions: vec![],
         sum_rollup_dimensions: None,
+        state: None,
         row_filters: vec![],
         result_type: DataType::Int64,
-        unit: Presence::Value(unit.into()),
+        unit: Presence::Value(semantic_catalog::Unit::Named { id: unit.into() }),
         temporal: Presence::Missing,
         empty_behavior: EmptyBehavior::Null,
         source_refs: vec![],
@@ -854,8 +883,10 @@ fn competing_metric_query() -> RowQuery {
             name: "first_metric".into(),
             alias: "value".into(),
             applicability: MetricApplicability {
-                required_unit: Some("points".into()),
-                required_source_grain: vec!["id".into()],
+                required_unit: Some(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
+                required_source_grain: Some(scoped_grain("scores", "id")),
             },
         },
     );
@@ -901,13 +932,22 @@ fn temporal_metric_fixture() -> Engine {
                 function: AggregateFunction::Sum,
                 field: Some("score".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "temporal_scores".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: Default::default(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: None,
+                state: None,
                 row_filters: vec![],
                 result_type: DataType::Int64,
-                unit: Presence::Value("points".into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
                 temporal: Presence::Value(MetricTemporalApplicability {
                     field: "day".into(),
                     grain: CalendarUnit::Month,
@@ -967,8 +1007,10 @@ fn temporal_metric_query(unit: CalendarUnit) -> RowQuery {
                 name: "monthly_score".into(),
                 alias: "score".into(),
                 applicability: MetricApplicability {
-                    required_unit: Some("points".into()),
-                    required_source_grain: vec!["id".into()],
+                    required_unit: Some(semantic_catalog::Unit::Named {
+                        id: "points".into(),
+                    }),
+                    required_source_grain: Some(scoped_grain("temporal_scores", "id")),
                 },
             },
         ),

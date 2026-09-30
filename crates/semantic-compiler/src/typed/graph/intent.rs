@@ -79,6 +79,98 @@ pub(super) fn requirements<'a>(
                     )?;
                 }
             }
+            GraphOperation::Calculate {
+                passthrough,
+                ratios,
+                ..
+            } => {
+                for slot in passthrough
+                    .iter()
+                    .map(|item| &item.id)
+                    .chain(ratios.iter().map(|item| &item.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: slot.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
+            GraphOperation::Conditional {
+                passthrough,
+                outputs,
+                ..
+            } => {
+                for slot in passthrough
+                    .iter()
+                    .map(|item| &item.id)
+                    .chain(outputs.iter().map(|item| &item.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: slot.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
+            GraphOperation::Cast {
+                passthrough, casts, ..
+            } => {
+                for slot in passthrough
+                    .iter()
+                    .map(|item| &item.id)
+                    .chain(casts.iter().map(|item| &item.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: slot.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
+            GraphOperation::NullTest {
+                passthrough, tests, ..
+            } => {
+                for slot in passthrough
+                    .iter()
+                    .map(|item| &item.id)
+                    .chain(tests.iter().map(|item| &item.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: slot.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
+            GraphOperation::CompareSlots {
+                passthrough,
+                comparisons,
+                ..
+            } => {
+                for slot in passthrough
+                    .iter()
+                    .map(|item| &item.id)
+                    .chain(comparisons.iter().map(|item| &item.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: slot.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
+            GraphOperation::Filter { .. } => {}
         }
     }
     for index in 0..query.ordering.len() {

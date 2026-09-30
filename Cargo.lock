@@ -4611,6 +4611,7 @@ name = "semantic-catalog"
 version = "0.1.0"
 dependencies = [
  "arrow-schema",
+ "chrono-tz",
  "semantic-plan",
  "serde",
  "serde_json",
@@ -4633,8 +4634,10 @@ dependencies = [
  "semantic-compiler",
  "semantic-engine",
  "semantic-ossie",
+ "semantic-plan",
  "semantic-server",
  "semantic-sources",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-postgres",
@@ -4700,6 +4703,8 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "chrono",
+ "chrono-tz",
  "datafusion",
  "datafusion-federation",
  "futures",
@@ -4735,6 +4740,7 @@ dependencies = [
  "semantic-catalog",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-plan",
  "serde",
  "serde-saphyr",
  "serde_json",
@@ -4748,9 +4754,12 @@ name = "semantic-performance"
 version = "0.1.0"
 dependencies = [
  "clickhouse",
+ "datafusion",
  "semantic-catalog",
  "semantic-clickhouse",
+ "semantic-compiler",
  "semantic-engine",
+ "semantic-plan",
  "serde_json",
  "testcontainers",
  "tokio",

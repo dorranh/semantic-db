@@ -173,6 +173,11 @@ pub(super) fn bind(
             id: key.id.clone(),
             field: Field::new(&key.alias, a.field.data_type().clone(), true),
             origin: a.origin.clone(),
+            meaning: if a.meaning == b.meaning {
+                a.meaning.clone()
+            } else {
+                SlotMeaning::default()
+            },
         });
     }
     let mut bound_values = Vec::new();
@@ -196,6 +201,7 @@ pub(super) fn bind(
             id: output.id.clone(),
             field: Field::new(&output.alias, source.field.data_type().clone(), true),
             origin: None,
+            meaning: source.meaning.clone(),
         });
     }
     let mut presence = "__semantic_group_present".to_owned();

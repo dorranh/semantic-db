@@ -164,6 +164,36 @@ impl Catalog {
                                 .or_default()
                                 .insert(entry.definition().name.clone());
                         }
+                        for allocation in semantics.allocations.values() {
+                            edges_visited += 1;
+                            if edges_visited > limits.max_edges {
+                                return Err(PublicationError::WorkLimit);
+                            }
+                            old_reverse
+                                .entry(allocation.bridge_relation.clone())
+                                .or_default()
+                                .insert(entry.definition().name.clone());
+                        }
+                        for rule in semantics.currency_rates.values() {
+                            edges_visited += 1;
+                            if edges_visited > limits.max_edges {
+                                return Err(PublicationError::WorkLimit);
+                            }
+                            old_reverse
+                                .entry(rule.rate_relation.clone())
+                                .or_default()
+                                .insert(entry.definition().name.clone());
+                        }
+                        for calendar in semantics.business_calendars.values() {
+                            edges_visited += 1;
+                            if edges_visited > limits.max_edges {
+                                return Err(PublicationError::WorkLimit);
+                            }
+                            old_reverse
+                                .entry(calendar.calendar_relation.clone())
+                                .or_default()
+                                .insert(entry.definition().name.clone());
+                        }
                     }
                 }
                 while let Some(name) = queue.pop_front() {
@@ -271,6 +301,7 @@ fn validate_definitions<'a>(
     edges: &mut usize,
     reverse: &mut ReverseEdges,
 ) -> Result<(), PublicationError> {
+    let snapshot = catalog.snapshot();
     for relation in relations {
         let Some(semantics) = &relation.semantics else {
             continue;
@@ -291,8 +322,267 @@ fn validate_definitions<'a>(
             }
             Ok(())
         };
+        if let Some(entity) = &semantics.entity_identity {
+            if entity.id.0.trim().is_empty()
+                || entity.id.0.len() > 256
+                || !identities.insert(entity.id.0.as_str())
+                || entity.relation != relation.name
+                || entity.source_grain.entity.as_ref() != Some(&entity.id)
+                || entity.source_grain.keys.is_empty()
+            {
+                return Err(invalid("invalid_entity_identity"));
+            }
+            let mut names = BTreeSet::new();
+            let mut key_tuple = Vec::with_capacity(entity.source_grain.keys.len());
+            for key in &entity.source_grain.keys {
+                if key.relation != relation.name || !names.insert(key.field.as_str()) {
+                    return Err(invalid("invalid_entity_key"));
+                }
+                check_field(&key.field, edges)?;
+                if entry
+                    .field(&key.field)
+                    .expect("checked entity key")
+                    .is_nullable()
+                {
+                    return Err(invalid("invalid_entity_key"));
+                }
+                key_tuple.push(key.field.as_str());
+            }
+            if semantics
+                .declared_primary_key
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                != key_tuple
+                && !semantics
+                    .declared_unique_keys
+                    .iter()
+                    .any(|keys| keys.iter().map(String::as_str).collect::<Vec<_>>() == key_tuple)
+            {
+                return Err(invalid("invalid_entity_key"));
+            }
+            match &entity.key_evidence {
+                crate::FactResolution::Known {
+                    value: crate::KeyEvidence::AuthoredDeclaration,
+                    contributors,
+                } if !contributors.is_empty()
+                    && contributors.iter().all(|fact| {
+                        fact.id.trim().len() > 0
+                            && fact.scope == relation.name
+                            && fact.value == crate::KeyEvidence::AuthoredDeclaration
+                            && fact.authority == crate::Authority::Authored
+                            && fact.evidence.is_empty()
+                    }) => {}
+                _ => return Err(invalid("unauthenticated_key_evidence")),
+            }
+        }
+        for (field, meaning) in &semantics.fields {
+            if let Some(unit) = &meaning.unit {
+                check_field(field, edges)?;
+                if !crate::valid_unit(unit)
+                    || !matches!(
+                        entry.field(field).expect("checked unit field").data_type(),
+                        crate::DataType::Int16
+                            | crate::DataType::Int32
+                            | crate::DataType::Int64
+                            | crate::DataType::Decimal128(_, _)
+                    )
+                {
+                    return Err(invalid("invalid_field_unit"));
+                }
+            }
+            if let Some(domain) = &meaning.enum_domain {
+                check_field(field, edges)?;
+                if domain.id.trim().is_empty()
+                    || entry
+                        .field(field)
+                        .is_none_or(|field| *field.data_type() != crate::DataType::Utf8)
+                {
+                    return Err(invalid("invalid_enum_domain"));
+                }
+            }
+            if let Some(reference_system) = &meaning.reference_system {
+                check_field(field, edges)?;
+                if reference_system.id.trim().is_empty() {
+                    return Err(invalid("invalid_reference_system"));
+                }
+            }
+            if let Some(calendar_reference) = &meaning.calendar_reference {
+                check_field(field, edges)?;
+                if !crate::valid_calendar_reference(calendar_reference)
+                    || !matches!(
+                        entry
+                            .field(field)
+                            .expect("checked calendar field")
+                            .data_type(),
+                        crate::DataType::Date32 | crate::DataType::Timestamp(_, _)
+                    )
+                {
+                    return Err(invalid("invalid_calendar_reference"));
+                }
+            }
+        }
+        if let Some(lineage) = &semantics.view_lineage {
+            let RelationKind::View { sql, dependencies } = &relation.kind else {
+                return Err(invalid("invalid_view_lineage"));
+            };
+            *edges += 1;
+            if *edges > limits.max_edges {
+                return Err(PublicationError::WorkLimit);
+            }
+            let source = snapshot
+                .relation(&lineage.source.id)
+                .ok_or_else(|| invalid("invalid_view_lineage"))?;
+            if dependencies.len() != 1
+                || dependencies[0] != lineage.source.id
+                || source.reference() != &lineage.source
+                || lineage.canonical_sql(&relation.schema).as_deref() != Some(sql.as_str())
+            {
+                return Err(invalid("invalid_view_lineage"));
+            }
+            for (output, input) in &lineage.columns {
+                check_field(output, edges)?;
+                *edges += 1;
+                if *edges > limits.max_edges {
+                    return Err(PublicationError::WorkLimit);
+                }
+                let Some(source_field) = source.field(input) else {
+                    return Err(invalid("invalid_view_lineage"));
+                };
+                let output_field = entry.field(output).expect("checked view output field");
+                if output_field.data_type() != source_field.data_type()
+                    || output_field.is_nullable() != source_field.is_nullable()
+                {
+                    return Err(invalid("invalid_view_lineage"));
+                }
+            }
+        }
+        if let Some(coverage) = &semantics.view_coverage {
+            if !matches!(relation.kind, RelationKind::View { .. }) {
+                return Err(invalid("view_coverage_on_base"));
+            }
+            check_field(&coverage.field, edges)?;
+            if coverage.validate().is_err()
+                || !concept_value_matches(
+                    entry
+                        .field(&coverage.field)
+                        .expect("checked view time field")
+                        .data_type(),
+                    &coverage.start,
+                )
+                || !concept_value_matches(
+                    entry
+                        .field(&coverage.field)
+                        .expect("checked view time field")
+                        .data_type(),
+                    &coverage.end,
+                )
+            {
+                return Err(invalid("invalid_view_coverage"));
+            }
+        }
+        for (name, conversion) in &semantics.conversions {
+            check_field(&conversion.field, edges)?;
+            if name.trim().is_empty()
+                || conversion.validate().is_err()
+                || !identities.insert(conversion.id.as_str())
+                || entry
+                    .field(&conversion.field)
+                    .is_none_or(|field| *field.data_type() != crate::DataType::Int64)
+            {
+                return Err(invalid("invalid_unit_conversion"));
+            }
+            if semantics
+                .fields
+                .get(&conversion.field)
+                .and_then(|field| field.unit.as_ref())
+                .is_some_and(|unit| unit != &conversion.from_unit)
+            {
+                return Err(invalid("conversion_source_unit"));
+            }
+        }
+        for (name, allocation) in &semantics.allocations {
+            *edges = edges
+                .checked_add(
+                    allocation.source_entity_fields.len()
+                        + allocation.bridge_source_fields.len()
+                        + allocation.target_dimensions.len()
+                        + 8,
+                )
+                .ok_or(PublicationError::WorkLimit)?;
+            if *edges > limits.max_edges {
+                return Err(PublicationError::WorkLimit);
+            }
+            if catalog.relation(&allocation.bridge_relation).is_none() {
+                return Err(PublicationError::MissingDependency {
+                    relation: relation.name.clone(),
+                    dependency: allocation.bridge_relation.clone(),
+                });
+            }
+            if name.trim().is_empty()
+                || !identities.insert(allocation.id.as_str())
+                || allocation.source_relation != relation.name
+                || allocation.validate(&snapshot, None).is_err()
+            {
+                return Err(invalid("invalid_allocation"));
+            }
+            reverse
+                .entry(allocation.bridge_relation.clone())
+                .or_default()
+                .insert(relation.name.clone());
+        }
+        for (name, rule) in &semantics.currency_rates {
+            *edges = edges.checked_add(12).ok_or(PublicationError::WorkLimit)?;
+            if *edges > limits.max_edges {
+                return Err(PublicationError::WorkLimit);
+            }
+            if catalog.relation(&rule.rate_relation).is_none() {
+                return Err(PublicationError::MissingDependency {
+                    relation: relation.name.clone(),
+                    dependency: rule.rate_relation.clone(),
+                });
+            }
+            if name.trim().is_empty()
+                || !identities.insert(rule.id.as_str())
+                || rule.source_relation != relation.name
+                || rule.validate(&snapshot, None).is_err()
+            {
+                return Err(invalid("invalid_currency_rate"));
+            }
+            reverse
+                .entry(rule.rate_relation.clone())
+                .or_default()
+                .insert(relation.name.clone());
+        }
+        for (name, calendar) in &semantics.business_calendars {
+            *edges = edges.checked_add(5).ok_or(PublicationError::WorkLimit)?;
+            if *edges > limits.max_edges {
+                return Err(PublicationError::WorkLimit);
+            }
+            if catalog.relation(&calendar.calendar_relation).is_none() {
+                return Err(PublicationError::MissingDependency {
+                    relation: relation.name.clone(),
+                    dependency: calendar.calendar_relation.clone(),
+                });
+            }
+            if name.trim().is_empty()
+                || !identities.insert(calendar.id.as_str())
+                || calendar.source_relation != relation.name
+                || calendar.validate(&snapshot, None).is_err()
+            {
+                return Err(invalid("invalid_business_calendar"));
+            }
+            reverse
+                .entry(calendar.calendar_relation.clone())
+                .or_default()
+                .insert(relation.name.clone());
+        }
         for (name, mapping) in &semantics.value_mappings {
             check_field(&mapping.field, edges)?;
+            let field_domain = semantics
+                .fields
+                .get(&mapping.field)
+                .and_then(|field| field.enum_domain.as_ref());
             if name.is_empty()
                 || mapping.id.is_empty()
                 || !identities.insert(mapping.id.as_str())
@@ -301,6 +591,9 @@ fn validate_definitions<'a>(
                     .is_none_or(|f| *f.data_type() != crate::DataType::Utf8)
             {
                 return Err(invalid("invalid_value_mapping"));
+            }
+            if !crate::enum_domains_compatible(field_domain, mapping.enum_domain.as_ref()) {
+                return Err(invalid("invalid_value_mapping_domain"));
             }
             for phrase in mapping.codes.keys() {
                 *edges += 1;
@@ -312,17 +605,166 @@ fn validate_definitions<'a>(
                 }
             }
         }
+        for (name, concept) in &semantics.concepts {
+            if name.trim().is_empty()
+                || concept.id.trim().is_empty()
+                || !identities.insert(concept.id.as_str())
+            {
+                return Err(invalid("invalid_concept_identity"));
+            }
+            if concept.alternatives.len() > 16 {
+                return Err(invalid("invalid_concept_alternatives"));
+            }
+            let mut alternatives = BTreeSet::new();
+            for alternative in &concept.alternatives {
+                *edges += 1;
+                if *edges > limits.max_edges {
+                    return Err(PublicationError::WorkLimit);
+                }
+                if alternative == name
+                    || !alternatives.insert(alternative.as_str())
+                    || !semantics.concepts.contains_key(alternative)
+                {
+                    return Err(invalid("invalid_concept_alternatives"));
+                }
+            }
+            let mut parameter_types = BTreeMap::new();
+            let mut pending = vec![&concept.predicate];
+            while let Some(predicate) = pending.pop() {
+                *edges += 1;
+                if *edges > limits.max_edges {
+                    return Err(PublicationError::WorkLimit);
+                }
+                use semantic_plan::typed::RowPredicate;
+                match predicate {
+                    RowPredicate::Compare {
+                        field,
+                        operator,
+                        value,
+                    } => {
+                        check_field(field, edges)?;
+                        let physical = entry.field(field).expect("checked concept field");
+                        if semantics
+                            .fields
+                            .get(field)
+                            .is_some_and(|semantics| semantics.enum_domain.is_some())
+                            && matches!(value, semantic_plan::typed::Literal::Utf8(_))
+                        {
+                            return Err(invalid("invalid_concept_enum_domain"));
+                        }
+                        if !concept_value_matches(physical.data_type(), value)
+                            || matches!(value, semantic_plan::typed::Literal::Boolean(_))
+                                && !matches!(
+                                    operator,
+                                    semantic_plan::typed::Comparison::Eq
+                                        | semantic_plan::typed::Comparison::NotEq
+                                )
+                        {
+                            return Err(invalid("invalid_concept_comparison"));
+                        }
+                    }
+                    RowPredicate::CompareParameter {
+                        field,
+                        operator,
+                        parameter,
+                    } => {
+                        check_field(field, edges)?;
+                        let physical = entry.field(field).expect("checked concept field");
+                        let data_type = physical.data_type();
+                        if parameter.is_empty()
+                            || parameter.len() > 64
+                            || !parameter
+                                .bytes()
+                                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                            || !parameter
+                                .as_bytes()
+                                .first()
+                                .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+                            || !matches!(
+                                data_type,
+                                crate::DataType::Boolean
+                                    | crate::DataType::Int64
+                                    | crate::DataType::Utf8
+                            )
+                            || *data_type == crate::DataType::Boolean
+                                && !matches!(
+                                    operator,
+                                    semantic_plan::typed::Comparison::Eq
+                                        | semantic_plan::typed::Comparison::NotEq
+                                )
+                            || semantics.fields.get(field).is_some_and(|semantics| {
+                                semantics.enum_domain.is_some()
+                                    || matches!(
+                                        semantics.comparison_profile.as_ref(),
+                                        Some(crate::ComparisonProfile::Locale { .. })
+                                    )
+                            })
+                            || parameter_types
+                                .get(parameter.as_str())
+                                .is_some_and(|previous| *previous != data_type)
+                        {
+                            return Err(invalid("invalid_concept_parameter"));
+                        }
+                        parameter_types.insert(parameter.as_str(), data_type);
+                        if parameter_types.len() > 16 {
+                            return Err(invalid("invalid_concept_parameter"));
+                        }
+                    }
+                    RowPredicate::CompareMapped {
+                        field,
+                        mapping,
+                        phrase,
+                        ..
+                    } => {
+                        check_field(field, edges)?;
+                        if semantics
+                            .value_mappings
+                            .get(mapping)
+                            .is_none_or(|definition| {
+                                definition.field != *field || !definition.codes.contains_key(phrase)
+                            })
+                        {
+                            return Err(invalid("invalid_concept_value_mapping"));
+                        }
+                    }
+                    RowPredicate::IsNull { field, .. } => check_field(field, edges)?,
+                    RowPredicate::All { predicates } | RowPredicate::Any { predicates } => {
+                        if predicates.is_empty() {
+                            return Err(invalid("empty_concept_boolean"));
+                        }
+                        pending.extend(predicates);
+                    }
+                    RowPredicate::Not { predicate } => pending.push(predicate),
+                }
+            }
+        }
         for (name, metric) in &semantics.metrics {
             if name.is_empty()
                 || metric.id.is_empty()
                 || !identities.insert(metric.id.as_str())
-                || metric.source_grain.is_empty()
+                || metric.source_grain.keys.is_empty()
             {
                 return Err(invalid("invalid_metric_identity_or_grain"));
             }
+            if metric.source_grain.entity.is_some()
+                && semantics.entity_identity.as_ref().is_none_or(|identity| {
+                    metric.source_grain.entity.as_ref() != Some(&identity.id)
+                        || metric.source_grain != identity.source_grain
+                })
+            {
+                return Err(invalid("invalid_metric_entity_grain"));
+            }
+            let mut grain_keys = BTreeSet::new();
+            for key in &metric.source_grain.keys {
+                if key.relation != relation.name || !grain_keys.insert(key.field.as_str()) {
+                    return Err(invalid("invalid_metric_source_grain"));
+                }
+            }
             for field in metric
                 .source_grain
+                .keys
                 .iter()
+                .map(|key| &key.field)
                 .chain(metric.compatible_dimensions.iter())
                 .chain(metric.sum_rollup_dimensions.iter().flatten())
                 .chain(metric.field.iter())
@@ -330,7 +772,7 @@ fn validate_definitions<'a>(
             {
                 check_field(field, edges)?;
             }
-            if matches!(&metric.unit, crate::Presence::Value(unit) if unit.trim().is_empty()) {
+            if matches!(&metric.unit, crate::Presence::Value(unit) if !crate::valid_unit(unit)) {
                 return Err(invalid("invalid_metric_unit"));
             }
             if let crate::Presence::Value(temporal) = &metric.temporal {
@@ -372,6 +814,105 @@ fn validate_definitions<'a>(
             {
                 return Err(invalid("invalid_metric_scalar_merge"));
             }
+            if let Some(state) = &metric.state {
+                use crate::MetricStateKind;
+                state
+                    .validate()
+                    .map_err(|_| invalid("invalid_metric_state"))?;
+                if metric.sum_rollup_dimensions.is_some()
+                    || !state
+                        .merge_dimensions
+                        .is_subset(&metric.compatible_dimensions)
+                {
+                    return Err(invalid("invalid_metric_state_scope"));
+                }
+                for field in &state.merge_dimensions {
+                    check_field(field, edges)?;
+                }
+                match &state.state {
+                    MetricStateKind::SumCountAverage => {
+                        if metric.function != semantic_plan::typed::AggregateFunction::Sum
+                            || metric.distinct
+                            || metric.empty_behavior != crate::EmptyBehavior::Null
+                            || metric.result_type != crate::DataType::Decimal128(38, 18)
+                            || metric
+                                .field
+                                .as_ref()
+                                .and_then(|field| entry.field(field))
+                                .is_none_or(|field| *field.data_type() != crate::DataType::Int64)
+                        {
+                            return Err(invalid("invalid_metric_state_type"));
+                        }
+                    }
+                    MetricStateKind::WeightedAverage { weight_field, zero } => {
+                        check_field(weight_field, edges)?;
+                        if metric.function != semantic_plan::typed::AggregateFunction::Sum
+                            || metric.distinct
+                            || metric.result_type != crate::DataType::Decimal128(38, 18)
+                            || metric.empty_behavior
+                                != match zero {
+                                    crate::ZeroWeight::Null => crate::EmptyBehavior::Null,
+                                    crate::ZeroWeight::Zero => crate::EmptyBehavior::Zero,
+                                }
+                            || metric
+                                .field
+                                .as_ref()
+                                .and_then(|field| entry.field(field))
+                                .is_none_or(|field| *field.data_type() != crate::DataType::Int64)
+                            || entry
+                                .field(weight_field)
+                                .is_none_or(|field| *field.data_type() != crate::DataType::Int64)
+                        {
+                            return Err(invalid("invalid_metric_state_type"));
+                        }
+                    }
+                    MetricStateKind::ExactDistinct { identity_fields } => {
+                        for field in identity_fields {
+                            check_field(field, edges)?;
+                            if !exact_state_field_type(
+                                entry.field(field).expect("checked field").data_type(),
+                            ) {
+                                return Err(invalid("invalid_metric_state_field_type"));
+                            }
+                        }
+                        if identity_fields.len() != 1
+                            || metric.function != semantic_plan::typed::AggregateFunction::Count
+                            || metric.field.as_deref() != Some(identity_fields[0].as_str())
+                            || metric.distinct
+                            || metric.empty_behavior != crate::EmptyBehavior::Zero
+                            || metric.result_type != crate::DataType::Int64
+                            || entry
+                                .field(&identity_fields[0])
+                                .is_none_or(|field| *field.data_type() != crate::DataType::Int64)
+                        {
+                            return Err(invalid("invalid_metric_state_type"));
+                        }
+                    }
+                    MetricStateKind::SnapshotBalance {
+                        time_field,
+                        tie_break_fields,
+                    } => {
+                        if !metric_numeric_type(&metric.result_type) {
+                            return Err(invalid("invalid_metric_state_type"));
+                        }
+                        check_field(time_field, edges)?;
+                        if !matches!(
+                            entry.field(time_field).expect("checked field").data_type(),
+                            crate::DataType::Date32 | crate::DataType::Timestamp(_, _)
+                        ) {
+                            return Err(invalid("invalid_metric_state_time_type"));
+                        }
+                        for field in tie_break_fields {
+                            check_field(field, edges)?;
+                            if !exact_state_field_type(
+                                entry.field(field).expect("checked field").data_type(),
+                            ) {
+                                return Err(invalid("invalid_metric_state_field_type"));
+                            }
+                        }
+                    }
+                }
+            }
         }
         for policy in &semantics.row_policies {
             if policy.id.is_empty()
@@ -400,6 +941,9 @@ fn validate_definitions<'a>(
                 || !semantics.metrics.contains_key(&ratio.denominator)
             {
                 return Err(invalid("missing_ratio_dependency"));
+            }
+            if matches!(&ratio.unit, crate::Presence::Value(unit) if !crate::valid_unit(unit)) {
+                return Err(invalid("invalid_ratio_unit"));
             }
         }
         for (name, relationship) in &semantics.relationships {
@@ -431,6 +975,19 @@ fn validate_definitions<'a>(
                 {
                     return Err(invalid("relationship_key_type"));
                 }
+                let left_system = semantics
+                    .fields
+                    .get(&key.left_field)
+                    .and_then(|field| field.reference_system.as_ref());
+                let right_system = right
+                    .definition()
+                    .semantics
+                    .as_ref()
+                    .and_then(|semantics| semantics.fields.get(&key.right_field))
+                    .and_then(|field| field.reference_system.as_ref());
+                if !crate::reference_systems_compatible(left_system, right_system) {
+                    return Err(invalid("relationship_reference_system"));
+                }
             }
             reverse
                 .entry(relationship.right_relation.clone())
@@ -439,6 +996,28 @@ fn validate_definitions<'a>(
         }
     }
     Ok(())
+}
+
+fn metric_numeric_type(ty: &crate::DataType) -> bool {
+    matches!(
+        ty,
+        crate::DataType::Int64 | crate::DataType::Decimal128(_, _)
+    )
+}
+
+fn exact_state_field_type(ty: &crate::DataType) -> bool {
+    matches!(
+        ty,
+        crate::DataType::Boolean
+            | crate::DataType::Int16
+            | crate::DataType::Int32
+            | crate::DataType::Int64
+            | crate::DataType::UInt64
+            | crate::DataType::Utf8
+            | crate::DataType::Decimal128(_, _)
+            | crate::DataType::Date32
+            | crate::DataType::Timestamp(_, _)
+    )
 }
 
 fn valid_temporal_coverage(
@@ -475,6 +1054,50 @@ fn valid_temporal_coverage(
                 && start_zone == field_zone.as_ref()
                 && end_zone == field_zone.as_ref()
                 && matches!(field_zone.as_ref(), "UTC" | "+00:00")
+        }
+        _ => false,
+    }
+}
+
+fn concept_value_matches(field: &crate::DataType, literal: &semantic_plan::typed::Literal) -> bool {
+    use arrow_schema::TimeUnit;
+    use semantic_plan::typed::{Literal, TimestampUnit};
+    match (field, literal) {
+        (crate::DataType::Boolean, Literal::Boolean(_))
+        | (crate::DataType::Int16, Literal::Int16(_))
+        | (crate::DataType::Int32, Literal::Int32(_))
+        | (crate::DataType::Int64, Literal::Int64(_))
+        | (crate::DataType::UInt64, Literal::UInt64(_))
+        | (crate::DataType::Utf8, Literal::Utf8(_))
+        | (crate::DataType::Date32, Literal::Date32(_)) => true,
+        (
+            crate::DataType::Decimal128(precision, scale),
+            Literal::Decimal128 {
+                precision: value_precision,
+                scale: value_scale,
+                ..
+            },
+        ) => {
+            precision == value_precision
+                && *scale >= 0
+                && u8::try_from(*scale).ok() == Some(*value_scale)
+        }
+        (
+            crate::DataType::Timestamp(field_unit, field_zone),
+            Literal::Timestamp {
+                unit: value_unit,
+                timezone: value_zone,
+                ..
+            },
+        ) => {
+            let unit = match field_unit {
+                TimeUnit::Second => TimestampUnit::Second,
+                TimeUnit::Millisecond => TimestampUnit::Millisecond,
+                TimeUnit::Microsecond => TimestampUnit::Microsecond,
+                TimeUnit::Nanosecond => TimestampUnit::Nanosecond,
+            };
+            unit == *value_unit
+                && field_zone.as_ref().map(|zone| zone.as_ref()) == value_zone.as_deref()
         }
         _ => false,
     }
@@ -607,7 +1230,31 @@ fn dependencies(
             .into_iter()
             .flat_map(|s| s.relationships.values())
             .map(|r| &r.right_relation);
-        for name in views.iter().chain(relationships) {
+        let allocations = relation
+            .semantics
+            .as_ref()
+            .into_iter()
+            .flat_map(|s| s.allocations.values())
+            .map(|a| &a.bridge_relation);
+        let currency_rates = relation
+            .semantics
+            .as_ref()
+            .into_iter()
+            .flat_map(|s| s.currency_rates.values())
+            .map(|r| &r.rate_relation);
+        let business_calendars = relation
+            .semantics
+            .as_ref()
+            .into_iter()
+            .flat_map(|s| s.business_calendars.values())
+            .map(|calendar| &calendar.calendar_relation);
+        for name in views
+            .iter()
+            .chain(relationships)
+            .chain(allocations)
+            .chain(currency_rates)
+            .chain(business_calendars)
+        {
             *edges += 1;
             if *edges > limits.max_edges {
                 return Err(PublicationError::WorkLimit);

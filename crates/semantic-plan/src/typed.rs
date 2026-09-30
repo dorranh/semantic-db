@@ -40,6 +40,14 @@ pub struct Requirement {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RowOperation {
+    /// Apply an exact authored concept predicate at row stage. Resolution is
+    /// scoped to the selected relation and fails on competing exact aliases.
+    ConceptFilter {
+        concept: String,
+        /// Exact typed values for placeholders in the authored concept.
+        #[serde(default)]
+        arguments: std::collections::BTreeMap<String, Literal>,
+    },
     /// Filter resolved output slots at an explicit relational stage.
     FilterOutput {
         stage: OutputFilterStage,
@@ -57,10 +65,62 @@ pub enum RowOperation {
         #[serde(default)]
         usage: LookupUsage,
     },
+    /// Follow exactly authored relationship roles through bounded occurrences.
+    /// Each hop executes its own endpoint policies and uniqueness guard.
+    PathLookup {
+        hops: Vec<PathHop>,
+        field: String,
+        alias: String,
+        missing: MissingMatch,
+    },
+    /// Allocate an authored source amount across one checked target dimension,
+    /// then sum the exact minor-unit shares by that target.
+    Allocate {
+        allocation: String,
+        target_aliases: Vec<String>,
+        amount_alias: String,
+    },
+    /// Apply an exact, authored rational conversion to its declared Int64
+    /// source field. The result is Decimal128(38,18).
+    Convert {
+        conversion: String,
+        alias: String,
+    },
+    /// Convert through one authored, dated rate relation under the same read.
+    /// The result is Decimal128(38,18) in the rule's target currency.
+    CurrencyConvert {
+        rate: String,
+        alias: String,
+    },
     /// A half-open interval of whole calendar periods, anchored by host context.
     CalendarFilter {
         field: FieldRef,
         period: CalendarPeriod,
+    },
+    /// Group observed UTC microsecond instants by their UTC calendar month.
+    /// This does not generate empty periods or imply a business calendar.
+    CalendarGroup {
+        field: FieldRef,
+        grain: CalendarUnit,
+        timezone: String,
+        alias: String,
+    },
+    /// Explicitly fill absent UTC months for one observed CalendarGroup and
+    /// one non-distinct COUNT(*). Bounds are first-of-month UTC microseconds;
+    /// the end is exclusive. This bounded profile only permits zero fill.
+    CalendarFill {
+        month_slot: String,
+        count_slot: String,
+        start_us: i64,
+        end_us: i64,
+        fill: i64,
+    },
+    /// Resolve exactly one policy-visible authored calendar row for a Date32
+    /// source value. Missing or duplicate dates fail the same query.
+    BusinessCalendar {
+        calendar: String,
+        field: BusinessCalendarField,
+        alias: String,
     },
     /// Evaluated after row policies/filters and any explicit aggregation, before
     /// final ordering/fetch. Window outputs cannot be inputs of other windows.
@@ -125,6 +185,32 @@ pub enum RowOperation {
     Limit {
         count: u32,
     },
+    /// Explicit bounded offset/fetch. This is presentation pagination and does
+    /// not claim stable pages unless the request supplies sufficient ordering.
+    Page {
+        offset: u32,
+        fetch: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PathHop {
+    pub relationship: String,
+    pub role: String,
+    pub instance: String,
+    /// Reserved for the checked half-open interval profile. Rejected by the
+    /// current compiler until same-query interval uniqueness is executable.
+    #[serde(default)]
+    pub as_of: Option<PathAsOf>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PathAsOf {
+    pub fact_time: String,
+    pub valid_from: String,
+    pub valid_to: String,
+    pub timezone: Option<String>,
 }
 
 /// Narrow, exact applicability requirements for a governed metric use. General
@@ -133,9 +219,9 @@ pub enum RowOperation {
 #[serde(deny_unknown_fields)]
 pub struct MetricApplicability {
     #[serde(default)]
-    pub required_unit: Option<String>,
+    pub required_unit: Option<crate::meaning::Unit>,
     #[serde(default)]
-    pub required_source_grain: Vec<String>,
+    pub required_source_grain: Option<crate::meaning::SourceGrain>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -182,6 +268,13 @@ pub enum RowPredicate<F = FieldRef> {
         field: F,
         operator: Comparison,
         value: Literal,
+    },
+    /// Required typed value supplied only through a prepared binding. An
+    /// ordinary row or graph compilation rejects this unbound proposal.
+    CompareParameter {
+        field: F,
+        operator: Comparison,
+        parameter: String,
     },
     IsNull {
         field: F,
@@ -354,6 +447,8 @@ pub enum WindowFrame {
     EntirePartition,
     /// RANGE UNBOUNDED PRECEDING ... CURRENT ROW includes every ordering peer.
     ThroughCurrentPeer,
+    /// ROWS UNBOUNDED PRECEDING ... CURRENT ROW requires a strict grouped order.
+    RowsThroughCurrent,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -379,6 +474,13 @@ pub enum CalendarUnit {
     IsoWeek,
     Month,
     Year,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BusinessCalendarField {
+    FiscalYear,
+    FiscalPeriod,
+    BusinessDay,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

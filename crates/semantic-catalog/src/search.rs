@@ -1,5 +1,5 @@
 //! Rebuildable discovery index. Scores never confer semantic authority.
-use crate::{AiContext, CatalogSnapshot};
+use crate::{AiContext, CatalogSnapshot, Unit};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -45,6 +45,29 @@ impl Default for SearchOptions {
             allowed_relations: None,
         }
     }
+}
+
+fn unit_search_label(unit: &Unit) -> String {
+    fn label(unit: &Unit, depth: usize) -> String {
+        if depth > 16 {
+            return "unknown".into();
+        }
+        let result = match unit {
+            Unit::Dimensionless => "dimensionless".into(),
+            Unit::Named { id } => id.chars().take(128).collect(),
+            Unit::Currency { code } => code.clone(),
+            Unit::Quotient {
+                numerator,
+                denominator,
+            } => format!(
+                "{} per {}",
+                label(numerator, depth + 1),
+                label(denominator, depth + 1)
+            ),
+        };
+        result.chars().take(256).collect()
+    }
+    label(unit, 0)
 }
 #[derive(Debug, Clone)]
 pub struct SearchIndex {
@@ -179,6 +202,81 @@ impl IndexBuilder {
                         vec![Some(&ratio.description)],
                         &[],
                         &ratio.aliases,
+                        &mut check,
+                    )?;
+                }
+                for (concept_name, concept) in &semantics.concepts {
+                    check(1, 0)?;
+                    index.insert(
+                        SearchObject {
+                            relation: name.clone(),
+                            field: None,
+                        },
+                        concept_name,
+                        vec![Some(&concept.description)],
+                        &[],
+                        &concept.aliases,
+                        &mut check,
+                    )?;
+                }
+                for (conversion_name, conversion) in &semantics.conversions {
+                    check(1, 0)?;
+                    let from = unit_search_label(&conversion.from_unit);
+                    let to = unit_search_label(&conversion.to_unit);
+                    index.insert(
+                        SearchObject {
+                            relation: name.clone(),
+                            field: Some(conversion.field.clone().into()),
+                        },
+                        conversion_name,
+                        vec![Some(&from), Some(&to)],
+                        &[],
+                        &[],
+                        &mut check,
+                    )?;
+                }
+                for (allocation_name, allocation) in &semantics.allocations {
+                    check(1, 0)?;
+                    index.insert(
+                        SearchObject {
+                            relation: name.clone(),
+                            field: Some(allocation.source_amount_field.clone().into()),
+                        },
+                        allocation_name,
+                        vec![
+                            Some(&allocation.amount_unit),
+                            Some(&allocation.bridge_relation),
+                        ],
+                        &[],
+                        &[],
+                        &mut check,
+                    )?;
+                }
+                for (rate_name, rate) in &semantics.currency_rates {
+                    check(1, 0)?;
+                    index.insert(
+                        SearchObject {
+                            relation: name.clone(),
+                            field: Some(rate.source_amount_field.clone().into()),
+                        },
+                        rate_name,
+                        vec![Some(&rate.to_currency), Some(&rate.rate_relation)],
+                        &[],
+                        &[],
+                        &mut check,
+                    )?;
+                }
+                for (calendar_name, calendar) in &semantics.business_calendars {
+                    check(1, 0)?;
+                    index.insert(
+                        SearchObject {
+                            relation: name.clone(),
+                            field: Some(calendar.source_date_field.clone().into()),
+                        },
+                        calendar_name,
+                        vec![Some(&calendar.timezone), Some(&calendar.calendar_relation)],
+                        &[],
+                        &[],
                         &mut check,
                     )?;
                 }

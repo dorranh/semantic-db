@@ -9,7 +9,7 @@ use datafusion::{
     },
     datasource::MemTable,
 };
-use semantic_catalog::Relation;
+use semantic_catalog::{GrainKey, Relation, SourceGrain};
 use semantic_compiler::{
     Compiler,
     provider::{Message, ModelProvider, ProviderError},
@@ -18,6 +18,16 @@ use semantic_compiler::{
 use semantic_engine::{Engine, QueryOptions};
 use semantic_plan::typed::*;
 use serde_json::json;
+
+fn scoped_grain(relation: &str, field: &str) -> SourceGrain {
+    SourceGrain {
+        entity: None,
+        keys: vec![GrainKey {
+            relation: relation.into(),
+            field: field.into(),
+        }],
+    }
+}
 
 fn fixture() -> Engine {
     let fields = vec![
@@ -202,6 +212,43 @@ async fn preserves_boolean_nulls_filter_order_and_limit_across_both_backends() {
     q.requirements
         .push(requirement("zero", RowOperation::Limit { count: 0 }));
     both_paths(&engine, q, vec![]).await;
+}
+
+#[tokio::test]
+async fn explicit_offset_fetch_has_sql_direct_parity_and_bounded_inputs() {
+    let engine = fixture();
+    let mut q = query();
+    q.requirements.push(requirement(
+        "order",
+        RowOperation::Order {
+            field: field("id"),
+            direction: Direction::Asc,
+            nulls: NullOrder::Last,
+        },
+    ));
+    q.requirements.push(requirement(
+        "page",
+        RowOperation::Page {
+            offset: 2,
+            fetch: 2,
+        },
+    ));
+    both_paths(&engine, q.clone(), vec![vec!["3"], vec!["4"]]).await;
+
+    let mut options = CompileOptions::default();
+    options.max_page_offset = 1;
+    assert!(matches!(
+        compile_rows(&engine, q.clone(), options).await.outcome,
+        TypedOutcome::Unresolved { diagnostic } if diagnostic.code == "page_limit"
+    ));
+    q.requirements
+        .push(requirement("second-page", RowOperation::Limit { count: 1 }));
+    assert!(matches!(
+        compile_rows(&engine, q, CompileOptions::default())
+            .await
+            .outcome,
+        TypedOutcome::Rejected { .. }
+    ));
 }
 
 #[tokio::test]
@@ -1070,17 +1117,26 @@ async fn governed_fixture_with_competitor(
                 function: AggregateFunction::Sum,
                 field: Some("score".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "governed".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: ["label".into()].into(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: rollup.clone(),
+                state: None,
                 row_filters: vec![GovernedFilter {
                     field: "active".into(),
                     operator: Comparison::Eq,
                     value: Literal::Boolean(true),
                 }],
                 result_type: DataType::Int64,
-                unit: Presence::Value("points".into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
                 temporal: Presence::Missing,
                 empty_behavior: EmptyBehavior::Null,
                 source_refs: vec![],
@@ -1110,6 +1166,7 @@ async fn governed_fixture_with_competitor(
                 ("lowercase bee".into(), "b".into()),
             ]
             .into(),
+            enum_domain: None,
             source_refs: vec![],
         },
     );
@@ -1122,13 +1179,20 @@ async fn governed_fixture_with_competitor(
             function: AggregateFunction::Count,
             field: None,
             distinct: false,
-            source_grain: vec!["id".into()],
+            source_grain: semantic_catalog::SourceGrain {
+                entity: None,
+                keys: vec![semantic_catalog::GrainKey {
+                    relation: "governed".into(),
+                    field: "id".into(),
+                }],
+            },
             compatible_dimensions: ["label".into()].into(),
             compatible_lookup_dimensions: vec![],
             sum_rollup_dimensions: rollup.clone(),
+            state: None,
             row_filters: vec![],
             result_type: DataType::Int64,
-            unit: Presence::Value("rows".into()),
+            unit: Presence::Value(semantic_catalog::Unit::Named { id: "rows".into() }),
             temporal: Presence::Missing,
             empty_behavior: EmptyBehavior::Zero,
             source_refs: vec![],
@@ -1143,7 +1207,12 @@ async fn governed_fixture_with_competitor(
             numerator: "qualified_score".into(),
             denominator: "visible_rows".into(),
             zero: ZeroDivision::Null,
-            unit: Presence::Value("points/row".into()),
+            unit: Presence::Value(semantic_catalog::Unit::Quotient {
+                numerator: Box::new(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
+                denominator: Box::new(semantic_catalog::Unit::Named { id: "rows".into() }),
+            }),
             source_refs: vec![],
         },
     );
@@ -1157,13 +1226,20 @@ async fn governed_fixture_with_competitor(
                 function: AggregateFunction::Count,
                 field: None,
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "governed".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: ["label".into()].into(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: rollup,
+                state: None,
                 row_filters: vec![],
                 result_type: DataType::Int64,
-                unit: Presence::Value(unit.into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named { id: unit.into() }),
                 temporal: Presence::Missing,
                 empty_behavior: EmptyBehavior::Zero,
                 source_refs: vec![],
@@ -1221,13 +1297,22 @@ fn temporal_metric_fixture() -> Engine {
                 function: AggregateFunction::Sum,
                 field: Some("score".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "temporal_scores".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: Default::default(),
                 compatible_lookup_dimensions: vec![],
                 sum_rollup_dimensions: None,
+                state: None,
                 row_filters: vec![],
                 result_type: DataType::Int64,
-                unit: Presence::Value("points".into()),
+                unit: Presence::Value(semantic_catalog::Unit::Named {
+                    id: "points".into(),
+                }),
                 temporal: Presence::Value(MetricTemporalApplicability {
                     field: "day".into(),
                     grain: CalendarUnit::Month,
@@ -1276,8 +1361,10 @@ fn temporal_metric_query(unit: CalendarUnit) -> RowQuery {
                     name: "monthly_score".into(),
                     alias: "score".into(),
                     applicability: MetricApplicability {
-                        required_unit: Some("points".into()),
-                        required_source_grain: vec!["id".into()],
+                        required_unit: Some(semantic_catalog::Unit::Named {
+                            id: "points".into(),
+                        }),
+                        required_source_grain: Some(scoped_grain("temporal_scores", "id")),
                     },
                 },
             ),
@@ -1347,7 +1434,7 @@ async fn metric_applicability_enforces_exact_unit_grain_and_temporal_coverage() 
     else {
         unreachable!()
     };
-    applicability.required_unit = Some("euros".into());
+    applicability.required_unit = Some(semantic_catalog::Unit::Named { id: "euros".into() });
     cases.push((
         "metric_unit",
         wrong_unit,
@@ -1358,7 +1445,7 @@ async fn metric_applicability_enforces_exact_unit_grain_and_temporal_coverage() 
     else {
         unreachable!()
     };
-    applicability.required_source_grain = vec!["day".into()];
+    applicability.required_source_grain = Some(scoped_grain("temporal_scores", "day"));
     cases.push((
         "metric_grain",
         wrong_grain,
@@ -1382,8 +1469,8 @@ async fn competing_metric_labels_require_identity_or_unique_exact_applicability(
                 name: "qualified points".into(),
                 alias: "value".into(),
                 applicability: MetricApplicability {
-                    required_unit: unit.map(str::to_owned),
-                    required_source_grain: vec!["id".into()],
+                    required_unit: unit.map(|id| semantic_catalog::Unit::Named { id: id.into() }),
+                    required_source_grain: Some(scoped_grain("governed", "id")),
                 },
             },
         );
@@ -2545,7 +2632,13 @@ fn lookup_fixture(duplicate: bool, null_keys_match: bool) -> Engine {
                 function: AggregateFunction::Sum,
                 field: Some("id".into()),
                 distinct: false,
-                source_grain: vec!["id".into()],
+                source_grain: semantic_catalog::SourceGrain {
+                    entity: None,
+                    keys: vec![semantic_catalog::GrainKey {
+                        relation: "items".into(),
+                        field: "id".into(),
+                    }],
+                },
                 compatible_dimensions: Default::default(),
                 compatible_lookup_dimensions: vec![semantic_catalog::MetricLookupDimension {
                     relationship: "bill".into(),
@@ -2553,6 +2646,7 @@ fn lookup_fixture(duplicate: bool, null_keys_match: bool) -> Engine {
                     missing: MissingMatch::Null,
                 }],
                 sum_rollup_dimensions: None,
+                state: None,
                 row_filters: vec![],
                 result_type: DataType::Int64,
                 unit: semantic_catalog::Presence::Missing,

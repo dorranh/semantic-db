@@ -14,7 +14,7 @@ use std::{
     fmt,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 use tokio::sync::{Mutex as AsyncMutex, Semaphore};
@@ -23,12 +23,16 @@ use tokio::sync::{Mutex as AsyncMutex, Semaphore};
 pub struct DeferredOptions {
     pub max_cached_providers: usize,
     pub max_concurrent_resolutions: usize,
+    /// Maximum distinct cold table resolutions admitted to either wait for a
+    /// backend permit or run. Same-table followers coalesce before admission.
+    pub max_active_cold_keys: usize,
 }
 impl Default for DeferredOptions {
     fn default() -> Self {
         Self {
             max_cached_providers: 256,
             max_concurrent_resolutions: 8,
+            max_active_cold_keys: 256,
         }
     }
 }
@@ -37,6 +41,9 @@ pub struct DeferredProviderStats {
     resolutions: AtomicU64,
     cache_hits: AtomicU64,
     evictions: AtomicU64,
+    admission_rejections: AtomicU64,
+    active_cold_keys: AtomicUsize,
+    peak_active_cold_keys: AtomicUsize,
 }
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DeferredProviderReport {
@@ -44,6 +51,9 @@ pub struct DeferredProviderReport {
     pub cache_hits: u64,
     pub evictions: u64,
     pub cached_providers: usize,
+    pub admission_rejections: u64,
+    pub active_cold_keys: usize,
+    pub peak_active_cold_keys: usize,
 }
 struct Cached {
     provider: Arc<dyn TableProvider>,
@@ -57,6 +67,39 @@ struct Shared<B> {
     semaphore: Semaphore,
     stats: DeferredProviderStats,
 }
+struct ColdAdmission<'a> {
+    active: &'a AtomicUsize,
+}
+impl Drop for ColdAdmission<'_> {
+    fn drop(&mut self) {
+        self.active.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+impl<B> Shared<B> {
+    fn admit_cold(&self) -> Result<ColdAdmission<'_>> {
+        let active = self
+            .stats
+            .active_cold_keys
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                (count < self.options.max_active_cold_keys).then_some(count + 1)
+            })
+            .map_err(|_| {
+                self.stats
+                    .admission_rejections
+                    .fetch_add(1, Ordering::Relaxed);
+                semantic_runtime::failure(
+                    "deferred provider admission exhausted: too many active cold tables",
+                )
+            })?
+            + 1;
+        self.stats
+            .peak_active_cold_keys
+            .fetch_max(active, Ordering::Relaxed);
+        Ok(ColdAdmission {
+            active: &self.stats.active_cold_keys,
+        })
+    }
+}
 /// Wrap a backend before passing it to `Engine::from_catalog`. The resulting
 /// engine validates view schemas using recorded base schemas. Live base
 /// providers resolve on the first selected physical scan and use a bounded LRU.
@@ -67,7 +110,10 @@ pub struct DeferredBackend<B> {
 }
 impl<B: RelationBackend + 'static> DeferredBackend<B> {
     pub fn new(backend: Arc<B>, options: DeferredOptions) -> Result<Self> {
-        if options.max_concurrent_resolutions == 0 || options.max_cached_providers == 0 {
+        if options.max_concurrent_resolutions == 0
+            || options.max_cached_providers == 0
+            || options.max_active_cold_keys == 0
+        {
             return Err(semantic_runtime::failure(
                 "deferred provider limits must be positive",
             ));
@@ -95,6 +141,17 @@ impl<B: RelationBackend + 'static> DeferredBackend<B> {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .len(),
+            admission_rejections: self
+                .shared
+                .stats
+                .admission_rejections
+                .load(Ordering::Relaxed),
+            active_cold_keys: self.shared.stats.active_cold_keys.load(Ordering::Acquire),
+            peak_active_cold_keys: self
+                .shared
+                .stats
+                .peak_active_cold_keys
+                .load(Ordering::Relaxed),
         }
     }
 }
@@ -142,6 +199,7 @@ impl<B: RelationBackend + 'static> DeferredTable<B> {
         if let Some(provider) = self.cached() {
             return Ok(provider);
         }
+        let _admission = self.shared.admit_cold()?;
         let _permit = self
             .shared
             .semaphore

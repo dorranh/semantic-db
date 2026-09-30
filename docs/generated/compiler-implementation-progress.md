@@ -5,6 +5,10 @@ with ordinary Rust tracing and compiler-owned records. OpenTelemetry export is
 out of scope per the implementation request. This checklist is an implementation
 audit, not a declaration that the full design is complete.
 
+The active post-MVP package ledger and verifier evidence are in the
+[full requirement audit](compiler-full-requirement-audit.md). The checkpoint
+notes below are historical and should not be read as the current feature list.
+
 The current executable boundary is listed in
 [the supported profile](compiler-supported-profile.md).
 

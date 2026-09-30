@@ -12,7 +12,7 @@ pub fn provider() -> super::Result<OpenAiProvider> {
 }
 
 /// The CLI resolves secrets; the shared loader never reads process state.
-pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + Sync> {
+pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + Sync + 'static> {
     let file = match dotenvy::from_path_iter(".env") {
         Ok(values) => values
             .collect::<std::result::Result<HashMap<_, _>, _>>()

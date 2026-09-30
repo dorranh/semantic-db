@@ -57,11 +57,15 @@ pub(super) fn sql_window(window: &BoundWindow) -> ast::Expr {
             with_fill: None,
         })
         .collect();
-    if window.frame == WindowFrame::EntirePartition {
-        spec.window_frame
-            .as_mut()
-            .expect("explicit frame")
-            .end_bound = Some(ast::WindowFrameBound::Following(None));
+    let frame = spec.window_frame.as_mut().expect("explicit frame");
+    match window.frame {
+        WindowFrame::EntirePartition => {
+            frame.end_bound = Some(ast::WindowFrameBound::Following(None));
+        }
+        WindowFrame::ThroughCurrentPeer => {}
+        WindowFrame::RowsThroughCurrent => {
+            frame.units = ast::WindowFrameUnits::Rows;
+        }
     }
     ast::Expr::Function(function.clone())
 }
@@ -108,10 +112,10 @@ pub(super) fn df_window(window: &BoundWindow) -> Expr {
             df_field(field).sort(*direction == Direction::Asc, *nulls == NullOrder::First)
         })
         .collect();
-    expr.params.window_frame = Frame::new(if window.frame == WindowFrame::ThroughCurrentPeer {
-        Some(false)
-    } else {
-        None
+    expr.params.window_frame = Frame::new(match window.frame {
+        WindowFrame::EntirePartition => None,
+        WindowFrame::ThroughCurrentPeer => Some(false),
+        WindowFrame::RowsThroughCurrent => Some(true),
     });
     Expr::WindowFunction(Box::new(expr))
 }

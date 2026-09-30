@@ -10,6 +10,26 @@ use thiserror::Error;
 
 mod governance;
 pub use governance::*;
+mod semantic_type;
+pub use semantic_type::*;
+mod entity_key;
+pub use entity_key::*;
+mod applicability;
+pub use applicability::*;
+mod conversion;
+pub use conversion::*;
+mod business_calendar;
+pub use business_calendar::*;
+mod currency_rate;
+pub use currency_rate::*;
+mod allocation;
+pub use allocation::*;
+mod metric_state;
+pub use metric_state::*;
+mod relationship_path;
+pub use relationship_path::*;
+mod view_lineage;
+pub use view_lineage::*;
 mod source;
 pub use source::*;
 mod canonical;
@@ -41,6 +61,11 @@ pub struct FieldSemantics {
     pub source_refs: Vec<SourceRef>,
     pub description: Option<String>,
     pub logical_type: Option<String>,
+    pub unit: Option<Unit>,
+    pub comparison_profile: Option<ComparisonProfile>,
+    pub enum_domain: Option<EnumDomain>,
+    pub reference_system: Option<ReferenceSystem>,
+    pub calendar_reference: Option<CalendarReference>,
     pub label: Option<String>,
     pub is_time: Option<bool>,
     pub ai_context: Option<AiContext>,
@@ -63,7 +88,14 @@ pub struct SemanticOrigin {
 /// Keys are declarations only: registration does not scan rows to enforce them.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RelationSemantics {
+    pub view_coverage: Option<ViewTemporalCoverage>,
+    pub view_lineage: Option<ViewOutputLineage>,
+    pub conversions: BTreeMap<String, UnitConversion>,
+    pub business_calendars: BTreeMap<String, BusinessCalendarRule>,
+    pub currency_rates: BTreeMap<String, CurrencyRateRule>,
+    pub allocations: BTreeMap<String, AllocationContract>,
     pub value_mappings: BTreeMap<String, ValueMapping>,
+    pub concepts: BTreeMap<String, ConceptDefinition>,
     pub metrics: BTreeMap<String, MetricDefinition>,
     pub ratio_metrics: BTreeMap<String, RatioDefinition>,
     pub relationships: BTreeMap<String, RelationshipDefinition>,
@@ -78,6 +110,8 @@ pub struct RelationSemantics {
     pub fields: BTreeMap<String, FieldSemantics>,
     pub declared_primary_key: Vec<String>,
     pub declared_unique_keys: Vec<Vec<String>>,
+    /// An authored entity/key contract with explicit, unpromoted evidence.
+    pub entity_identity: Option<EntityIdentity>,
     pub origin: Option<SemanticOrigin>,
 }
 
