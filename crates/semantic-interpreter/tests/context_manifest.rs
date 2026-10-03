@@ -3,7 +3,7 @@ use semantic_catalog::{
     Field, GrainKey, KeyEvidence, Relation, RelationKind, RelationSemantics, Schema, SearchReport,
     SourceGrain, ViewOutputLineage,
 };
-use semantic_compiler::typed::{
+use semantic_interpreter::typed::{
     ContextAudit, ContextDependency, ContextGapKind, ContextManifest, ContextObject, SelectionMode,
     audit_context_manifest,
 };

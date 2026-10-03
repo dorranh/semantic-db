@@ -1,8 +1,8 @@
 use axum::{Json, Router, routing::post};
 use semantic_db::{
     Engine,
-    compiler::{
-        Compiler,
+    interpreter::{
+        Interpreter,
         provider::{OpenAiConfig, OpenAiProvider},
     },
 };
@@ -78,7 +78,7 @@ async fn compilation_outcomes_and_disabled_mode() {
         serve(Router::new().route("/chat/completions", post(completion))).await;
     let mut config = OpenAiConfig::new("fixture".into(), "fixture".into());
     config.base_url = model;
-    let compiler = Compiler::new(OpenAiProvider::new(config).unwrap());
+    let compiler = Interpreter::new(OpenAiProvider::new(config).unwrap());
     let (url, server) = serve(router(StateData {
         engine: engine.clone(),
         compiler: Some(compiler),

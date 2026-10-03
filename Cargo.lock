@@ -2312,6 +2312,7 @@ dependencies = [
  "semantic-compiler",
  "semantic-db",
  "semantic-engine",
+ "semantic-interpreter",
  "semantic-ossie",
  "semantic-runtime",
  "semantic-sources",
@@ -4633,6 +4634,7 @@ dependencies = [
  "rustyline",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-interpreter",
  "semantic-ossie",
  "semantic-plan",
  "semantic-server",
@@ -4668,7 +4670,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "datafusion",
- "reqwest 0.12.28",
  "semantic-catalog",
  "semantic-engine",
  "semantic-plan",
@@ -4689,6 +4690,7 @@ dependencies = [
  "semantic-clickhouse",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-interpreter",
  "semantic-ossie",
  "semantic-plan",
  "semantic-postgres",
@@ -4717,6 +4719,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "semantic-interpreter"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "datafusion",
+ "reqwest 0.12.28",
+ "semantic-catalog",
+ "semantic-compiler",
+ "semantic-engine",
+ "semantic-plan",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "semantic-materialization"
 version = "0.1.0"
 dependencies = [
@@ -4740,6 +4762,7 @@ dependencies = [
  "semantic-catalog",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-interpreter",
  "semantic-plan",
  "serde",
  "serde-saphyr",
@@ -4759,6 +4782,7 @@ dependencies = [
  "semantic-clickhouse",
  "semantic-compiler",
  "semantic-engine",
+ "semantic-interpreter",
  "semantic-plan",
  "serde_json",
  "testcontainers",
@@ -4848,8 +4872,10 @@ dependencies = [
  "futures",
  "semantic-catalog",
  "semantic-clickhouse",
+ "semantic-compiler",
  "semantic-engine",
  "semantic-ossie",
+ "semantic-plan",
  "semantic-postgres",
  "semantic-runtime",
  "serde",

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::dependency_cache::{
+use semantic_compiler::typed::{
     AnalysisCache, AnalysisCacheError, AnalysisCacheIdentity, AnalysisCacheLimits, LookupDependency,
 };
 use std::sync::atomic::{AtomicBool, Ordering};

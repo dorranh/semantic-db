@@ -26,6 +26,7 @@ tokio.workspace = true
 semantic-ossie.workspace = true
 semantic-engine.workspace = true
 semantic-compiler.workspace = true
+semantic-interpreter.workspace = true
 
 [lints]
 workspace = true

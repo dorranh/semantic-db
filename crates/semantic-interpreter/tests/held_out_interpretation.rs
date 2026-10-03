@@ -19,12 +19,13 @@ use semantic_catalog::{
     AiContext, Catalog, CatalogMutation, ConceptDefinition, GovernedFilter, PublicationLimits,
     Relation, RelationSemantics, RowPolicy,
 };
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::typed::{Comparison, Literal, RowPredicate};
 use serde::Deserialize;
 use serde_json::Value;
@@ -193,8 +194,8 @@ fn engine(competing_alias: bool, policy: bool) -> Engine {
     engine
 }
 
-fn options(mode: &str) -> CompileOptions {
-    let mut options = CompileOptions::default();
+fn options(mode: &str) -> InterpretOptions {
+    let mut options = InterpretOptions::default();
     options.selection_mode = match mode {
         "full" => SelectionMode::Full,
         "retrieved" => SelectionMode::Retrieved,
@@ -221,7 +222,7 @@ async fn independently_expected_cases_hold_across_full_and_retrieved_context() {
                     calls: Arc::new(AtomicUsize::new(0)),
                     contexts: Arc::new(Mutex::new(Vec::new())),
                 };
-                let compilation = Compiler::new(provider.clone())
+                let compilation = Interpreter::new(provider.clone())
                     .with_max_repairs(0)
                     .compile_typed(&engine, &case.request, options(mode))
                     .await;
@@ -238,7 +239,7 @@ async fn independently_expected_cases_hold_across_full_and_retrieved_context() {
                 );
                 assert!(
                     compilation
-                        .record
+                        .interpretation
                         .contexts
                         .iter()
                         .all(|context| !context.semantic_sufficiency_proven)
@@ -352,7 +353,7 @@ async fn new_competing_alias_changes_the_published_result_and_acceptance() {
         calls: Arc::new(AtomicUsize::new(0)),
         contexts: Arc::new(Mutex::new(Vec::new())),
     };
-    let compiler = Compiler::new(scripted).with_max_repairs(0);
+    let compiler = Interpreter::new(scripted).with_max_repairs(0);
     let baseline = compiler
         .compile_typed(&engine(false, false), &case.request, options("full"))
         .await;

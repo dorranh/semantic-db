@@ -14,6 +14,7 @@ semantic_model:
     datasets:
       - name: samples
         source: drilling.samples
+        primary_key: [well_id, sample_id]
         fields:
           - name: well_id
             expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
@@ -28,6 +29,7 @@ semantic_model:
             expression: {dialects: [{dialect: ANSI_SQL, expression: load_kn}]}
       - name: wells
         source: drilling.wells
+        primary_key: [well_id]
         fields:
           - name: well_id
             expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
@@ -46,6 +48,7 @@ semantic_model:
       - name: summary
         source: drilling.summary
         description: Finalized AggregatingMergeTree states, one row per well with measurements.
+        primary_key: [well_id]
         fields:
           - name: well_id
             expression: {dialects: [{dialect: ANSI_SQL, expression: well_id}]}
@@ -57,3 +60,19 @@ semantic_model:
             expression: {dialects: [{dialect: ANSI_SQL, expression: mean_load_kn}]}
           - name: samples
             expression: {dialects: [{dialect: ANSI_SQL, expression: samples}]}
+    relationships:
+      - name: sample_well
+        from: samples
+        to: wells
+        from_columns: [well_id]
+        to_columns: [well_id]
+      - name: well_samples
+        from: wells
+        to: samples
+        from_columns: [well_id]
+        to_columns: [well_id]
+      - name: well_summary
+        from: wells
+        to: summary
+        from_columns: [well_id]
+        to_columns: [well_id]

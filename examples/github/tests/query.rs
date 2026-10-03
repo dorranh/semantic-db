@@ -12,11 +12,11 @@ use std::{
 use datafusion::{catalog::TableProvider, prelude::SessionContext};
 use example_github::{GitHub, GitHubConfig};
 use futures::StreamExt;
-use semantic_compiler::{
-    Compiler, GroundingOutcome,
+use semantic_engine::{Engine, pretty_format_batches};
+use semantic_interpreter::{
+    GroundingOutcome, Interpreter,
     provider::{Message, ModelProvider, ProviderError},
 };
-use semantic_engine::{Engine, pretty_format_batches};
 use semantic_ossie::{OssieDocument, SourceBindings};
 use serde_json::{Value, json};
 
@@ -593,7 +593,7 @@ async fn compiler_receives_semantics_and_clarification_does_not_execute_github()
     let server = Server::fixture();
     let github = GitHub::new(server.config()).unwrap();
     let engine = remote(&github).await;
-    let clarification = Compiler::new(Model { clarify: true })
+    let clarification = Interpreter::new(Model { clarify: true })
         .compile(&engine, "Which teams have stale issues?")
         .await
         .unwrap();
@@ -601,7 +601,7 @@ async fn compiler_receives_semantics_and_clarification_does_not_execute_github()
         clarification.outcome,
         GroundingOutcome::NeedsClarification { .. }
     ));
-    let grounded = Compiler::new(Model { clarify: false })
+    let grounded = Interpreter::new(Model { clarify: false })
         .compile(&engine, "Count open issues by team and repository")
         .await
         .unwrap();

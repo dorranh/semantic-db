@@ -19,7 +19,7 @@ use rustyline::{
 };
 
 use crate::{
-    Compiler, CompilerMode, Engine, OpenAiProvider, ReadMode, Result, TypedPresentation, config,
+    CompilerMode, Engine, Interpreter, OpenAiProvider, ReadMode, Result, TypedPresentation, config,
     run_ask, run_query, run_typed_ask,
 };
 
@@ -217,7 +217,7 @@ pub(super) async fn run(
                     InputKind::Ask => {
                         async {
                             if compiler.is_none() {
-                                compiler = Some(Compiler::new(config::provider()?));
+                                compiler = Some(Interpreter::new(config::provider()?));
                             }
                             run_ask_request(
                                 engine,
@@ -278,7 +278,7 @@ pub(super) async fn run(
 
 async fn run_ask_request(
     engine: &Engine,
-    compiler: &Compiler<OpenAiProvider>,
+    compiler: &Interpreter<OpenAiProvider>,
     request: &str,
     compile_only: bool,
     read_mode: &ReadMode,

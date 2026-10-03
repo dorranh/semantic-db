@@ -12,12 +12,13 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::Relation;
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::{Engine, QueryOptions, RelationBackend, TableProvider};
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::typed::{
     Direction, FieldRef, NullOrder, RelationInput, Requirement, RowOperation, RowQuery,
 };
@@ -145,11 +146,11 @@ async fn nested_authored_views_retain_local_definition_and_exact_rows() {
         output: serde_json::json!({"status":"query", "query": query()}).to_string(),
         contexts: contexts.clone(),
     };
-    let result = Compiler::new(provider)
+    let result = Interpreter::new(provider)
         .compile_typed(
             &engine,
             "List IDs of active deep wells in North Basin, ordered by ID",
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
     let TypedOutcome::Compiled { query } = result.outcome else {

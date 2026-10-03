@@ -22,15 +22,16 @@ use semantic_catalog::{
     MetricTemporalApplicability, Presence, Relation, RelationSemantics, RelationshipDefinition,
     RelationshipKey, RowPolicy, SourceGrain,
 };
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{
-        Calendar, CompileOptions, CompiledGraph, CompiledQuery, ContextOrigin, RequestContext,
-        SelectionMode, TypedCompilation, TypedOutcome, compile_graph, compile_rows,
-    },
+use semantic_compiler::typed::{
+    Calendar, CompileOptions, CompiledGraph, CompiledQuery, ContextOrigin, RequestContext,
+    TypedCompilation, TypedOutcome, compile_graph, compile_rows,
 };
 use semantic_engine::{Engine, QueryOptions};
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::{graph::*, typed::*};
 use serde_json::{Value, json};
 
@@ -1142,8 +1143,8 @@ impl ModelProvider for ScriptedProvider {
     }
 }
 
-fn scripted(replies: Vec<Value>) -> Compiler<ScriptedProvider> {
-    Compiler::new(ScriptedProvider {
+fn scripted(replies: Vec<Value>) -> Interpreter<ScriptedProvider> {
+    Interpreter::new(ScriptedProvider {
         replies: Mutex::new(replies.into_iter().map(|reply| reply.to_string()).collect()),
         calls: Mutex::new(0),
     })
@@ -1204,12 +1205,16 @@ async fn scope_and_context_bounds_fail_explicitly_and_scripted_provider_is_only_
 
     let proposal = json!({ "status": "query", "query": id_query });
     let result = scripted(vec![proposal])
-        .compile_typed(&engine, "List item identifiers", CompileOptions::default())
+        .compile_typed(
+            &engine,
+            "List item identifiers",
+            InterpretOptions::default(),
+        )
         .await;
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
-    assert_eq!(result.record.work.model_calls, 1);
+    assert_eq!(result.interpretation.work.model_calls, 1);
 
-    let mut bounded = CompileOptions::default();
+    let mut bounded = InterpretOptions::default();
     bounded.selection_mode = SelectionMode::Retrieved;
     bounded.max_search_candidates = 1;
     let result = scripted(vec![])
@@ -1218,5 +1223,5 @@ async fn scope_and_context_bounds_fail_explicitly_and_scripted_provider_is_only_
     assert!(
         matches!(result.outcome, TypedOutcome::Unresolved { diagnostic } if diagnostic.code == expected_diagnostic("bounded_context"))
     );
-    assert_eq!(result.record.work.model_calls, 0);
+    assert_eq!(result.interpretation.work.model_calls, 0);
 }

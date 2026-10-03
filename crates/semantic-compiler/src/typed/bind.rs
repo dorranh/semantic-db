@@ -355,7 +355,7 @@ pub(super) fn bind(
     options: &CompileOptions,
     work: &mut Work,
 ) -> Result<BoundQuery, CompileDiagnostic> {
-    if !super::context::allowed(&query.input.relation, options) {
+    if !super::allowed(&query.input.relation, options) {
         return Err(diagnostic(
             "access_scope",
             "Relation is outside the compiler access scope",
@@ -1530,6 +1530,7 @@ pub(super) fn bind(
                             | DataType::Int16
                             | DataType::Int32
                             | DataType::Int64
+                            | DataType::Float64
                             | DataType::Utf8
                             | DataType::Decimal128(_, _)
                             | DataType::Date32
@@ -1682,6 +1683,7 @@ pub(super) fn bind(
         .any(|requirement| match &requirement.operation {
             BoundOperation::Aggregate {
                 function,
+                field,
                 mean_state,
                 weighted,
                 exact_distinct,
@@ -1689,6 +1691,9 @@ pub(super) fn bind(
                 ..
             } => {
                 *function == AggregateFunction::Sum
+                    && field
+                        .as_ref()
+                        .is_some_and(|field| field.field.data_type() != &DataType::Float64)
                     && !mean_state
                     && weighted.is_none()
                     && !exact_distinct
@@ -1713,12 +1718,20 @@ pub(super) fn bind(
     }
     if requirements.iter().any(|requirement| {
         matches!(
-            requirement.operation,
+            &requirement.operation,
             BoundOperation::Aggregate {
                 mean_state: true,
                 ..
             }
         )
+            || matches!(
+                &requirement.operation,
+                BoundOperation::Aggregate {
+                    function: AggregateFunction::Avg,
+                    field: Some(field),
+                    ..
+                } if matches!(field.field.data_type(), DataType::Int16 | DataType::Int32 | DataType::Int64)
+            )
     }) {
         definitions.push(ObjectRef {
             id: "functions/semantic_mean_i64_v1".into(),
@@ -2024,7 +2037,7 @@ impl Binder<'_> {
                 "Relationship key budget exhausted",
             ));
         }
-        if !super::context::allowed(&relationship.right_relation, self.options) {
+        if !super::allowed(&relationship.right_relation, self.options) {
             return Err(diagnostic(
                 "access_scope",
                 "Related relation is outside the compiler access scope",
@@ -2891,7 +2904,7 @@ fn collect_metric_candidates<'a>(
     let mut relations_visited = 0usize;
     for relation in snapshot.relations() {
         options.check()?;
-        if !super::context::allowed(&relation.definition().name, options) {
+        if !super::allowed(&relation.definition().name, options) {
             continue;
         }
         relations_visited = relations_visited.saturating_add(1);
@@ -3419,11 +3432,23 @@ fn aggregate_type(
         (AggregateFunction::Sum, DataType::Decimal128(p, s)) => {
             DataType::Decimal128((*p + 10).min(38), *s)
         }
+        (AggregateFunction::Sum | AggregateFunction::Avg, DataType::Float64) => DataType::Float64,
+        (AggregateFunction::Avg, DataType::Int16 | DataType::Int32 | DataType::Int64) => {
+            if distinct {
+                return Err(diagnostic(
+                    "aggregate_arguments",
+                    "Exact signed integer average does not accept DISTINCT",
+                ));
+            }
+            DataType::Decimal128(38, 18)
+        }
         (
             AggregateFunction::Min | AggregateFunction::Max,
             DataType::Int16
             | DataType::Int32
             | DataType::Int64
+            | DataType::UInt64
+            | DataType::Float64
             | DataType::Utf8
             | DataType::Decimal128(_, _)
             | DataType::Date32

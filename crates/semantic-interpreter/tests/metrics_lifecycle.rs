@@ -14,15 +14,16 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::Relation;
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{
-        CompilationCacheOptions, CompilationSession, CompileOptions, CompilerMetrics, TypedOutcome,
-        compile_graph, compile_graph_intent, compile_intent, compile_rows, compile_semantic,
-    },
+use semantic_compiler::typed::{
+    CompilationCacheOptions, CompilationSession, CompileOptions, CompilerMetrics, TypedOutcome,
+    compile_graph, compile_graph_intent, compile_intent, compile_rows, compile_semantic,
 };
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, InterpreterMetrics},
+};
 use semantic_plan::{graph::*, typed::*};
 
 fn fixture() -> Engine {
@@ -119,6 +120,16 @@ fn row_intent() -> IntentQuery {
     }
 }
 
+fn interpret_options(
+    compiler: CompileOptions,
+    metrics: &Arc<InterpreterMetrics>,
+) -> InterpretOptions {
+    let mut options = InterpretOptions::default();
+    options.compiler = compiler;
+    options.metrics = Some(metrics.clone());
+    options
+}
+
 fn options(metrics: &Arc<CompilerMetrics>) -> CompileOptions {
     let mut options = CompileOptions::default();
     options.metrics = Some(metrics.clone());
@@ -136,6 +147,7 @@ impl ModelProvider for Unsupported {
 async fn one_logical_request_is_counted_once_on_each_public_compile_route() {
     let engine = fixture();
     let metrics = Arc::new(CompilerMetrics::default());
+    let interpreter_metrics = Arc::new(InterpreterMetrics::default());
     let session = CompilationSession::new(&engine, CompilationCacheOptions::default()).unwrap();
     let _ = compile_rows(&engine, row(), options(&metrics)).await;
     let _ = compile_semantic(&engine, row(), options(&metrics)).await;
@@ -147,12 +159,21 @@ async fn one_logical_request_is_counted_once_on_each_public_compile_route() {
     let _ = session
         .compile_graph_intent(graph_intent(), options(&metrics))
         .await;
-    let _ = Compiler::new(Unsupported)
-        .compile_typed(&engine, "IDs", options(&metrics))
+    let _ = Interpreter::new(Unsupported)
+        .compile_typed(
+            &engine,
+            "IDs",
+            interpret_options(options(&metrics), &interpreter_metrics),
+        )
         .await;
     let snapshot = metrics.snapshot();
-    assert_eq!(snapshot.admitted, 9);
-    assert_eq!(snapshot.completed, 9);
+    assert_eq!(snapshot.admitted, 8);
+    assert_eq!(snapshot.completed, 8);
+    let interpreted = interpreter_metrics.snapshot();
+    assert_eq!(interpreted.admitted, 1);
+    assert_eq!(interpreted.completed, 1);
+    assert_eq!(interpreted.model_calls, 1);
+    assert_eq!(interpreted.outcomes["unsupported"], 1);
     assert_eq!(snapshot.in_flight, 0);
     assert!(snapshot.peak_in_flight >= 1);
     assert_eq!(snapshot.abandoned, 0);
@@ -175,18 +196,18 @@ impl ModelProvider for MultiPending {
 #[tokio::test]
 async fn concurrent_pending_requests_show_live_and_peak_counts() {
     let engine = Arc::new(fixture());
-    let metrics = Arc::new(CompilerMetrics::default());
+    let metrics = Arc::new(InterpreterMetrics::default());
     let (entered, mut receiver) = tokio::sync::mpsc::unbounded_channel();
-    let compiler = Arc::new(Compiler::new(MultiPending { entered }));
+    let compiler = Arc::new(Interpreter::new(MultiPending { entered }));
     let mut tasks = Vec::new();
     for _ in 0..2 {
         let engine = engine.clone();
         let metrics = metrics.clone();
         let compiler = compiler.clone();
         tasks.push(tokio::spawn(async move {
-            compiler
-                .compile_typed(&engine, "IDs", options(&metrics))
-                .await
+            let mut options = InterpretOptions::default();
+            options.metrics = Some(metrics);
+            compiler.compile_typed(&engine, "IDs", options).await
         }));
     }
     for _ in 0..2 {
@@ -222,6 +243,7 @@ impl ModelProvider for PendingProvider {
 async fn cancellation_deadline_abort_and_panic_leave_an_accurate_gauge() {
     let engine = Arc::new(fixture());
     let metrics = Arc::new(CompilerMetrics::default());
+    let interpreter_metrics = Arc::new(InterpreterMetrics::default());
 
     let cancelled = options(&metrics);
     cancelled.cancellation.cancel();
@@ -231,26 +253,37 @@ async fn cancellation_deadline_abort_and_panic_leave_an_accurate_gauge() {
     );
 
     let (entered, _receiver) = tokio::sync::oneshot::channel();
-    let compiler = Arc::new(Compiler::new(PendingProvider {
+    let compiler = Arc::new(Interpreter::new(PendingProvider {
         entered: Mutex::new(Some(entered)),
     }));
     let mut deadline = options(&metrics);
     deadline.timeout = Duration::from_millis(20);
-    let result = compiler.compile_typed(&engine, "IDs", deadline).await;
+    let result = compiler
+        .compile_typed(
+            &engine,
+            "IDs",
+            interpret_options(deadline, &interpreter_metrics),
+        )
+        .await;
     assert!(
         matches!(result.outcome, TypedOutcome::Unresolved { diagnostic } if diagnostic.code == "deadline")
     );
 
     let (entered, receiver) = tokio::sync::oneshot::channel();
-    let compiler = Arc::new(Compiler::new(PendingProvider {
+    let compiler = Arc::new(Interpreter::new(PendingProvider {
         entered: Mutex::new(Some(entered)),
     }));
     let task = {
         let engine = engine.clone();
         let metrics = metrics.clone();
+        let interpreter_metrics = interpreter_metrics.clone();
         tokio::spawn(async move {
             compiler
-                .compile_typed(&engine, "IDs", options(&metrics))
+                .compile_typed(
+                    &engine,
+                    "IDs",
+                    interpret_options(options(&metrics), &interpreter_metrics),
+                )
                 .await
         })
     };
@@ -258,10 +291,10 @@ async fn cancellation_deadline_abort_and_panic_leave_an_accurate_gauge() {
         .await
         .expect("provider must be entered")
         .unwrap();
-    assert_eq!(metrics.snapshot().in_flight, 1);
+    assert_eq!(interpreter_metrics.snapshot().in_flight, 1);
     task.abort();
     assert!(task.await.unwrap_err().is_cancelled());
-    assert_eq!(metrics.snapshot().in_flight, 0);
+    assert_eq!(interpreter_metrics.snapshot().in_flight, 0);
 
     struct Panics;
     impl ModelProvider for Panics {
@@ -272,17 +305,25 @@ async fn cancellation_deadline_abort_and_panic_leave_an_accurate_gauge() {
     let task = {
         let engine = engine.clone();
         let metrics = metrics.clone();
+        let interpreter_metrics = interpreter_metrics.clone();
         tokio::spawn(async move {
-            Compiler::new(Panics)
-                .compile_typed(&engine, "IDs", options(&metrics))
+            Interpreter::new(Panics)
+                .compile_typed(
+                    &engine,
+                    "IDs",
+                    interpret_options(options(&metrics), &interpreter_metrics),
+                )
                 .await
         })
     };
     assert!(task.await.unwrap_err().is_panic());
-    let snapshot = metrics.snapshot();
-    assert_eq!(snapshot.admitted, 4);
-    assert_eq!(snapshot.completed, 2);
-    assert_eq!(snapshot.cancelled, 1);
+    let compiler_snapshot = metrics.snapshot();
+    assert_eq!(compiler_snapshot.admitted, 1);
+    assert_eq!(compiler_snapshot.completed, 1);
+    assert_eq!(compiler_snapshot.cancelled, 1);
+    let snapshot = interpreter_metrics.snapshot();
+    assert_eq!(snapshot.admitted, 3);
+    assert_eq!(snapshot.completed, 1);
     assert_eq!(snapshot.deadline_exceeded, 1);
     assert_eq!(snapshot.abandoned, 2);
     assert_eq!(snapshot.in_flight, 0);

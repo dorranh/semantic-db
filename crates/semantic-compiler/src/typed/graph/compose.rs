@@ -88,7 +88,7 @@ pub(super) fn bind(
         }
         None
     } else {
-        if !context::allowed(relationship_relation, options) {
+        if !super::allowed(relationship_relation, options) {
             return Err(diagnostic(
                 "access_scope",
                 "Composition relationship is outside the access scope",
@@ -119,7 +119,7 @@ pub(super) fn bind(
     if let Some(contract) = contract
         && (contract.id.is_empty()
             || contract.role != *role
-            || !context::allowed(&contract.right_relation, options)
+            || !super::allowed(&contract.right_relation, options)
             || contract.key_pairs.len() != keys.len())
     {
         return Err(diagnostic(

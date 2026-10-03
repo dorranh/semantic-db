@@ -5,8 +5,8 @@ use std::{
 };
 
 use clap::{ArgGroup, Args as ClapArgs, Parser, Subcommand};
-use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
+use semantic_interpreter::{GroundingOutcome, Interpreter, provider::OpenAiProvider};
 use semantic_ossie::ModelInspection;
 use semantic_sources::{Project, Registry};
 use serde::Deserialize;
@@ -510,7 +510,7 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
     let path = required_project_path(args.project)?;
     let mut engine = load_engine(Some(path), registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
-    let compiler = Compiler::new(config::provider()?);
+    let compiler = Interpreter::new(config::provider()?);
     if args.compiler_mode != CompilerMode::SqlCompatibility {
         return run_typed_ask(
             &engine,
@@ -804,7 +804,7 @@ async fn run_query(engine: &Engine, sql: &str, read_mode: &ReadMode) -> Result<(
 
 async fn run_ask(
     engine: &Engine,
-    compiler: &Compiler<OpenAiProvider>,
+    compiler: &Interpreter<OpenAiProvider>,
     request: &str,
     compile_only: bool,
     read_mode: &ReadMode,
@@ -868,15 +868,16 @@ async fn run_write(engine: &Engine, sql: &str, explain: bool) -> Result<()> {
 
 async fn run_typed_ask(
     engine: &Engine,
-    compiler: &Compiler<OpenAiProvider>,
+    compiler: &Interpreter<OpenAiProvider>,
     request: &str,
     compile_only: bool,
     read_mode: &ReadMode,
     mode: CompilerMode,
     presentation: TypedPresentation,
 ) -> Result<()> {
-    use semantic_compiler::typed::{CompileOptions, SelectionMode, TypedOutcome};
-    let mut options = CompileOptions::default();
+    use semantic_compiler::typed::TypedOutcome;
+    use semantic_interpreter::typed::{InterpretOptions, SelectionMode};
+    let mut options = InterpretOptions::default();
     options.selection_mode = match mode {
         CompilerMode::TypedFull => SelectionMode::Full,
         CompilerMode::TypedRetrieved => SelectionMode::Retrieved,

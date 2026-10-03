@@ -8,6 +8,15 @@ pub(super) fn checked_scalar(value: &Literal) -> Result<ScalarValue, CompileDiag
         Literal::Int16(v) => ScalarValue::Int16(Some(*v)),
         Literal::Int32(v) => ScalarValue::Int32(Some(*v)),
         Literal::Int64(v) => ScalarValue::Int64(Some(*v)),
+        Literal::Float64(v) => {
+            if !v.is_finite() {
+                return Err(diagnostic(
+                    "float_literal",
+                    "Float64 literals must be finite",
+                ));
+            }
+            ScalarValue::Float64(Some(*v))
+        }
         Literal::UInt64(v) => ScalarValue::UInt64(Some(*v)),
         Literal::Utf8(v) => ScalarValue::Utf8(Some(v.clone())),
         Literal::Date32(v) => ScalarValue::Date32(Some(*v)),
@@ -67,6 +76,7 @@ pub(super) fn sql_type(value: &Literal) -> ast::DataType {
         Literal::Int16(_) => ast::DataType::SmallInt(None),
         Literal::Int32(_) => ast::DataType::Int(None),
         Literal::Int64(_) => ast::DataType::BigInt(None),
+        Literal::Float64(_) => ast::DataType::Double(ast::ExactNumberInfo::None),
         Literal::UInt64(_) => ast::DataType::BigIntUnsigned(None),
         Literal::Utf8(_) => ast::DataType::Text,
         Literal::Date32(_) => ast::DataType::Date,

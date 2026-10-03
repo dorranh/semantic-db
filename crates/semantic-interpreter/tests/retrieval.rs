@@ -3,12 +3,13 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::{AiContext, FieldSemantics, Relation, RelationSemantics};
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode, TypedOutcome, compile_rows},
-};
+use semantic_compiler::typed::{TypedOutcome, compile_rows};
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::typed::*;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -23,10 +24,10 @@ impl ModelProvider for Scripted {
         Ok(self.replies.lock().unwrap().remove(0))
     }
 }
-fn make_compiler(replies: Vec<Value>) -> (Compiler<Scripted>, Calls) {
+fn make_compiler(replies: Vec<Value>) -> (Interpreter<Scripted>, Calls) {
     let calls = Arc::new(Mutex::new(Vec::new()));
     (
-        Compiler::new(Scripted {
+        Interpreter::new(Scripted {
             replies: Mutex::new(replies.into_iter().map(|r| r.to_string()).collect()),
             calls: calls.clone(),
         }),
@@ -98,8 +99,8 @@ fn query(relation: &str, field: &str) -> RowQuery {
         unresolved: vec![],
     }
 }
-fn retrieved() -> CompileOptions {
-    let mut options = CompileOptions::default();
+fn retrieved() -> InterpretOptions {
+    let mut options = InterpretOptions::default();
     options.selection_mode = SelectionMode::Retrieved;
     options.max_context_fields = 32;
     options
@@ -116,10 +117,10 @@ async fn field_search_hydrates_governing_metadata_without_full_wide_schemas() {
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.context_fields, 15);
-    assert_eq!(result.record.contexts[0].included.len(), 3);
+    assert_eq!(result.interpretation.work.context_fields, 15);
+    assert_eq!(result.interpretation.contexts[0].included.len(), 3);
     assert!(
-        result.record.contexts[0]
+        result.interpretation.contexts[0]
             .included
             .iter()
             .all(|r| !r.field_inventory_complete)
@@ -127,7 +128,7 @@ async fn field_search_hydrates_governing_metadata_without_full_wide_schemas() {
     let text = &calls.lock().unwrap()[0][1].content;
     assert!(text.contains("No historical status") && text.contains("Current measurements only"));
     assert!(!text.contains("UNSELECTED_FIELD_PROSE") && !text.contains("private:source"));
-    assert!(!result.record.contexts[0].semantic_sufficiency_proven);
+    assert!(!result.interpretation.contexts[0].semantic_sufficiency_proven);
 }
 #[tokio::test]
 async fn unhydrated_proposals_expand_and_reconsider_before_binding() {
@@ -139,9 +140,9 @@ async fn unhydrated_proposals_expand_and_reconsider_before_binding() {
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.context_expansions, 1);
-    assert_eq!(result.record.work.model_calls, 2);
-    assert_eq!(result.record.contexts.len(), 2);
+    assert_eq!(result.interpretation.work.context_expansions, 1);
+    assert_eq!(result.interpretation.work.model_calls, 2);
+    assert_eq!(result.interpretation.contexts.len(), 2);
     let calls = calls.lock().unwrap();
     assert!(!calls[0][1].content.contains("f900"));
     assert!(calls[1][1].content.contains("f900"));
@@ -181,7 +182,7 @@ async fn explicit_search_and_inventory_expansion_share_one_budget() {
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.context_expansions, 1);
+    assert_eq!(result.interpretation.work.context_expansions, 1);
     let (compiler, _) = make_compiler(vec![
         json!({"status":"need_context","requests":[{"kind":"search","terms":"f999","relation":"wide"}]}),
         proposal("wide", "f999"),
@@ -238,7 +239,7 @@ async fn access_scope_applies_to_search_hydration_and_structured_binding() {
         matches!(result.outcome,TypedOutcome::Rejected {ref diagnostic} if diagnostic.code=="access_scope")
     );
     assert!(!calls.lock().unwrap()[0][1].content.contains("alternative"));
-    let result = compile_rows(&engine, query("alternative", "f1"), options).await;
+    let result = compile_rows(&engine, query("alternative", "f1"), options.compiler).await;
     assert!(
         matches!(result.outcome,TypedOutcome::Rejected {ref diagnostic} if diagnostic.code=="access_scope")
     );
@@ -254,7 +255,7 @@ async fn auto_falls_back_to_retrieved_and_model_input_budget_includes_protocol()
         .await;
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
     assert_eq!(
-        result.record.contexts[0].selection_mode,
+        result.interpretation.contexts[0].selection_mode,
         SelectionMode::Retrieved
     );
     let (compiler, calls) = make_compiler(vec![]);
@@ -302,7 +303,7 @@ async fn auto_uses_retrieved_context_when_full_catalog_exceeds_model_call_envelo
         result.outcome
     );
     assert_eq!(
-        result.record.contexts[0].selection_mode,
+        result.interpretation.contexts[0].selection_mode,
         SelectionMode::Retrieved
     );
     assert_eq!(calls.lock().unwrap().len(), 1);

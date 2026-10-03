@@ -11,6 +11,7 @@ publish.workspace = true
 semantic-catalog.workspace = true
 semantic-clickhouse.workspace = true
 semantic-compiler.workspace = true
+semantic-interpreter.workspace = true
 semantic-engine.workspace = true
 semantic-plan.workspace = true
 datafusion.workspace = true

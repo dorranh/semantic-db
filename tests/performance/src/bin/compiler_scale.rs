@@ -14,12 +14,13 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::{Relation, SearchOptions};
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::{Engine, RelationBackend, TableProvider};
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use serde_json::{Value, json};
 
 const REQUEST: &str = "measure_alpha measure_beta measure_gamma";
@@ -206,8 +207,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "unresolved": [],
         },
     });
-    let compiler = Compiler::new(StaticProposal(proposal.to_string()));
-    let mut options = CompileOptions::default();
+    let compiler = Interpreter::new(StaticProposal(proposal.to_string()));
+    let mut options = InterpretOptions::default();
     options.selection_mode = SelectionMode::Retrieved;
     let mut samples = Vec::new();
     let mut work = Vec::new();
@@ -230,8 +231,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let elapsed_ms = millis(start.elapsed());
         if repetition == 0 {
             cold_compile_ms = Some(elapsed_ms);
-            cold_compile_work = Some(serde_json::to_value(&compilation.record.work)?);
-            cold_compile_stages = Some(serde_json::to_value(&compilation.record.stages)?);
+            cold_compile_work = Some(serde_json::to_value(&compilation.interpretation.work)?);
+            cold_compile_stages = Some(serde_json::to_value(&compilation.interpretation.stages)?);
         }
         if repetition >= warmup {
             let plan_bytes = match &compilation.outcome {
@@ -239,16 +240,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 _ => unreachable!("checked compiled outcome"),
             };
             samples.push(elapsed_ms);
-            work.push(serde_json::to_value(&compilation.record.work)?);
+            work.push(serde_json::to_value(&compilation.interpretation.work)?);
             statuses.push(json!({
                 "outcome": compilation.record.outcome,
-                "cache": compilation.record.cache_status,
-                "context_bytes": compilation.record.work.context_bytes,
-                "context_fields": compilation.record.work.context_fields,
-                "extra_context_fields": compilation.record.work.context_fields.saturating_sub(NEEDLE_FIELDS.len()),
-                "model_calls": compilation.record.work.model_calls,
+                "cache": compilation.interpretation.cache_status,
+                "context_bytes": compilation.interpretation.work.context_bytes,
+                "context_fields": compilation.interpretation.work.context_fields,
+                "extra_context_fields": compilation.interpretation.work.context_fields.saturating_sub(NEEDLE_FIELDS.len()),
+                "model_calls": compilation.interpretation.work.model_calls,
                 "sql_plan_bytes": plan_bytes,
-                "stages": compilation.record.stages,
+                "stages": compilation.interpretation.stages,
             }));
         }
     }

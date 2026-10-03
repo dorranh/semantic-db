@@ -10,12 +10,15 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::{GrainKey, Relation, SourceGrain};
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, CompiledQuery, TypedCompilation, TypedOutcome, compile_rows},
+use semantic_compiler::typed::{
+    CompileOptions, CompiledQuery, TypedCompilation, TypedOutcome, compile_rows,
 };
 use semantic_engine::{Engine, QueryOptions};
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::typed::*;
 use serde_json::json;
 
@@ -139,7 +142,7 @@ async fn both_paths(engine: &Engine, query: RowQuery, expected: Vec<Vec<&str>>) 
         })
         .count();
     let result = compile_rows(engine, query, CompileOptions::default()).await;
-    assert_eq!(result.record.work.model_calls, 0);
+    assert_eq!(result.record.mode, "structured_rows_v1");
     assert_eq!(result.record.work.relations_looked_up, expected_relations);
     assert!(result.record.artifact_digest.is_some());
     let query = compiled(result);
@@ -483,8 +486,8 @@ impl ModelProvider for Scripted {
         Ok(self.replies.lock().unwrap().remove(0))
     }
 }
-fn compiler(replies: Vec<String>) -> Compiler<Scripted> {
-    Compiler::new(Scripted {
+fn compiler(replies: Vec<String>) -> Interpreter<Scripted> {
+    Interpreter::new(Scripted {
         replies: Mutex::new(replies),
         calls: Mutex::new(vec![]),
     })
@@ -499,20 +502,22 @@ async fn model_repairs_typed_proposals_but_never_accepts_sql_fallback() {
         proposal,
     ]);
     let result = compiler
-        .compile_typed(&engine, "List IDs", CompileOptions::default())
+        .compile_typed(&engine, "List IDs", InterpretOptions::default())
         .await;
-    assert_eq!(result.record.work.model_calls, 2);
+    assert_eq!(result.interpretation.work.model_calls, 2);
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
-    assert!(result.record.work.model_input_bytes > result.record.work.context_bytes * 2);
+    assert!(
+        result.interpretation.work.model_input_bytes > result.interpretation.work.context_bytes * 2
+    );
     let c = compiler_typed_sql();
     assert!(matches!(
-        c.compile_typed(&engine, "List IDs", CompileOptions::default())
+        c.compile_typed(&engine, "List IDs", InterpretOptions::default())
             .await
             .outcome,
         TypedOutcome::Rejected { .. }
     ));
 }
-fn compiler_typed_sql() -> Compiler<Scripted> {
+fn compiler_typed_sql() -> Interpreter<Scripted> {
     compiler(vec![
         json!({"status":"query","query":{"sql":"SELECT * FROM items"}}).to_string(),
     ])
@@ -523,7 +528,7 @@ fn compiler_typed_sql() -> Compiler<Scripted> {
 async fn context_cutoffs_do_not_call_model_or_claim_absence() {
     let engine = fixture();
     for field_cutoff in [true, false] {
-        let mut options = CompileOptions::default();
+        let mut options = InterpretOptions::default();
         if field_cutoff {
             options.max_context_fields = 1;
         } else {
@@ -532,7 +537,7 @@ async fn context_cutoffs_do_not_call_model_or_claim_absence() {
         let result = compiler(vec![])
             .compile_typed(&engine, "List IDs", options)
             .await;
-        assert_eq!(result.record.work.model_calls, 0);
+        assert_eq!(result.interpretation.work.model_calls, 0);
         assert!(
             matches!(result.outcome,TypedOutcome::Unresolved {ref diagnostic} if diagnostic.code=="context_limit")
         );
@@ -543,9 +548,9 @@ async fn context_cutoffs_do_not_call_model_or_claim_absence() {
         json!({"status":"unresolved","reason":"No established mapping"}),
     ] {
         let result = compiler(vec![response.to_string()])
-            .compile_typed(&engine, "Find deep items", CompileOptions::default())
+            .compile_typed(&engine, "Find deep items", InterpretOptions::default())
             .await;
-        assert_eq!(result.record.work.model_calls, 1);
+        assert_eq!(result.interpretation.work.model_calls, 1);
         assert!(!matches!(
             result.outcome,
             TypedOutcome::Compiled { .. } | TypedOutcome::Rejected { .. }
@@ -562,32 +567,38 @@ async fn deadline_and_cancellation_interrupt_model_wait_without_retry() {
         }
     }
     let engine = fixture();
-    let mut options = CompileOptions::default();
+    let mut options = InterpretOptions::default();
     options.timeout = std::time::Duration::from_millis(10);
-    let result = Compiler::new(Pending)
+    let result = Interpreter::new(Pending)
         .compile_typed(&engine, "List IDs", options)
         .await;
     assert!(
         matches!(result.outcome,TypedOutcome::Unresolved {ref diagnostic} if diagnostic.code=="deadline")
     );
-    let options = CompileOptions::default();
+    let options = InterpretOptions::default();
     let cancel = options.cancellation.clone();
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         cancel.cancel();
     });
-    let result = Compiler::new(Pending)
+    let result = Interpreter::new(Pending)
         .compile_typed(&engine, "List IDs", options)
         .await;
     assert!(
         matches!(result.outcome,TypedOutcome::Unresolved {ref diagnostic} if diagnostic.code=="cancelled")
     );
-    assert_eq!(result.record.work.model_calls, 1);
+    assert_eq!(result.interpretation.work.model_calls, 1);
     assert_eq!(
-        result.record.model_attempts[0].failure_code,
+        result.interpretation.model_attempts[0].failure_code,
         Some("interrupted")
     );
-    assert_eq!(result.record.token_accounting.calls_missing_input_usage, 1);
+    assert_eq!(
+        result
+            .interpretation
+            .token_accounting
+            .calls_missing_input_usage,
+        1
+    );
 }
 
 #[tokio::test]
@@ -650,7 +661,7 @@ async fn wide_catalog_binding_uses_indexed_fields_and_never_scans_providers() {
     let result = compile_rows(&engine, q, CompileOptions::default()).await;
     assert_eq!(result.record.work.relations_looked_up, 1);
     assert_eq!(result.record.work.fields_looked_up, 1);
-    assert_eq!(result.record.work.context_fields, 0);
+    assert_eq!(result.record.mode, "structured_rows_v1");
     assert_eq!(compiled(result).bound().snapshot_id(), snapshot.id());
 }
 
@@ -686,14 +697,14 @@ async fn provider_failure_is_distinct_and_does_not_retry() {
             Err(ProviderError::Http(401))
         }
     }
-    let result = Compiler::new(Failing)
-        .compile_typed(&fixture(), "List IDs", CompileOptions::default())
+    let result = Interpreter::new(Failing)
+        .compile_typed(&fixture(), "List IDs", InterpretOptions::default())
         .await;
     assert!(matches!(
         result.outcome,
         TypedOutcome::ProviderFailure { .. }
     ));
-    assert_eq!(result.record.work.model_calls, 1);
+    assert_eq!(result.interpretation.work.model_calls, 1);
     assert_eq!(result.record.outcome, "provider_failure");
 }
 
@@ -1914,7 +1925,7 @@ async fn normal_records_digest_model_supplied_requirement_identities() {
 
 #[tokio::test]
 async fn provider_attempts_account_for_reported_and_unknown_usage() {
-    use semantic_compiler::provider::{
+    use semantic_interpreter::provider::{
         CompletionMetadata, CompletionStatus, ModelCompletion, TokenUsage,
     };
     struct Reported;
@@ -1938,23 +1949,35 @@ async fn provider_attempts_account_for_reported_and_unknown_usage() {
             })
         }
     }
-    let result = Compiler::new(Reported)
-        .compile_typed(&fixture(), "IDs", CompileOptions::default())
+    let result = Interpreter::new(Reported)
+        .compile_typed(&fixture(), "IDs", InterpretOptions::default())
         .await;
     assert!(matches!(
         result.outcome,
         TypedOutcome::ProviderFailure { .. }
     ));
     assert_eq!(
-        result.record.model_attempts[0].status,
+        result.interpretation.model_attempts[0].status,
         Some(CompletionStatus::Refused)
     );
-    assert_eq!(result.record.token_accounting.reported_input_tokens, 100);
     assert_eq!(
-        result.record.token_accounting.reported_cached_input_tokens,
+        result.interpretation.token_accounting.reported_input_tokens,
+        100
+    );
+    assert_eq!(
+        result
+            .interpretation
+            .token_accounting
+            .reported_cached_input_tokens,
         40
     );
-    assert_eq!(result.record.token_accounting.calls_missing_output_usage, 0);
+    assert_eq!(
+        result
+            .interpretation
+            .token_accounting
+            .calls_missing_output_usage,
+        0
+    );
     assert!(
         !serde_json::to_string(&result.record)
             .unwrap()
@@ -2140,7 +2163,7 @@ async fn ratios_aggregate_before_dividing_with_declared_precision_and_zero_behav
 
 #[tokio::test]
 async fn governed_ratios_retain_component_contracts_and_retrieval_closure() {
-    use semantic_compiler::typed::SelectionMode;
+    use semantic_interpreter::typed::SelectionMode;
     let engine = governed_fixture().await;
     let mut q = query();
     q.input.relation = "governed".into();
@@ -2153,7 +2176,7 @@ async fn governed_ratios_retain_component_contracts_and_retrieval_closure() {
         },
     )];
     both_paths(&engine, q.clone(), vec![vec!["2.500000000000000000"]]).await;
-    let mut options = CompileOptions::default();
+    let mut options = InterpretOptions::default();
     options.selection_mode = SelectionMode::Retrieved;
     options.small_relation_fields = 0;
     options.initial_fields_per_relation = 0;
@@ -2161,7 +2184,7 @@ async fn governed_ratios_retain_component_contracts_and_retrieval_closure() {
         .compile_typed(&engine, "qualified average", options)
         .await;
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
-    let selected = result.record.contexts[0]
+    let selected = result.interpretation.contexts[0]
         .included
         .iter()
         .find(|r| r.reference.id == "governed")
@@ -2596,7 +2619,7 @@ async fn intent_retains_exact_request_and_validates_utf8_spans_without_claiming_
         .compile_typed(
             &engine,
             &intent.evidence.original_request,
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
     assert!(result.record.request_spans_validated);
@@ -2804,7 +2827,7 @@ async fn duplicate_dimension_keys_fail_during_execution_never_fan_out_or_choose_
 
 #[tokio::test]
 async fn bounded_model_capture_replays_repairs_and_does_not_change_compilation() {
-    use semantic_compiler::typed::{CaptureLimits, RecordingProvider, TranscriptProvider};
+    use semantic_interpreter::typed::{CaptureLimits, RecordingProvider, TranscriptProvider};
     let engine = fixture();
     let replies = vec![
         "not JSON".into(),
@@ -2818,8 +2841,8 @@ async fn bounded_model_capture_replays_repairs_and_does_not_change_compilation()
         CaptureLimits::default(),
     );
     let recorder = provider.recorder();
-    let original = Compiler::new(provider)
-        .compile_typed(&engine, "secret request IDs", CompileOptions::default())
+    let original = Interpreter::new(provider)
+        .compile_typed(&engine, "secret request IDs", InterpretOptions::default())
         .await;
     let digest = original.record.artifact_digest.clone().unwrap();
     let transcript = recorder.snapshot();
@@ -2832,15 +2855,15 @@ async fn bounded_model_capture_replays_repairs_and_does_not_change_compilation()
             .contains("secret request")
     );
     let provider = Arc::new(TranscriptProvider::new(transcript.clone(), 1024 * 1024).unwrap());
-    let replay = Compiler::new(provider.clone())
-        .compile_typed(&engine, "secret request IDs", CompileOptions::default())
+    let replay = Interpreter::new(provider.clone())
+        .compile_typed(&engine, "secret request IDs", InterpretOptions::default())
         .await;
     provider.verify_consumed().unwrap();
     assert_eq!(replay.record.artifact_digest, Some(digest.clone()));
-    assert_eq!(replay.record.work.model_calls, 2);
+    assert_eq!(replay.interpretation.work.model_calls, 2);
     let wrong = Arc::new(TranscriptProvider::new(transcript, 1024 * 1024).unwrap());
-    let mismatched = Compiler::new(wrong.clone())
-        .compile_typed(&engine, "changed request", CompileOptions::default())
+    let mismatched = Interpreter::new(wrong.clone())
+        .compile_typed(&engine, "changed request", InterpretOptions::default())
         .await;
     assert!(matches!(
         mismatched.outcome,
@@ -2858,8 +2881,8 @@ async fn bounded_model_capture_replays_repairs_and_does_not_change_compilation()
         },
     );
     let recorder = provider.recorder();
-    let limited = Compiler::new(provider)
-        .compile_typed(&engine, "secret request IDs", CompileOptions::default())
+    let limited = Interpreter::new(provider)
+        .compile_typed(&engine, "secret request IDs", InterpretOptions::default())
         .await;
     assert_eq!(limited.record.artifact_digest, Some(digest));
     let capture = recorder.snapshot();
@@ -2870,9 +2893,9 @@ async fn bounded_model_capture_replays_repairs_and_does_not_change_compilation()
 
 #[tokio::test]
 async fn aggregate_metrics_include_cache_reuse_rejections_and_usage_without_a_trace_subscriber() {
-    use semantic_compiler::{
-        provider::{CompletionMetadata, CompletionStatus, ModelCompletion, TokenUsage},
-        typed::{CompilationCacheOptions, CompilationSession, CompilerMetrics},
+    use semantic_compiler::typed::{CompilationCacheOptions, CompilationSession, CompilerMetrics};
+    use semantic_interpreter::provider::{
+        CompletionMetadata, CompletionStatus, ModelCompletion, TokenUsage,
     };
     struct Reported;
     impl ModelProvider for Reported {
@@ -2902,11 +2925,13 @@ async fn aggregate_metrics_include_cache_reuse_rejections_and_usage_without_a_tr
     let metrics = Arc::new(CompilerMetrics::default());
     let mut options = CompileOptions::default();
     options.metrics = Some(metrics.clone());
+    let mut model_options = InterpretOptions::default();
+    model_options.compiler = options.clone();
+    let model_result = Interpreter::new(Reported)
+        .compile_typed(&engine, "IDs", model_options)
+        .await;
     assert!(matches!(
-        Compiler::new(Reported)
-            .compile_typed(&engine, "IDs", options.clone())
-            .await
-            .outcome,
+        model_result.outcome,
         TypedOutcome::Compiled { .. }
     ));
     let session = CompilationSession::new(&engine, CompilationCacheOptions::default()).unwrap();
@@ -2935,20 +2960,38 @@ async fn aggregate_metrics_include_cache_reuse_rejections_and_usage_without_a_tr
     assert_eq!(total.cache_hits, 1);
     assert_eq!(
         (
-            total.model_calls,
-            total.reported_input_tokens,
-            total.reported_output_tokens
+            model_result.interpretation.work.model_calls,
+            model_result
+                .interpretation
+                .token_accounting
+                .reported_input_tokens,
+            model_result
+                .interpretation
+                .token_accounting
+                .reported_output_tokens
         ),
         (1, 8, 4)
     );
     assert_eq!(
         (
-            total.reported_cached_input_tokens,
-            total.reported_reasoning_tokens
+            model_result
+                .interpretation
+                .token_accounting
+                .reported_cached_input_tokens,
+            model_result
+                .interpretation
+                .token_accounting
+                .reported_reasoning_tokens
         ),
         (3, 1)
     );
-    assert_eq!(total.calls_missing_input_usage, 0);
+    assert_eq!(
+        model_result
+            .interpretation
+            .token_accounting
+            .calls_missing_input_usage,
+        0
+    );
     assert_eq!(total.latency_buckets.iter().sum::<u128>(), total.completed);
 }
 
@@ -3204,8 +3247,8 @@ async fn authored_value_mappings_bind_exact_codes_and_keep_parameter_provenance(
             .parameters()
             .contains(&Literal::Utf8("O'Reilly".into()))
     );
-    let mut options = CompileOptions::default();
-    options.selection_mode = semantic_compiler::typed::SelectionMode::Retrieved;
+    let mut options = InterpretOptions::default();
+    options.selection_mode = semantic_interpreter::typed::SelectionMode::Retrieved;
     let response = serde_json::to_string(&TypedProposal::Query { query: q.clone() }).unwrap();
     let result = compiler(vec![response.clone(), response])
         .compile_typed(&engine, "publisher", options)
@@ -3781,10 +3824,10 @@ async fn model_graphs_share_context_scope_and_generated_ctes_never_capture_catal
         .compile_typed(
             &engine,
             "Combine all item and special IDs",
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
-    assert_eq!(result.record.work.model_calls, 1);
+    assert_eq!(result.interpretation.work.model_calls, 1);
     let TypedOutcome::CompiledGraph { query: compiled } = result.outcome else {
         panic!("{:?}", result.outcome)
     };
@@ -3820,7 +3863,7 @@ async fn model_graphs_share_context_scope_and_generated_ctes_never_capture_catal
         ),
         expected
     );
-    let mut options = CompileOptions::default();
+    let mut options = InterpretOptions::default();
     options.allowed_relations = Some(["items".into()].into());
     let result = compiler(vec![response])
         .compile_typed(&engine, "Combine IDs", options)
@@ -4149,7 +4192,7 @@ async fn graph_intent_covers_scoped_requirements_order_limit_and_replays_exact_e
         .compile_typed(
             &engine,
             &intent.evidence.original_request,
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
     assert!(
@@ -4292,7 +4335,7 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         .compile_typed(
             &engine,
             &intent.evidence.original_request,
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
     assert!(
@@ -4300,7 +4343,7 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.model_calls, 2);
+    assert_eq!(result.interpretation.work.model_calls, 2);
     assert!(!result.record.request_spans_validated);
     assert!(result.record.request_digest.is_none());
 
@@ -4317,7 +4360,7 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         })
         .unwrap(),
     ]);
-    let mut options = CompileOptions::default();
+    let mut options = InterpretOptions::default();
     options.graph_request_evidence = Some(intent.evidence.clone());
     let result = model
         .compile_typed(&engine, &intent.evidence.original_request, options)
@@ -4327,7 +4370,7 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.model_calls, 2);
+    assert_eq!(result.interpretation.work.model_calls, 2);
     assert!(result.record.request_spans_validated);
 
     let mut wrong_request = intent.evidence.clone();
@@ -4348,7 +4391,7 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         .compile_typed(
             &engine,
             &intent.evidence.original_request,
-            CompileOptions::default(),
+            InterpretOptions::default(),
         )
         .await;
     assert!(
@@ -4356,6 +4399,6 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
         "{:?}",
         result.outcome
     );
-    assert_eq!(result.record.work.model_calls, 2);
+    assert_eq!(result.interpretation.work.model_calls, 2);
     assert!(result.record.request_spans_validated);
 }

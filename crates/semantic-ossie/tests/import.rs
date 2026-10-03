@@ -8,11 +8,11 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::{DataType, Field, Schema};
-use semantic_compiler::{
-    Compiler, GroundingOutcome, catalog_context,
+use semantic_engine::{Engine, TableProvider, pretty_format_batches};
+use semantic_interpreter::{
+    GroundingOutcome, Interpreter, catalog_context,
     provider::{Message, ModelProvider, ProviderError},
 };
-use semantic_engine::{Engine, TableProvider, pretty_format_batches};
 use semantic_ossie::{ImportError, OssieDocument, SCHEMA_COMMIT, SourceBindings};
 use serde_json::{Value, json};
 
@@ -180,7 +180,7 @@ async fn compiler_receives_imported_semantics_without_physical_paths_or_rows() {
         .await
         .unwrap();
     let imported = document.load(None, &sources).unwrap();
-    let compilation = Compiler::new(Model)
+    let compilation = Interpreter::new(Model)
         .compile(
             &imported.engine,
             "List active wells in North Basin at least 2500 metres deep",

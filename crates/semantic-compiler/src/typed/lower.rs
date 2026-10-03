@@ -6,7 +6,7 @@ use datafusion::{
     logical_expr::{Expr, lit},
     sql::sqlparser::{ast, dialect::GenericDialect, parser::Parser},
 };
-use semantic_catalog::ObjectRef;
+use semantic_catalog::{DataType, ObjectRef};
 use semantic_engine::Engine;
 use semantic_plan::typed::{
     AggregateFunction, Comparison, Direction, ExistenceMode, Literal, NullOrder, OutputFilterStage,
@@ -1488,10 +1488,28 @@ fn sql_aggregate(aggregate: &Aggregation, parameters: &mut Vec<Literal>) -> ast:
         "semantic_weighted_mean_i64_v1"
     } else if aggregate.mean_state {
         "semantic_mean_i64_v1"
+    } else if aggregate.function == AggregateFunction::Avg
+        && aggregate.field.as_ref().is_some_and(|field| {
+            matches!(
+                field.field.data_type(),
+                DataType::Int16 | DataType::Int32 | DataType::Int64
+            )
+        })
+    {
+        "semantic_mean_i64_v1"
     } else {
         match aggregate.function {
             AggregateFunction::Count => "count",
+            AggregateFunction::Sum
+                if aggregate
+                    .field
+                    .as_ref()
+                    .is_some_and(|field| field.field.data_type() == &DataType::Float64) =>
+            {
+                "sum"
+            }
             AggregateFunction::Sum => "semantic_sum_v1",
+            AggregateFunction::Avg => "avg",
             AggregateFunction::Min => "min",
             AggregateFunction::Max => "max",
         }
@@ -1506,7 +1524,22 @@ fn sql_aggregate(aggregate: &Aggregation, parameters: &mut Vec<Literal>) -> ast:
         aggregate
             .field
             .as_ref()
-            .map(sql_field)
+            .map(|field| {
+                let expression = sql_field(field);
+                if aggregate.function == AggregateFunction::Avg
+                    && matches!(field.field.data_type(), DataType::Int16 | DataType::Int32)
+                {
+                    ast::Expr::Cast {
+                        kind: ast::CastKind::Cast,
+                        expr: Box::new(expression),
+                        data_type: ast::DataType::BigInt(None),
+                        format: None,
+                        array: false,
+                    }
+                } else {
+                    expression
+                }
+            })
             .unwrap_or_else(|| ast::Expr::Value(ast::Value::Number("1".into(), false).into())),
     ))];
     if let Some(weighted) = &aggregate.weighted {
@@ -1546,10 +1579,28 @@ fn df_aggregate(aggregate: &Aggregation) -> Expr {
         semantic_engine::semantic_weighted_mean_i64_v1()
     } else if aggregate.mean_state {
         semantic_engine::semantic_mean_i64_v1()
+    } else if aggregate.function == AggregateFunction::Avg
+        && aggregate.field.as_ref().is_some_and(|field| {
+            matches!(
+                field.field.data_type(),
+                DataType::Int16 | DataType::Int32 | DataType::Int64
+            )
+        })
+    {
+        semantic_engine::semantic_mean_i64_v1()
     } else {
         match aggregate.function {
             AggregateFunction::Count => count::count_udaf(),
+            AggregateFunction::Sum
+                if aggregate
+                    .field
+                    .as_ref()
+                    .is_some_and(|field| field.field.data_type() == &DataType::Float64) =>
+            {
+                datafusion::functions_aggregate::sum::sum_udaf()
+            }
             AggregateFunction::Sum => semantic_engine::semantic_sum_v1(),
+            AggregateFunction::Avg => datafusion::functions_aggregate::average::avg_udaf(),
             AggregateFunction::Min => min_max::min_udaf(),
             AggregateFunction::Max => min_max::max_udaf(),
         }
@@ -1558,7 +1609,19 @@ fn df_aggregate(aggregate: &Aggregation) -> Expr {
         aggregate
             .field
             .as_ref()
-            .map(df_field)
+            .map(|field| {
+                let expression = df_field(field);
+                if aggregate.function == AggregateFunction::Avg
+                    && matches!(field.field.data_type(), DataType::Int16 | DataType::Int32)
+                {
+                    Expr::Cast(datafusion::logical_expr::expr::Cast::new(
+                        Box::new(expression),
+                        DataType::Int64,
+                    ))
+                } else {
+                    expression
+                }
+            })
             .unwrap_or_else(|| lit(1i64)),
     ];
     if let Some(weighted) = &aggregate.weighted {

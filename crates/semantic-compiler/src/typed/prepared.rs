@@ -19,6 +19,7 @@ const MAX_PREDICATE_DEPTH: usize = 64;
 pub enum PreparedType {
     Boolean,
     Int64,
+    Float64,
     Utf8,
     Date32,
     TimestampMicrosUtc,
@@ -28,6 +29,7 @@ impl PreparedType {
         match (self, value) {
             (Self::Boolean, Literal::Boolean(_))
             | (Self::Int64, Literal::Int64(_))
+            | (Self::Float64, Literal::Float64(_))
             | (Self::Utf8, Literal::Utf8(_))
             | (Self::Date32, Literal::Date32(_)) => true,
             (

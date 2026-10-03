@@ -5,12 +5,12 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::Relation;
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode},
-};
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 
 struct Unsupported;
 impl ModelProvider for Unsupported {
@@ -33,8 +33,8 @@ fn register(engine: &mut Engine, name: &str, extra_field: bool) {
         .unwrap();
 }
 
-fn options(mode: SelectionMode, name: &str) -> CompileOptions {
-    let mut options = CompileOptions::default();
+fn options(mode: SelectionMode, name: &str) -> InterpretOptions {
+    let mut options = InterpretOptions::default();
     options.selection_mode = mode;
     options.allowed_relations = Some(BTreeSet::from([name.into()]));
     options
@@ -42,21 +42,24 @@ fn options(mode: SelectionMode, name: &str) -> CompileOptions {
 
 #[tokio::test]
 async fn unrelated_publication_reuses_selection_but_renders_current_snapshot() {
-    let compiler = Compiler::new(Unsupported);
+    let compiler = Interpreter::new(Unsupported);
     let mut engine = Engine::new();
     register(&mut engine, "items", false);
     let first = compiler
         .compile_typed(&engine, "items", options(SelectionMode::Full, "items"))
         .await;
-    let first_manifest = &first.record.contexts[0];
+    let first_manifest = &first.interpretation.contexts[0];
     assert_eq!(first_manifest.included[0].fields, vec!["id"]);
 
     register(&mut engine, "unrelated", false);
     let second = compiler
         .compile_typed(&engine, "items", options(SelectionMode::Full, "items"))
         .await;
-    let second_manifest = &second.record.contexts[0];
-    assert_eq!(second.record.cache_status, "selection_hit_re_rendered");
+    let second_manifest = &second.interpretation.contexts[0];
+    assert_eq!(
+        second.interpretation.cache_status,
+        "selection_hit_re_rendered"
+    );
     assert_ne!(first_manifest.snapshot_id, second_manifest.snapshot_id);
     assert_eq!(second_manifest.included[0].fields, vec!["id"]);
     assert_eq!(
@@ -64,14 +67,14 @@ async fn unrelated_publication_reuses_selection_but_renders_current_snapshot() {
         first_manifest.included[0].reference
     );
     assert_eq!(
-        second.record.work.context_bytes,
-        first.record.work.context_bytes
+        second.interpretation.work.context_bytes,
+        first.interpretation.work.context_bytes
     );
 }
 
 #[tokio::test]
 async fn changed_or_newly_present_selected_name_invalidates_selection() {
-    let compiler = Compiler::new(Unsupported);
+    let compiler = Interpreter::new(Unsupported);
     let mut first_engine = Engine::new();
     register(&mut first_engine, "items", false);
     compiler
@@ -91,9 +94,12 @@ async fn changed_or_newly_present_selected_name_invalidates_selection() {
             options(SelectionMode::Full, "items"),
         )
         .await;
-    assert_ne!(changed.record.cache_status, "selection_hit_re_rendered");
+    assert_ne!(
+        changed.interpretation.cache_status,
+        "selection_hit_re_rendered"
+    );
     assert_eq!(
-        changed.record.contexts[0].included[0].fields,
+        changed.interpretation.contexts[0].included[0].fields,
         vec!["changed", "id"]
     );
 
@@ -106,7 +112,7 @@ async fn changed_or_newly_present_selected_name_invalidates_selection() {
             options(SelectionMode::Full, "future"),
         )
         .await;
-    assert!(missing.record.contexts[0].included.is_empty());
+    assert!(missing.interpretation.contexts[0].included.is_empty());
     register(&mut missing_engine, "future", false);
     let present = compiler
         .compile_typed(
@@ -115,13 +121,16 @@ async fn changed_or_newly_present_selected_name_invalidates_selection() {
             options(SelectionMode::Full, "future"),
         )
         .await;
-    assert_ne!(present.record.cache_status, "selection_hit_re_rendered");
-    assert_eq!(present.record.contexts[0].included.len(), 1);
+    assert_ne!(
+        present.interpretation.cache_status,
+        "selection_hit_re_rendered"
+    );
+    assert_eq!(present.interpretation.contexts[0].included.len(), 1);
 }
 
 #[tokio::test]
 async fn ranked_retrieval_still_rebuilds_after_unrelated_publication() {
-    let compiler = Compiler::new(Unsupported);
+    let compiler = Interpreter::new(Unsupported);
     let mut engine = Engine::new();
     register(&mut engine, "items", false);
     compiler
@@ -131,6 +140,9 @@ async fn ranked_retrieval_still_rebuilds_after_unrelated_publication() {
     let changed = compiler
         .compile_typed(&engine, "items", options(SelectionMode::Retrieved, "items"))
         .await;
-    assert_ne!(changed.record.cache_status, "selection_hit_re_rendered");
-    assert!(changed.record.work.index_objects_visited > 0);
+    assert_ne!(
+        changed.interpretation.cache_status,
+        "selection_hit_re_rendered"
+    );
+    assert!(changed.interpretation.work.index_objects_visited > 0);
 }

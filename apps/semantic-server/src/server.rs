@@ -4,8 +4,8 @@ use crate::{
 };
 use clap::Args;
 use semantic_db::{
-    compiler::{
-        Compiler,
+    interpreter::{
+        Interpreter,
         provider::{OpenAiConfig, OpenAiProvider},
     },
     sources::{Project, Registry},
@@ -77,7 +77,7 @@ pub async fn run_with_registry(
         if let Some(url) = secret("OPENAI_BASE_URL") {
             config.base_url = url;
         }
-        Some(Compiler::new(OpenAiProvider::new(config)?))
+        Some(Interpreter::new(OpenAiProvider::new(config)?))
     } else {
         None
     };

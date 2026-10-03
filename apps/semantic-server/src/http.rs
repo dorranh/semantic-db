@@ -7,7 +7,7 @@ use axum::{
 };
 use semantic_db::{
     Engine,
-    compiler::{Compilation, Compiler, provider::OpenAiProvider},
+    interpreter::{Compilation, Interpreter, provider::OpenAiProvider},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -18,13 +18,14 @@ use std::{
 
 pub struct StateData {
     pub engine: Arc<Engine>,
-    pub compiler: Option<Compiler<OpenAiProvider>>,
+    pub compiler: Option<Interpreter<OpenAiProvider>>,
 }
 struct HttpState {
     engine: Arc<Engine>,
-    compiler: Option<Compiler<OpenAiProvider>>,
+    compiler: Option<Interpreter<OpenAiProvider>>,
     session: semantic_db::compiler::typed::CompilationSession<'static>,
     metrics: Arc<semantic_db::compiler::typed::CompilerMetrics>,
+    interpreter_metrics: Arc<semantic_db::interpreter::typed::InterpreterMetrics>,
     admission: tokio::sync::Semaphore,
 }
 type HttpError = (StatusCode, Json<Value>);
@@ -69,6 +70,7 @@ pub fn router_with_compilation_limit(
         session,
         admission: tokio::sync::Semaphore::new(max_concurrent),
         metrics: Arc::new(Default::default()),
+        interpreter_metrics: Arc::new(Default::default()),
     };
     Ok(Router::new()
         .route("/health", get(health))
@@ -88,7 +90,9 @@ async fn health(State(s): State<Arc<HttpState>>) -> Json<Value> {
     Json(json!({"ready": true, "ask_enabled": s.compiler.is_some()}))
 }
 async fn catalog(State(s): State<Arc<HttpState>>) -> Json<Value> {
-    Json(semantic_db::compiler::catalog_context(s.engine.catalog()))
+    Json(semantic_db::interpreter::catalog_context(
+        s.engine.catalog(),
+    ))
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -121,14 +125,15 @@ async fn compile(
 struct SemanticRequest {
     question: String,
     #[serde(default)]
-    context: semantic_db::compiler::typed::SelectionMode,
+    context: semantic_db::interpreter::typed::SelectionMode,
     #[serde(default)]
     request_context: Option<semantic_db::compiler::typed::RequestContext>,
 }
 async fn compile_semantic(
     State(s): State<Arc<HttpState>>,
     Json(request): Json<SemanticRequest>,
-) -> Result<Json<semantic_db::compiler::typed::TypedCompilation>, (StatusCode, Json<Value>)> {
+) -> Result<Json<semantic_db::interpreter::typed::InterpretedCompilation>, (StatusCode, Json<Value>)>
+{
     let Some(compiler) = &s.compiler else {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
@@ -142,7 +147,9 @@ async fn compile_semantic(
         ));
     }
     let _permit = s.admit()?;
-    let mut options = s.options();
+    let mut options = semantic_db::interpreter::typed::InterpretOptions::default();
+    options.compiler = s.options();
+    options.metrics = Some(s.interpreter_metrics.clone());
     options.selection_mode = request.context;
     options.request_context = request.request_context;
     Ok(Json(
@@ -315,7 +322,9 @@ async fn compile_intent(
     Ok(Json(s.session.compile(request.intent.query, options).await))
 }
 async fn compiler_metrics(State(s): State<Arc<HttpState>>) -> Json<Value> {
-    Json(json!({"compilations":s.metrics.snapshot(),"cache":s.session.stats()}))
+    Json(
+        json!({"compilations":s.metrics.snapshot(),"interpretations":s.interpreter_metrics.snapshot(),"cache":s.session.stats()}),
+    )
 }
 
 #[cfg(test)]
@@ -333,6 +342,7 @@ mod tests {
             engine,
             compiler: None,
             metrics: Arc::new(Default::default()),
+            interpreter_metrics: Arc::new(Default::default()),
             admission: tokio::sync::Semaphore::new(1),
         });
         let query = serde_json::from_value(json!({"version":1,"input":{"relation":"missing","instance":"r"},"requirements":[],"unresolved":[]})).unwrap();
@@ -358,6 +368,7 @@ mod tests {
             engine,
             compiler: None,
             metrics: Arc::new(Default::default()),
+            interpreter_metrics: Arc::new(Default::default()),
             admission: tokio::sync::Semaphore::new(1),
         });
         let request = serde_json::from_value(json!({

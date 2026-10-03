@@ -28,7 +28,7 @@ pub struct RequestContext {
     pub origin: ContextOrigin,
 }
 impl RequestContext {
-    pub(super) fn validate(&self) -> Result<(), CompileDiagnostic> {
+    pub fn validate(&self) -> Result<(), CompileDiagnostic> {
         if self.timezone.len() > 128
             || self.timezone.parse::<Tz>().is_err()
             || chrono::DateTime::<Utc>::from_timestamp_millis(self.reference_unix_millis).is_none()

@@ -35,7 +35,7 @@ async fn structured_route_needs_no_model_and_never_executes_rows() {
     let compiled: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(compiled["version"], 1);
     assert_eq!(compiled["outcome"]["status"], "compiled");
-    assert_eq!(compiled["record"]["work"]["model_calls"], 0);
+    assert!(compiled["record"]["work"].get("model_calls").is_none());
     let response = app
         .clone()
         .oneshot(
@@ -149,7 +149,7 @@ async fn graph_route_compiles_sets_without_a_model() {
             .unwrap();
     assert_eq!(compiled["outcome"]["status"], "compiled_graph");
     assert_eq!(compiled["record"]["outcome"], "compiled");
-    assert_eq!(compiled["record"]["work"]["model_calls"], 0);
+    assert!(compiled["record"]["work"].get("model_calls").is_none());
 }
 
 #[tokio::test]
@@ -192,7 +192,7 @@ async fn graph_intent_route_validates_final_order_and_limit_without_a_model() {
             serde_json::from_slice(&to_bytes(response.into_body(), 1024 * 1024).await.unwrap())
                 .unwrap();
         assert_eq!(value["outcome"]["status"], expected, "{value}");
-        assert_eq!(value["record"]["work"]["model_calls"], 0);
+        assert!(value["record"]["work"].get("model_calls").is_none());
         if expected == "compiled_graph" {
             assert_eq!(value["record"]["request_spans_validated"], true);
             assert_eq!(

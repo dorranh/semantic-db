@@ -5,12 +5,13 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::Relation;
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 
 struct Unsupported;
 impl ModelProvider for Unsupported {
@@ -32,8 +33,8 @@ fn register(engine: &mut Engine, name: &str) {
         .unwrap();
 }
 
-fn options() -> CompileOptions {
-    let mut options = CompileOptions::default();
+fn options() -> InterpretOptions {
+    let mut options = InterpretOptions::default();
     options.selection_mode = SelectionMode::Retrieved;
     options
 }
@@ -42,40 +43,43 @@ fn options() -> CompileOptions {
 async fn repeated_context_reuses_rendering_and_respects_request_and_snapshot() {
     let mut engine = Engine::new();
     register(&mut engine, "items");
-    let compiler = Compiler::new(Unsupported);
+    let compiler = Interpreter::new(Unsupported);
     let first = compiler.compile_typed(&engine, "items", options()).await;
     assert!(
         matches!(first.outcome, TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "partial_catalog")
     );
-    assert!(first.record.work.index_objects_visited > 0);
+    assert!(first.interpretation.work.index_objects_visited > 0);
     let second = compiler.compile_typed(&engine, "items", options()).await;
     assert!(
         matches!(second.outcome, TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "partial_catalog")
     );
-    assert_eq!(second.record.cache_status, "context_hit_same_snapshot");
-    assert_eq!(second.record.work.index_objects_visited, 0);
     assert_eq!(
-        second.record.work.context_bytes,
-        first.record.work.context_bytes
+        second.interpretation.cache_status,
+        "context_hit_same_snapshot"
+    );
+    assert_eq!(second.interpretation.work.index_objects_visited, 0);
+    assert_eq!(
+        second.interpretation.work.context_bytes,
+        first.interpretation.work.context_bytes
     );
 
     let changed_request = compiler
         .compile_typed(&engine, "items current", options())
         .await;
     assert_ne!(
-        changed_request.record.cache_status,
+        changed_request.interpretation.cache_status,
         "context_hit_same_snapshot"
     );
 
     register(&mut engine, "later");
     let changed_snapshot = compiler.compile_typed(&engine, "items", options()).await;
     assert_ne!(
-        changed_snapshot.record.cache_status,
+        changed_snapshot.interpretation.cache_status,
         "context_hit_same_snapshot"
     );
     assert_ne!(
-        first.record.snapshot_id,
-        changed_snapshot.record.snapshot_id
+        first.interpretation.snapshot_id,
+        changed_snapshot.interpretation.snapshot_id
     );
 }
 
@@ -84,7 +88,7 @@ async fn concurrent_compiles_share_one_initial_context_build() {
     let mut engine = Engine::new();
     register(&mut engine, "items");
     let engine = Arc::new(engine);
-    let compiler = Arc::new(Compiler::new(Unsupported));
+    let compiler = Arc::new(Interpreter::new(Unsupported));
     let mut tasks = Vec::new();
     for _ in 0..8 {
         let compiler = compiler.clone();
@@ -100,7 +104,7 @@ async fn concurrent_compiles_share_one_initial_context_build() {
         assert!(
             matches!(compilation.outcome, TypedOutcome::Unresolved { ref diagnostic } if diagnostic.code == "partial_catalog")
         );
-        if compilation.record.cache_status == "context_hit_same_snapshot" {
+        if compilation.interpretation.cache_status == "context_hit_same_snapshot" {
             hits += 1;
         } else {
             builds += 1;

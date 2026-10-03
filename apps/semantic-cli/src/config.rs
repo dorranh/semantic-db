@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use semantic_compiler::provider::{OpenAiConfig, OpenAiProvider};
+use semantic_interpreter::provider::{OpenAiConfig, OpenAiProvider};
 
 /// Read .env from the working directory only when natural-language mode is used.
 /// Existing process variables take precedence. Do not mutate global environment

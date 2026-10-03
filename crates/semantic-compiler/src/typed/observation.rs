@@ -31,10 +31,6 @@ pub struct Observation {
     pub outcome: ObservationOutcome,
     pub artifact_cache_hit: bool,
     pub context_cache_hit: bool,
-    pub model_calls: u64,
-    pub context_expansions: u64,
-    pub index_objects_visited: u64,
-    pub search_postings_visited: u64,
     pub elapsed_micros: u64,
 }
 
@@ -54,11 +50,6 @@ impl Observation {
             outcome,
             artifact_cache_hit: record.cache_status == "hit_same_snapshot_and_scope",
             context_cache_hit: record.cache_status == "context_hit_same_snapshot",
-            model_calls: record.work.model_calls.min(u64::MAX as usize) as u64,
-            context_expansions: record.work.context_expansions.min(u64::MAX as usize) as u64,
-            index_objects_visited: record.work.index_objects_visited.min(u64::MAX as usize) as u64,
-            search_postings_visited: record.work.search_postings_visited.min(u64::MAX as usize)
-                as u64,
             elapsed_micros: record.elapsed_micros.min(u128::from(u64::MAX)) as u64,
         }
     }

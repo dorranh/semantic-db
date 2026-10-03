@@ -15,12 +15,13 @@ use datafusion::{
     datasource::MemTable,
 };
 use semantic_catalog::Relation;
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, ProviderError},
-    typed::{CompileOptions, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, ProviderError},
+    typed::InterpretOptions,
+};
 use serde_json::json;
 use tokio::{sync::Semaphore, task::JoinSet};
 
@@ -97,11 +98,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         gate: gate.clone(),
         proposal: proposal(),
     };
-    let compiler = Arc::new(Compiler::new(provider));
+    let compiler = Arc::new(Interpreter::new(provider));
     let mut tasks = JoinSet::new();
     let mut cancellations = Vec::new();
     for id in 0..clients {
-        let mut options = CompileOptions::default();
+        let mut options = InterpretOptions::default();
         options.timeout = Duration::from_secs(10);
         cancellations.push(options.cancellation.clone());
         let compiler = compiler.clone();
@@ -121,7 +122,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 id,
                 kind,
                 elapsed_ms,
-                result.record.work.model_calls,
+                result.interpretation.work.model_calls,
                 result.record.artifact_digest,
             )
         });

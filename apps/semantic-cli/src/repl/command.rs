@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) async fn run(
     engine: &mut Engine,
-    compiler: &mut Option<Compiler<OpenAiProvider>>,
+    compiler: &mut Option<Interpreter<OpenAiProvider>>,
     mode: &mut ReplMode,
     line: &str,
     read_mode: &ReadMode,
@@ -102,7 +102,7 @@ pub(super) async fn run(
                 return Err("provide a natural-language request".into());
             }
             if compiler.is_none() {
-                *compiler = Some(Compiler::new(config::provider()?));
+                *compiler = Some(Interpreter::new(config::provider()?));
             }
             run_ask_request(
                 engine,

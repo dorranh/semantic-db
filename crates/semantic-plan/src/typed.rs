@@ -250,6 +250,7 @@ pub enum ExistenceMode {
 pub enum AggregateFunction {
     Count,
     Sum,
+    Avg,
     Min,
     Max,
 }
@@ -320,6 +321,7 @@ pub enum Literal {
     Int16(i16),
     Int32(i32),
     Int64(i64),
+    Float64(f64),
     #[serde(rename = "uint64")]
     UInt64(u64),
     Utf8(String),

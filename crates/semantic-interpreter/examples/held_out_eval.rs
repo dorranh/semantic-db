@@ -21,12 +21,13 @@ use semantic_catalog::{
     Relation, RelationSemantics, RelationshipDefinition, RelationshipKey, RowPolicy,
     UNIT_CONVERSION_VERSION, UnitConversion,
 };
-use semantic_compiler::{
-    Compiler,
-    provider::{Message, ModelProvider, OpenAiConfig, OpenAiProvider, ProviderError},
-    typed::{CompileOptions, SelectionMode, TypedOutcome},
-};
+use semantic_compiler::typed::TypedOutcome;
 use semantic_engine::Engine;
+use semantic_interpreter::{
+    Interpreter,
+    provider::{Message, ModelProvider, OpenAiConfig, OpenAiProvider, ProviderError},
+    typed::{InterpretOptions, SelectionMode},
+};
 use semantic_plan::typed::{AggregateFunction, Comparison, Literal, RowPredicate};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -517,7 +518,7 @@ async fn evaluate(
         &case.expected.retrieved
     };
     let engine = engine(case);
-    let mut options = CompileOptions::default();
+    let mut options = InterpretOptions::default();
     options.selection_mode = mode;
     options.timeout = Duration::from_secs(30);
     // Retrieved context may need one bounded hydration round before the same
@@ -526,7 +527,7 @@ async fn evaluate(
     options.max_expansions = 1;
     options.max_total_model_input_bytes = 64 * 1024;
     options.max_total_model_output_bytes = 8 * 1024;
-    let compilation = Compiler::new(provider(live, &case.scripted_output)?)
+    let compilation = Interpreter::new(provider(live, &case.scripted_output)?)
         .with_max_repairs(0)
         .compile_typed(&engine, &case.request, options)
         .await;
@@ -562,7 +563,7 @@ async fn evaluate(
         .required_facts
         .iter()
         .filter(|required| {
-            compilation.record.contexts.iter().any(|context| {
+            compilation.interpretation.contexts.iter().any(|context| {
                 context.audit.facts.iter().any(|fact| {
                     fact.relation == required.relation
                         && fact.kind == required.kind
@@ -584,17 +585,23 @@ async fn evaluate(
         actual_diagnostic: diagnostic.map(str::to_owned),
         required_facts: case.required_facts.len(),
         recalled_facts,
-        model_calls: compilation.record.work.model_calls,
+        model_calls: compilation.interpretation.work.model_calls,
         elapsed_micros: compilation.record.elapsed_micros,
-        input_tokens: compilation.record.token_accounting.reported_input_tokens,
-        output_tokens: compilation.record.token_accounting.reported_output_tokens,
+        input_tokens: compilation
+            .interpretation
+            .token_accounting
+            .reported_input_tokens,
+        output_tokens: compilation
+            .interpretation
+            .token_accounting
+            .reported_output_tokens,
         token_usage_incomplete: compilation
-            .record
+            .interpretation
             .token_accounting
             .calls_missing_input_usage
             > 0
             || compilation
-                .record
+                .interpretation
                 .token_accounting
                 .calls_missing_output_usage
                 > 0,

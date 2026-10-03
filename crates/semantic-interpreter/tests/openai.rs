@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use semantic_compiler::provider::{
+use semantic_interpreter::provider::{
     Message, ModelProvider, OpenAiConfig, OpenAiProvider, ProviderError, Role,
 };
 use serde_json::json;

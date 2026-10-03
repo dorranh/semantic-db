@@ -1,7 +1,8 @@
-use semantic_compiler::typed::{TypedCompilation, TypedOutcome};
+use semantic_compiler::typed::TypedOutcome;
+use semantic_interpreter::typed::InterpretedCompilation;
 use semantic_plan::typed::{AggregateFunction, RowOperation};
 
-pub(crate) fn format_compilation(compilation: &TypedCompilation) -> Option<String> {
+pub(crate) fn format_compilation(compilation: &InterpretedCompilation) -> Option<String> {
     let mut lines =
         vec!["Interpretation (model-proposed, compiler-checked operations):".to_owned()];
     match &compilation.outcome {
@@ -77,6 +78,7 @@ fn operation_summary(operation: &RowOperation) -> String {
                 AggregateFunction::Sum => "sum",
                 AggregateFunction::Min => "minimum",
                 AggregateFunction::Max => "maximum",
+                AggregateFunction::Avg => "average",
             };
             match field {
                 Some(field) => format!(
