@@ -16,7 +16,15 @@ fn help_is_scoped_to_each_command() {
         String::from_utf8_lossy(&bare.stderr)
     );
     for command in [
-        "repl", "sql", "ask", "validate", "inspect", "cache", "server", "init",
+        "repl",
+        "sql",
+        "ask",
+        "compile-prepared",
+        "validate",
+        "inspect",
+        "cache",
+        "server",
+        "init",
     ] {
         assert!(help.contains(command), "{help}");
         let output = run(&[command, "--help"]);
@@ -26,8 +34,12 @@ fn help_is_scoped_to_each_command() {
         ("sql", "--plan"),
         ("sql", "--explain"),
         ("ask", "--compile-only"),
+        ("ask", "--compiler-mode"),
+        ("compile-prepared", "--file"),
+        ("compile-prepared", "--execute"),
         ("validate", "--connect"),
         ("repl", "--no-history"),
+        ("repl", "--experimental-compiler"),
         ("server", "--http-port"),
         ("init", "[PATH]"),
     ] {
@@ -50,6 +62,14 @@ fn help_is_scoped_to_each_command() {
     }
     let ask = String::from_utf8(run(&["ask", "--help"]).stdout).unwrap();
     assert!(!ask.contains("views-only"));
+    for mode in [
+        "sql-compatibility",
+        "typed-full",
+        "typed-retrieved",
+        "typed-auto",
+    ] {
+        assert!(ask.contains(mode), "{ask}");
+    }
     for command in ["status", "refresh", "invalidate"] {
         assert!(run(&["cache", command, "--help"]).status.success());
     }
@@ -65,7 +85,15 @@ fn version_identifies_the_build_without_loading_a_project() {
         format!("sdb {expected}")
     );
     for command in [
-        "repl", "sql", "ask", "validate", "inspect", "cache", "server", "init",
+        "repl",
+        "sql",
+        "ask",
+        "compile-prepared",
+        "validate",
+        "inspect",
+        "cache",
+        "server",
+        "init",
     ] {
         let output = run(&[command, "--version"]);
         assert!(output.status.success(), "{command}");

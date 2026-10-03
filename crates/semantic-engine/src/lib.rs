@@ -1,6 +1,33 @@
 //! Deterministic SQL execution with a descriptive relation catalog.
 
+mod allocation;
+mod business_calendar;
+mod calendar;
+mod checked_distinct;
+mod checked_mean;
+mod checked_snapshot;
+mod checked_weighted;
+pub use allocation::{
+    semantic_allocation_floor_v1, semantic_allocation_remainder_v1, semantic_allocation_share_v1,
+    semantic_assert_allocation_v1,
+};
+pub use business_calendar::semantic_local_date_us_v1;
+pub use calendar::semantic_utc_month_us_v1;
+mod checked_sum;
+mod compiler_functions;
+mod conversion;
+pub use checked_distinct::{EXACT_DISTINCT_MAX_IDENTITIES_V1, semantic_exact_count_i64_v1};
+pub use checked_mean::semantic_mean_i64_v1;
+pub use checked_snapshot::semantic_snapshot_balance_i64_v1;
+pub use checked_sum::semantic_sum_v1;
+pub use checked_weighted::semantic_weighted_mean_i64_v1;
 mod contracts;
+pub use compiler_functions::{semantic_assert_single_v1, semantic_ratio_i64_v1};
+pub use conversion::semantic_scale_i64_v1;
+mod deferred;
+pub use deferred::{DeferredBackend, DeferredOptions, DeferredProviderReport};
+mod execution_profile;
+pub use execution_profile::*;
 mod reads;
 mod writes;
 pub use contracts::*;
@@ -10,8 +37,10 @@ mod federation;
 mod materialization;
 mod parameters;
 mod query;
+mod rate_guard;
 pub use parameters::ReadDescription;
 pub use query::{PreparedQuery, QueryExecution};
+pub use rate_guard::semantic_assert_exactly_one_v1;
 pub use semantic_materialization::{CacheOptions, MaterializationManager, MaterializationPolicy};
 pub use semantic_runtime::SourceDescriptor;
 pub use semantic_runtime::staging::{StagedInput, StagingOptions};
@@ -20,7 +49,7 @@ pub use semantic_runtime::{QueryContext, QueryOptions};
 use std::{
     collections::{BTreeMap, BTreeSet},
     future::Future,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use datafusion::{
@@ -52,6 +81,8 @@ pub trait RelationBackend: Send + Sync {
 
 #[derive(Debug, Error)]
 pub enum EngineError {
+    #[error(transparent)]
+    CatalogPublication(#[from] semantic_catalog::PublicationError),
     #[error(transparent)]
     DataFusion(#[from] DataFusionError),
     #[error(transparent)]
@@ -88,6 +119,73 @@ pub enum EngineError {
 
 pub type Result<T> = std::result::Result<T, EngineError>;
 
+// The cache is deliberately local to an Engine. A DataFrame contains an
+// unexecuted logical plan and its SessionState; a fresh physical plan is made
+// when callers collect it. Keep retention small because a plan can reference
+// a wide provider schema even when the SQL projects only a few fields.
+const GENERATED_PLAN_CACHE_ENTRIES: usize = 8;
+const GENERATED_PLAN_CACHE_SQL_BYTES: usize = 256 * 1024;
+const GENERATED_PLAN_CACHE_MAX_SQL_BYTES: usize = 64 * 1024;
+
+struct GeneratedPlanEntry {
+    generation: u64,
+    sql: String,
+    frame: DataFrame,
+}
+
+#[derive(Default)]
+struct GeneratedPlanCache {
+    // Oldest entry first. A linear lookup is cheaper than another index at
+    // this deliberately small bound.
+    entries: Vec<GeneratedPlanEntry>,
+    sql_bytes: usize,
+}
+
+impl GeneratedPlanCache {
+    fn get(&mut self, generation: u64, sql: &str) -> Option<DataFrame> {
+        let index = self
+            .entries
+            .iter()
+            .position(|entry| entry.generation == generation && entry.sql == sql)?;
+        let entry = self.entries.remove(index);
+        let frame = entry.frame.clone();
+        self.entries.push(entry);
+        Some(frame)
+    }
+
+    fn insert(&mut self, generation: u64, sql: &str, frame: &DataFrame) {
+        if sql.len() > GENERATED_PLAN_CACHE_MAX_SQL_BYTES {
+            return;
+        }
+        if let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.generation == generation && entry.sql == sql)
+        {
+            let entry = self.entries.remove(index);
+            self.entries.push(entry);
+            return;
+        }
+        while self.entries.len() >= GENERATED_PLAN_CACHE_ENTRIES
+            || self.sql_bytes + sql.len() > GENERATED_PLAN_CACHE_SQL_BYTES
+        {
+            let oldest = self.entries.remove(0);
+            self.sql_bytes -= oldest.sql.len();
+        }
+        self.sql_bytes += sql.len();
+        self.entries.push(GeneratedPlanEntry {
+            generation,
+            sql: sql.to_owned(),
+            frame: frame.clone(),
+        });
+    }
+
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.sql_bytes = 0;
+    }
+}
+
 /// One in-memory session. Registration requires exclusive access so metadata and
 /// executable providers are updated together. No catalog persistence yet.
 pub struct Engine {
@@ -102,6 +200,7 @@ pub struct Engine {
     read_bindings: BTreeMap<String, ReadBinding>,
     write_bindings: BTreeMap<String, WriteBinding>,
     binding_generation: u64,
+    generated_plan_cache: Mutex<GeneratedPlanCache>,
     write_domains: BTreeMap<String, String>,
     resource_identities: BTreeMap<String, ResourceIdentity>,
 }
@@ -131,8 +230,24 @@ impl Engine {
             .with_optimizer_rules(federation::optimizer_rules())
             .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
             .build();
+        let context = SessionContext::new_with_state(state);
+        context.register_udf((*semantic_ratio_i64_v1()).clone());
+        context.register_udf((*semantic_assert_single_v1()).clone());
+        context.register_udf((*semantic_assert_exactly_one_v1()).clone());
+        context.register_udf((*semantic_scale_i64_v1()).clone());
+        context.register_udf((*semantic_allocation_floor_v1()).clone());
+        context.register_udf((*semantic_allocation_remainder_v1()).clone());
+        context.register_udf((*semantic_assert_allocation_v1()).clone());
+        context.register_udf((*semantic_allocation_share_v1()).clone());
+        context.register_udf((*semantic_utc_month_us_v1()).clone());
+        context.register_udf((*semantic_local_date_us_v1()).clone());
+        context.register_udaf((*semantic_sum_v1()).clone());
+        context.register_udaf((*semantic_mean_i64_v1()).clone());
+        context.register_udaf((*semantic_weighted_mean_i64_v1()).clone());
+        context.register_udaf((*semantic_exact_count_i64_v1()).clone());
+        context.register_udaf((*semantic_snapshot_balance_i64_v1()).clone());
         Ok(Self {
-            context: SessionContext::new_with_state(state),
+            context,
             catalog: Catalog::default(),
             providers: BTreeMap::new(),
             descriptors: BTreeMap::new(),
@@ -143,6 +258,7 @@ impl Engine {
             read_bindings: BTreeMap::new(),
             write_bindings: BTreeMap::new(),
             binding_generation: 0,
+            generated_plan_cache: Mutex::new(GeneratedPlanCache::default()),
             write_domains: BTreeMap::new(),
             resource_identities: BTreeMap::new(),
         })
@@ -206,6 +322,9 @@ impl Engine {
                 }
             }
         }
+        engine
+            .catalog
+            .validate(&semantic_catalog::PublicationLimits::default())?;
         Ok(engine)
     }
 
@@ -218,6 +337,47 @@ impl Engine {
     ) -> Result<()> {
         if !matches!(relation.kind, RelationKind::Base { .. }) {
             return Err(EngineError::ExpectedBaseRelation(relation.name));
+        }
+        self.register_provider(relation, provider)
+    }
+
+    /// Register a preplanned canonical direct-projection view. The caller
+    /// supplies the plan; the engine still checks its SQL dependencies and
+    /// Arrow output contract before making it visible.
+    pub fn register_view_projection(
+        &mut self,
+        relation: Relation,
+        provider: Arc<dyn TableProvider>,
+    ) -> Result<()> {
+        let RelationKind::View { sql, dependencies } = &relation.kind else {
+            return Err(EngineError::InvalidViewDefinition);
+        };
+        let lineage = relation
+            .semantics
+            .as_ref()
+            .and_then(|semantics| semantics.view_lineage.as_ref())
+            .ok_or(EngineError::InvalidViewDefinition)?;
+        if dependencies.len() != 1
+            || dependencies[0] != lineage.source.id
+            || lineage.canonical_sql(&relation.schema).as_deref() != Some(sql.as_str())
+            || self
+                .catalog
+                .snapshot()
+                .relation(&lineage.source.id)
+                .is_none_or(|source| source.reference() != &lineage.source)
+        {
+            return Err(EngineError::InvalidViewDefinition);
+        }
+        if self.validate_view_definition(&relation.name, sql)? != *dependencies {
+            return Err(EngineError::InvalidViewDefinition);
+        }
+        for dependency in dependencies {
+            if self.catalog.relation(dependency).is_none() {
+                return Err(EngineError::MissingDependency {
+                    view: relation.name.clone(),
+                    dependency: dependency.clone(),
+                });
+            }
         }
         self.register_provider(relation, provider)
     }
@@ -241,6 +401,10 @@ impl Engine {
         self.providers.insert(relation.name.clone(), provider);
         self.catalog.register(relation)?;
         self.binding_generation += 1;
+        self.generated_plan_cache
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .clear();
         Ok(())
     }
 
@@ -335,19 +499,38 @@ impl Engine {
             }
             pending.insert(relation.name.clone(), dependencies);
         }
-        let mut ready = BTreeSet::new();
+        let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut indegree = BTreeMap::new();
+        for (name, dependencies) in &pending {
+            indegree.insert(name.clone(), dependencies.len());
+            for dependency in dependencies {
+                dependents
+                    .entry(dependency.clone())
+                    .or_default()
+                    .push(name.clone());
+            }
+        }
+        let mut ready: BTreeSet<_> = indegree
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(name, _)| name.clone())
+            .collect();
         let mut order = Vec::new();
-        while !pending.is_empty() {
-            let next = pending
-                .iter()
-                .find(|(_, dependencies)| dependencies.iter().all(|name| ready.contains(name)))
-                .map(|(name, _)| name.clone());
-            let Some(name) = next else {
-                return Err(EngineError::CyclicViews(pending.into_keys().collect()));
-            };
+        while let Some(name) = ready.pop_first() {
             pending.remove(&name);
-            ready.insert(name.clone());
+            if let Some(children) = dependents.get(&name) {
+                for child in children {
+                    let count = indegree.get_mut(child).expect("known dependent");
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.insert(child.clone());
+                    }
+                }
+            }
             order.push(name);
+        }
+        if !pending.is_empty() {
+            return Err(EngineError::CyclicViews(pending.into_keys().collect()));
         }
         Ok(order)
     }
@@ -380,7 +563,28 @@ impl Engine {
                 return Err(EngineError::UnregisteredQueryRelation);
             }
         }
-        self.plan_sql(sql).await
+        // Parameter values and their inferred types are supplied later. Until
+        // they are part of a cache key, never retain plans containing a `$`.
+        // This also conservatively bypasses strings/identifiers containing `$`.
+        let cacheable = !sql.contains('$') && sql.len() <= GENERATED_PLAN_CACHE_MAX_SQL_BYTES;
+        if cacheable {
+            if let Some(frame) = self
+                .generated_plan_cache
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .get(self.binding_generation, sql)
+            {
+                return Ok(frame);
+            }
+        }
+        let frame = self.plan_sql(sql).await?;
+        if cacheable {
+            self.generated_plan_cache
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .insert(self.binding_generation, sql, &frame);
+        }
+        Ok(frame)
     }
 
     /// Convenience for small interactive results. Large consumers should call

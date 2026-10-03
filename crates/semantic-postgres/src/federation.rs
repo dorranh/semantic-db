@@ -565,11 +565,9 @@ fn expr_supported(expr: &Expr, plan: &LogicalPlan) -> bool {
                 && ordered(&list.expr, plan)
                 && list.list.iter().all(|v| ordered(v, plan))
         }
-        Expr::Cast(c) => matches!(
-            (expression_type(&c.expr, plan), c.field.data_type()),
-            (Some(DataType::Int16), DataType::Int32 | DataType::Int64)
-                | (Some(DataType::Int32), DataType::Int64)
-        ),
+        Expr::Cast(c) => expression_type(&c.expr, plan).is_some_and(|source| {
+            POSTGRES_EXECUTION_PROFILE.safe_cast(&source, c.field.data_type())
+        }),
         Expr::AggregateFunction(a) => {
             let implementation = a.func.inner().as_ref() as &dyn Any;
             let args = &a.params.args;
@@ -677,4 +675,60 @@ fn supported(plan: &LogicalPlan) -> Result<bool> {
         })
     })?;
     Ok(yes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::{
+        arrow::datatypes::{Field, Schema},
+        catalog::empty::EmptyTable,
+        datasource::provider_as_source,
+        logical_expr::LogicalPlanBuilder,
+        prelude::{col, lit},
+    };
+
+    fn scan() -> LogicalPlanBuilder {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, true),
+            Field::new("label", DataType::Utf8, true),
+        ]));
+        LogicalPlanBuilder::scan(
+            "input",
+            provider_as_source(Arc::new(EmptyTable::new(schema))),
+            None,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn eligibility_accepts_exact_integer_and_null_semantics() {
+        let plan = scan()
+            .filter(col("id").gt(lit(1_i64)).and(col("id").is_not_null()))
+            .unwrap()
+            .sort(vec![col("id").sort(true, false)])
+            .unwrap()
+            .limit(0, Some(10))
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(supported(&plan).unwrap());
+    }
+
+    #[test]
+    fn eligibility_keeps_unpinned_text_and_arithmetic_local() {
+        let text = scan()
+            .filter(col("label").eq(lit("a")))
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(!supported(&text).unwrap());
+
+        let arithmetic = scan()
+            .project(vec![col("id") + lit(1_i64)])
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(!supported(&arithmetic).unwrap());
+    }
 }

@@ -19,6 +19,8 @@ pub use semantic_clickhouse as clickhouse;
 #[cfg(feature = "compiler")]
 pub use semantic_compiler as compiler;
 pub use semantic_engine as engine;
+#[cfg(feature = "interpreter")]
+pub use semantic_interpreter as interpreter;
 #[cfg(feature = "ossie")]
 pub use semantic_ossie as ossie;
 pub use semantic_plan as plan;
@@ -28,9 +30,9 @@ pub use semantic_postgres as postgres;
 pub use semantic_sources as sources;
 
 pub use semantic_catalog::{Catalog, Relation, RelationKind};
-#[cfg(feature = "compiler")]
-pub use semantic_compiler::{Compiler, CompilerError, GroundingOutcome};
 pub use semantic_engine::{Engine, EngineError, RelationBackend, TableProvider};
+#[cfg(feature = "interpreter")]
+pub use semantic_interpreter::{CompilerError, GroundingOutcome, Interpreter};
 
 pub use semantic_engine::{
     CacheOptions, MaterializationManager, MaterializationPolicy, PreparedQuery, QueryContext,

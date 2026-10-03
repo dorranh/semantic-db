@@ -5,10 +5,11 @@ use std::{
 };
 
 use clap::{ArgGroup, Args as ClapArgs, Parser, Subcommand};
-use semantic_compiler::{Compiler, GroundingOutcome, provider::OpenAiProvider};
 use semantic_engine::{Engine, pretty_format_batches};
+use semantic_interpreter::{GroundingOutcome, Interpreter, provider::OpenAiProvider};
 use semantic_ossie::ModelInspection;
 use semantic_sources::{Project, Registry};
+use serde::Deserialize;
 
 mod config;
 mod init;
@@ -66,6 +67,9 @@ struct ReplArgs {
     project: ProjectOptions,
     #[command(flatten)]
     read: ReadPolicyArgs,
+    /// Use the new typed compiler for Ask mode, .ask, and .plan.
+    #[arg(long)]
+    experimental_compiler: bool,
     /// Query-wide deadline, including cache fills and local operators.
     #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
     query_timeout_seconds: u64,
@@ -107,8 +111,25 @@ struct SqlArgs {
     query_timeout_seconds: u64,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum CompilerMode {
+    SqlCompatibility,
+    TypedFull,
+    TypedRetrieved,
+    TypedAuto,
+}
+
+#[derive(Clone, Copy)]
+enum TypedPresentation {
+    Cli,
+    Repl,
+}
+
 #[derive(ClapArgs)]
 struct AskArgs {
+    /// Choose SQL compatibility or the deterministic typed compiler/context mode.
+    #[arg(long, value_enum, default_value_t = CompilerMode::SqlCompatibility)]
+    compiler_mode: CompilerMode,
     #[command(flatten)]
     project: RequiredProject,
     /// Natural-language request to compile and execute.
@@ -124,6 +145,66 @@ struct AskArgs {
     /// Query-wide deadline, including cache fills and local operators.
     #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
     query_timeout_seconds: u64,
+}
+
+#[derive(ClapArgs)]
+struct PreparedArgs {
+    #[command(flatten)]
+    project: RequiredProject,
+    /// JSON row template, declarations and values; '-' reads standard input.
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+    /// Execute rows only after successful binding and current-scope validation.
+    #[arg(long)]
+    execute: bool,
+    /// Query-wide deadline, including provider reads when --execute is set.
+    #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
+    query_timeout_seconds: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum PreparedTypeWire {
+    Boolean,
+    Int64,
+    Utf8,
+    Date32,
+    TimestampMicrosUtc,
+}
+impl From<PreparedTypeWire> for semantic_compiler::typed::PreparedType {
+    fn from(value: PreparedTypeWire) -> Self {
+        use semantic_compiler::typed::PreparedType;
+        match value {
+            PreparedTypeWire::Boolean => PreparedType::Boolean,
+            PreparedTypeWire::Int64 => PreparedType::Int64,
+            PreparedTypeWire::Utf8 => PreparedType::Utf8,
+            PreparedTypeWire::Date32 => PreparedType::Date32,
+            PreparedTypeWire::TimestampMicrosUtc => PreparedType::TimestampMicrosUtc,
+        }
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PreparedDeclarationWire {
+    name: String,
+    value_type: PreparedTypeWire,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PreparedReferenceWire {
+    instant_parameter: String,
+    timezone: String,
+    calendar: semantic_compiler::typed::Calendar,
+    origin: semantic_compiler::typed::ContextOrigin,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PreparedRequest {
+    query: semantic_plan::typed::RowQuery,
+    declarations: Vec<PreparedDeclarationWire>,
+    values: std::collections::BTreeMap<String, semantic_plan::typed::Literal>,
+    #[serde(default)]
+    reference: Option<PreparedReferenceWire>,
 }
 
 #[derive(ClapArgs)]
@@ -237,6 +318,8 @@ enum Command {
     Sql(SqlArgs),
     /// Compile and execute a natural-language read.
     Ask(AskArgs),
+    /// Bind a typed row template from JSON without a model; optionally execute it.
+    CompilePrepared(PreparedArgs),
     /// Check a project offline or validate physical schemas.
     Validate(ValidateArgs),
     /// Inspect a project's model, sources, and views offline.
@@ -263,6 +346,7 @@ pub async fn run_with_registry(registry: Registry) -> Result<()> {
         Command::Repl(args) => run_repl(args, registry).await,
         Command::Sql(args) => run_sql_command(args, registry).await,
         Command::Ask(args) => run_ask_command(args, registry).await,
+        Command::CompilePrepared(args) => run_prepared_command(args, registry).await,
         Command::Validate(args) => run_validation(args, registry).await,
         Command::Inspect(args) => run_inspection(args, registry),
         Command::Cache(args) => run_cache(args, registry).await,
@@ -303,15 +387,29 @@ fn required_project_path(args: RequiredProject) -> Result<PathBuf> {
     })
 }
 
-async fn load_engine(path: Option<PathBuf>, registry: &Registry) -> Result<Engine> {
+async fn load_engine(path: Option<PathBuf>, registry: Registry) -> Result<Engine> {
     if let Some(path) = path {
         let project = Project::from_path(path)?;
-        let env = config::environment()?;
-        let imported = project.load(registry, &env).await?;
-        for warning in imported.warnings {
-            eprintln!("Warning: {warning}");
+        let env = std::sync::Arc::new(config::environment()?);
+        if project.deferred_read_only() {
+            let loaded = project
+                .load_deferred_read_only(
+                    std::sync::Arc::new(registry),
+                    env,
+                    semantic_engine::DeferredOptions::default(),
+                )
+                .await?;
+            for warning in loaded.warnings {
+                eprintln!("Warning: {warning}");
+            }
+            Ok(loaded.engine)
+        } else {
+            let imported = project.load(&registry, env.as_ref()).await?;
+            for warning in imported.warnings {
+                eprintln!("Warning: {warning}");
+            }
+            Ok(imported.engine)
         }
-        Ok(imported.engine)
     } else {
         Ok(Engine::new())
     }
@@ -330,11 +428,12 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
         return Err("sdb repl requires a terminal; use sdb sql - for stdin".into());
     }
     let path = project_path(args.project)?;
-    let mut engine = load_engine(path.clone(), &registry).await?;
+    let mut engine = load_engine(path.clone(), registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
     repl::run(
         &mut engine,
         path,
+        args.experimental_compiler,
         args.no_color,
         args.no_history,
         args.history_file,
@@ -385,7 +484,7 @@ async fn run_sql_command(args: SqlArgs, registry: Registry) -> Result<()> {
     if write && path.is_none() {
         return Err("mutation SQL requires a project with an explicit write binding".into());
     }
-    let mut engine = load_engine(path, &registry).await?;
+    let mut engine = load_engine(path, registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
     if write {
         run_write(
@@ -409,9 +508,21 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
         usage_error("--compile-only cannot be combined with read policy or report options");
     }
     let path = required_project_path(args.project)?;
-    let mut engine = load_engine(Some(path), &registry).await?;
+    let mut engine = load_engine(Some(path), registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
-    let compiler = Compiler::new(config::provider()?);
+    let compiler = Interpreter::new(config::provider()?);
+    if args.compiler_mode != CompilerMode::SqlCompatibility {
+        return run_typed_ask(
+            &engine,
+            &compiler,
+            &args.request,
+            args.compile_only,
+            &ReadMode::new(&args.read, false, args.read_report),
+            args.compiler_mode,
+            TypedPresentation::Cli,
+        )
+        .await;
+    }
     run_ask(
         &engine,
         &compiler,
@@ -421,6 +532,93 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
         None,
     )
     .await
+}
+
+async fn run_prepared_command(args: PreparedArgs, registry: Registry) -> Result<()> {
+    use semantic_compiler::typed::{
+        CompileOptions, ParameterDeclaration, PreparedReferenceContext, PreparedRows, TypedOutcome,
+    };
+    const MAX_INPUT_BYTES: u64 = 16 * 1024;
+    let mut input = Vec::new();
+    if args.file == std::path::Path::new("-") {
+        io::stdin()
+            .take(MAX_INPUT_BYTES + 1)
+            .read_to_end(&mut input)?;
+    } else {
+        std::fs::File::open(&args.file)?
+            .take(MAX_INPUT_BYTES + 1)
+            .read_to_end(&mut input)?;
+    }
+    if input.is_empty() || input.len() as u64 > MAX_INPUT_BYTES {
+        return Err("prepared JSON must contain 1 to 16384 bytes".into());
+    }
+    let request: PreparedRequest =
+        serde_json::from_slice(&input).map_err(|_| "invalid prepared row JSON")?;
+    let path = required_project_path(args.project)?;
+    let mut engine = load_engine(Some(path), registry).await?;
+    set_timeout(&mut engine, args.query_timeout_seconds)?;
+    let current_scope = engine
+        .catalog()
+        .snapshot()
+        .relations()
+        .map(|relation| relation.definition().name.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut options = CompileOptions::default();
+    options.timeout = std::time::Duration::from_secs(args.query_timeout_seconds);
+    options.allowed_relations = Some(current_scope.clone());
+    let declarations = request
+        .declarations
+        .into_iter()
+        .map(|declaration| ParameterDeclaration {
+            name: declaration.name,
+            value_type: declaration.value_type.into(),
+        })
+        .collect();
+    let reference = request.reference.map(|reference| PreparedReferenceContext {
+        instant_parameter: reference.instant_parameter,
+        timezone: reference.timezone,
+        calendar: reference.calendar,
+        origin: reference.origin,
+    });
+    let prepared = PreparedRows::prepare(&engine, request.query, declarations, reference, options)
+        .map_err(|diagnostic| format!("prepared row rejected: {}", diagnostic.code))?;
+    let compilation = prepared
+        .bind_values(&engine, request.values, Some(&current_scope))
+        .await
+        .map_err(|diagnostic| format!("prepared row rejected: {}", diagnostic.code))?;
+    match compilation.outcome {
+        TypedOutcome::Compiled { query } => {
+            println!("SQL:\n{}", query.sql().statement());
+            println!(
+                "Parameter types: {}",
+                serde_json::to_string(query.sql().parameter_types())?
+            );
+            if args.execute {
+                let batches = query
+                    .execute_authorized(&engine, &current_scope, engine.query_options().clone())
+                    .await
+                    .map_err(|diagnostic| {
+                        format!("prepared row execution rejected: {}", diagnostic.code)
+                    })?
+                    .collect()
+                    .await?;
+                println!("{}", pretty_format_batches(&batches)?);
+                println!(
+                    "{} row(s)",
+                    batches.iter().map(|batch| batch.num_rows()).sum::<usize>()
+                );
+            }
+            Ok(())
+        }
+        TypedOutcome::Rejected { diagnostic }
+        | TypedOutcome::Unresolved { diagnostic }
+        | TypedOutcome::ProviderFailure { diagnostic } => {
+            Err(format!("prepared row rejected: {}", diagnostic.code).into())
+        }
+        TypedOutcome::NeedsClarification { .. } => Err("prepared row needs clarification".into()),
+        TypedOutcome::Unsupported { .. } => Err("prepared row unsupported".into()),
+        TypedOutcome::CompiledGraph { .. } => Err("prepared row returned a graph".into()),
+    }
 }
 
 fn show_project_inspection(
@@ -523,7 +721,7 @@ async fn run_cache(args: CacheArgs, registry: Registry) -> Result<()> {
             query_timeout_seconds,
         } => {
             let path = required_project_path(project)?;
-            let mut engine = load_engine(Some(path), &registry).await?;
+            let mut engine = load_engine(Some(path), registry).await?;
             set_timeout(&mut engine, query_timeout_seconds)?;
             engine.refresh_materialization(&name).await?;
         }
@@ -606,7 +804,7 @@ async fn run_query(engine: &Engine, sql: &str, read_mode: &ReadMode) -> Result<(
 
 async fn run_ask(
     engine: &Engine,
-    compiler: &Compiler<OpenAiProvider>,
+    compiler: &Interpreter<OpenAiProvider>,
     request: &str,
     compile_only: bool,
     read_mode: &ReadMode,
@@ -664,6 +862,117 @@ async fn run_write(engine: &Engine, sql: &str, explain: bool) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.success() {
         return Err(format!("write outcome: {:?}", result.outcome).into());
+    }
+    Ok(())
+}
+
+async fn run_typed_ask(
+    engine: &Engine,
+    compiler: &Interpreter<OpenAiProvider>,
+    request: &str,
+    compile_only: bool,
+    read_mode: &ReadMode,
+    mode: CompilerMode,
+    presentation: TypedPresentation,
+) -> Result<()> {
+    use semantic_compiler::typed::TypedOutcome;
+    use semantic_interpreter::typed::{InterpretOptions, SelectionMode};
+    let mut options = InterpretOptions::default();
+    options.selection_mode = match mode {
+        CompilerMode::TypedFull => SelectionMode::Full,
+        CompilerMode::TypedRetrieved => SelectionMode::Retrieved,
+        CompilerMode::TypedAuto => SelectionMode::Auto,
+        CompilerMode::SqlCompatibility => unreachable!(),
+    };
+    let compilation = compiler.compile_typed(engine, request, options).await;
+    if compile_only && matches!(presentation, TypedPresentation::Cli) {
+        println!("{}", serde_json::to_string_pretty(&compilation)?);
+        return Ok(());
+    }
+    if matches!(presentation, TypedPresentation::Repl)
+        && let Some(explanation) = repl::explain_compilation(&compilation)
+    {
+        println!("{explanation}");
+    }
+    match compilation.outcome {
+        TypedOutcome::Compiled { query } => {
+            println!("SQL:\n{}", query.sql().statement());
+            println!(
+                "Parameters: {}",
+                serde_json::to_string(query.sql().parameters())?
+            );
+            if compile_only {
+                return Ok(());
+            }
+            let (batches, report) = if read_mode.custom {
+                let result = query
+                    .execute_read(engine, read_mode.options(engine))
+                    .await?
+                    .collect()
+                    .await?;
+                (result.batches, read_mode.report.then_some(result.report))
+            } else {
+                (
+                    query
+                        .execute(engine, engine.query_options().clone())
+                        .await?
+                        .collect()
+                        .await?,
+                    None,
+                )
+            };
+            println!("{}", pretty_format_batches(&batches)?);
+            println!(
+                "{} row(s)",
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>()
+            );
+            if let Some(report) = report {
+                eprintln!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
+        TypedOutcome::CompiledGraph { query } => {
+            println!("SQL:\n{}", query.sql().statement());
+            println!(
+                "Parameters: {}",
+                serde_json::to_string(query.sql().parameters())?
+            );
+            if compile_only {
+                return Ok(());
+            }
+            let (batches, report) = if read_mode.custom {
+                let result = query
+                    .execute_read(engine, read_mode.options(engine))
+                    .await?
+                    .collect()
+                    .await?;
+                (result.batches, read_mode.report.then_some(result.report))
+            } else {
+                (
+                    query
+                        .execute(engine, engine.query_options().clone())
+                        .await?
+                        .collect()
+                        .await?,
+                    None,
+                )
+            };
+            println!("{}", pretty_format_batches(&batches)?);
+            println!(
+                "{} row(s)",
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>()
+            );
+            if let Some(report) = report {
+                eprintln!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
+        TypedOutcome::NeedsClarification { question, .. } => {
+            println!("Needs clarification: {question}")
+        }
+        TypedOutcome::Unsupported { reason } => println!("Unsupported: {reason}"),
+        TypedOutcome::Unresolved { diagnostic } => println!("Unresolved: {diagnostic}"),
+        TypedOutcome::Rejected { diagnostic } | TypedOutcome::ProviderFailure { diagnostic } => {
+            return Err(diagnostic.into());
+        }
     }
     Ok(())
 }

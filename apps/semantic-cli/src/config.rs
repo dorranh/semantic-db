@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use semantic_compiler::provider::{OpenAiConfig, OpenAiProvider};
+use semantic_interpreter::provider::{OpenAiConfig, OpenAiProvider};
 
 /// Read .env from the working directory only when natural-language mode is used.
 /// Existing process variables take precedence. Do not mutate global environment
@@ -12,7 +12,7 @@ pub fn provider() -> super::Result<OpenAiProvider> {
 }
 
 /// The CLI resolves secrets; the shared loader never reads process state.
-pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + Sync> {
+pub fn environment() -> super::Result<impl Fn(&str) -> Option<String> + Send + Sync + 'static> {
     let file = match dotenvy::from_path_iter(".env") {
         Ok(values) => values
             .collect::<std::result::Result<HashMap<_, _>, _>>()

@@ -6,6 +6,8 @@ use datafusion::{
 };
 use std::sync::Arc;
 
+use crate::{FunctionKind, FunctionPlacement, MVP_EXECUTION_PROFILE};
+
 pub(super) fn optimizer_rules() -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let mut rules = datafusion_federation::default_optimizer_rules();
     let index = rules
@@ -33,25 +35,38 @@ impl OptimizerRule for GuardedFederation {
         config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
         let mut has_remote = false;
-        let mut unsupported_subquery = false;
+        let mut requires_local = false;
         plan.apply_with_subqueries(|node| {
             if let LogicalPlan::TableScan(scan) = node {
                 has_remote |= datafusion_federation::get_table_source(&scan.source)?.is_some();
             }
             for expression in node.expressions() {
                 expression.apply(|expr| {
-                    unsupported_subquery |= matches!(expr, Expr::InSubquery(_));
+                    let function = match expr {
+                        Expr::ScalarFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Scalar, function.func.name()),
+                        Expr::AggregateFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Aggregate, function.func.name()),
+                        Expr::WindowFunction(function) => MVP_EXECUTION_PROFILE
+                            .compiler_function(FunctionKind::Window, function.fun.name()),
+                        _ => None,
+                    };
+                    requires_local |= matches!(expr, Expr::InSubquery(_))
+                        || function.is_some_and(|function| {
+                            function.placement == FunctionPlacement::LocalOnly
+                        });
                     Ok(TreeNodeRecursion::Continue)
                 })?;
             }
             Ok(TreeNodeRecursion::Continue)
         })?;
-        // Core 0.5.6 explicitly errors on a remaining InSubquery. Retain normal
-        // scans for these plans, and do not involve federation in local queries.
+        // Core 0.5.6 cannot ship remaining InSubquery expressions. Versioned
+        // compiler functions also require local semantics: their implementation
+        // is not installed in remote databases. Eligible children may still ship.
         if !has_remote {
             return Ok(Transformed::no(plan));
         }
-        if unsupported_subquery {
+        if requires_local {
             let expressions = plan.expressions();
             let inputs = plan
                 .inputs()

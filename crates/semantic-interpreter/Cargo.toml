@@ -1,0 +1,29 @@
+[package]
+name = "semantic-interpreter"
+description = "Model interpretation and context orchestration for semantic intent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+semantic-catalog.workspace = true
+semantic-plan.workspace = true
+semantic-engine.workspace = true
+semantic-compiler.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+tracing = "0.1"
+tokio = { workspace = true, features = ["time", "sync"] }
+
+[dev-dependencies]
+datafusion.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+
+[lints]
+workspace = true

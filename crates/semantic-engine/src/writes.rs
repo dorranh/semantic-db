@@ -507,11 +507,7 @@ impl Engine {
                         .map_err(datafusion::error::DataFusionError::from)?
                         .data_type()
                         .clone();
-                    projection.push(format!(
-                        "CAST({} AS {})",
-                        a.value,
-                        crate::parameters::sql_type(&ty)?
-                    ));
+                    projection.push(crate::parameters::cast_sql(&a.value, &ty)?);
                     assignments.push((
                         mapped(&binding.columns, &n)?,
                         expression(&a.value, &alias, &binding.columns)?,
@@ -619,11 +615,7 @@ impl Engine {
                             .field_with_name(c)
                             .map_err(datafusion::error::DataFusionError::from)?
                             .data_type();
-                        Ok(format!(
-                            "CAST({} AS {})",
-                            aliases[j],
-                            crate::parameters::sql_type(ty)?
-                        ))
+                        Ok(crate::parameters::cast_sql(&aliases[j], ty)?)
                     })
                     .collect::<Result<Vec<_>>>()?;
                 let query = format!(

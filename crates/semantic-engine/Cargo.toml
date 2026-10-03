@@ -15,7 +15,10 @@ semantic-runtime.workspace = true
 semantic-catalog.workspace = true
 datafusion.workspace = true
 datafusion-federation.workspace = true
+chrono.workspace = true
+chrono-tz = "=0.10.4"
 thiserror.workspace = true
+async-trait.workspace = true
 
 futures.workspace = true
 async-stream.workspace = true

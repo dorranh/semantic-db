@@ -67,6 +67,15 @@ shows project and history details. Run `sdb repl --help` for history, color,
 and read policy options; see [Interactive SQL REPL](interactive-repl.md) for
 editing, shared history, and progress display.
 
+Pass `--experimental-compiler` to use the typed compiler with automatic context
+selection for Ask mode, `.ask`, and `.plan`. Without the flag, the REPL uses the
+SQL-compatibility compiler. In experimental mode, `.plan` shows generated SQL
+and parameters without executing rows. Successful typed Ask queries also show a
+short interpretation summary: model-proposed request phrases, the checked
+operations and catalog definitions, and whether original-wording coverage was
+verified. Use `sdb ask --compiler-mode typed-auto --compile-only` for the full
+JSON compilation record.
+
 ## Natural-language reads
 
 Copy `.env.example` to `.env` in the working directory and set

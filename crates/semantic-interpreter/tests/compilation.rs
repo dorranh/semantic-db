@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
-use semantic_compiler::{
-    Compiler, CompilerError, GroundingOutcome, catalog_context,
+use semantic_engine::{Engine, pretty_format_batches};
+use semantic_interpreter::{
+    CompilerError, GroundingOutcome, Interpreter, catalog_context,
     provider::{Message, ModelProvider, ProviderError},
 };
-use semantic_engine::{Engine, pretty_format_batches};
 use serde_json::json;
 
 type Calls = Arc<Mutex<Vec<Vec<Message>>>>;
@@ -26,10 +26,10 @@ impl ModelProvider for ScriptedProvider {
     }
 }
 
-fn compiler(responses: Vec<String>) -> (Compiler<ScriptedProvider>, Calls) {
+fn compiler(responses: Vec<String>) -> (Interpreter<ScriptedProvider>, Calls) {
     let calls = Arc::new(Mutex::new(Vec::new()));
     (
-        Compiler::new(ScriptedProvider {
+        Interpreter::new(ScriptedProvider {
             responses: Mutex::new(responses.into()),
             calls: calls.clone(),
         }),
@@ -216,7 +216,7 @@ async fn provider_errors_do_not_trigger_repairs() {
             Err(ProviderError::Http(401))
         }
     }
-    let error = Compiler::new(FailingProvider)
+    let error = Interpreter::new(FailingProvider)
         .compile(&fixture().await, "List wells")
         .await
         .unwrap_err();

@@ -49,6 +49,38 @@ fn config(views: Value) -> Value {
         "sources":{"fixtures.geospatial.wells":{"connection":"local", "path":concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/geospatial/wells.csv")}}, "views":views})
 }
 
+#[test]
+fn inspection_orders_shared_view_dependencies_deterministically() {
+    let files = Files::new();
+    files.write("a.sql", "SELECT well_id FROM wells");
+    files.write("b.sql", "SELECT well_id FROM wells");
+    files.write(
+        "c.sql",
+        "SELECT a.well_id FROM a JOIN b ON a.well_id = b.well_id",
+    );
+    files.write("d.sql", "SELECT well_id FROM c");
+    files.write("z.sql", "SELECT well_id FROM wells");
+    let project = files
+        .project(config(json!({
+            "a":{"sql_file":"views/a.sql"},
+            "b":{"sql_file":"views/b.sql"},
+            "c":{"sql_file":"views/c.sql"},
+            "d":{"sql_file":"views/d.sql"},
+            "z":{"sql_file":"views/z.sql"}
+        })))
+        .unwrap();
+    let inspection = project.inspect_project(&Registry::standard()).unwrap();
+    assert_eq!(
+        inspection
+            .views
+            .iter()
+            .map(|view| view.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a", "b", "c", "d", "z"]
+    );
+    assert_eq!(inspection.views[2].dependencies, ["a", "b"]);
+}
+
 #[tokio::test]
 async fn nested_views_keep_descriptions_and_cached_sql_until_project_reload() {
     let files = Files::new();

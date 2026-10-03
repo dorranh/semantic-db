@@ -18,14 +18,19 @@ use rustyline::{
     validate::{ValidationContext, ValidationResult, Validator},
 };
 
-use crate::{Compiler, Engine, OpenAiProvider, ReadMode, Result, config, run_ask, run_query};
+use crate::{
+    CompilerMode, Engine, Interpreter, OpenAiProvider, ReadMode, Result, TypedPresentation, config,
+    run_ask, run_query, run_typed_ask,
+};
 
 mod command;
 mod completion;
+mod explain;
 mod history;
 mod lex;
 mod progress;
 
+pub(crate) use explain::format_compilation as explain_compilation;
 pub(crate) use progress::Reporter as ProgressReporter;
 
 type ReplEditor = Editor<EditorHelper, DefaultHistory>;
@@ -110,6 +115,7 @@ fn history_entry(kind: InputKind, input: &str) -> String {
 pub(super) async fn run(
     engine: &mut Engine,
     project_path: Option<PathBuf>,
+    experimental_compiler: bool,
     no_color: bool,
     no_history: bool,
     history_file: Option<PathBuf>,
@@ -157,6 +163,9 @@ pub(super) async fn run(
         color,
         dumb,
     );
+    if experimental_compiler {
+        println!("Ask compiler: experimental typed (automatic context selection)");
+    }
     let progress = ProgressReporter::new(color && std::io::stderr().is_terminal());
     let mut compiler = None;
     let mut initial: Option<Draft> = None;
@@ -201,21 +210,23 @@ pub(super) async fn run(
                             trimmed,
                             &read_mode,
                             &progress,
+                            experimental_compiler,
                         )
                         .await
                     }
                     InputKind::Ask => {
                         async {
                             if compiler.is_none() {
-                                compiler = Some(Compiler::new(config::provider()?));
+                                compiler = Some(Interpreter::new(config::provider()?));
                             }
-                            run_ask(
+                            run_ask_request(
                                 engine,
                                 compiler.as_ref().expect("compiler initialized"),
                                 trimmed,
                                 false,
                                 &read_mode,
-                                Some(&progress),
+                                &progress,
+                                experimental_compiler,
                             )
                             .await
                         }
@@ -263,6 +274,39 @@ pub(super) async fn run(
         }
     }
     Ok(())
+}
+
+async fn run_ask_request(
+    engine: &Engine,
+    compiler: &Interpreter<OpenAiProvider>,
+    request: &str,
+    compile_only: bool,
+    read_mode: &ReadMode,
+    progress: &ProgressReporter,
+    experimental_compiler: bool,
+) -> Result<()> {
+    if experimental_compiler {
+        run_typed_ask(
+            engine,
+            compiler,
+            request,
+            compile_only,
+            read_mode,
+            CompilerMode::TypedAuto,
+            TypedPresentation::Repl,
+        )
+        .await
+    } else {
+        run_ask(
+            engine,
+            compiler,
+            request,
+            compile_only,
+            read_mode,
+            Some(progress),
+        )
+        .await
+    }
 }
 
 fn colors_enabled(no_color: bool, terminal: bool, env_no_color: bool, dumb: bool) -> bool {

@@ -1,0 +1,22 @@
+{
+  "profile": "semantic-compiler-mvp-v1",
+  "provider_coverage": "Deterministic typed proposals and one scripted-provider orchestration boundary; no live-model accuracy claim.",
+  "cases": {
+    "governed_metric_policy": { "rows": [["10", "60", "4"]] },
+    "billing_shipping_roles": { "rows": [["1", "CH", "GB"], ["2", "GB", "CH"], ["3", "", ""]] },
+    "set_intersect_all": { "rows": [["O'Reilly"], [""]] },
+    "set_except_all": { "rows": [["O'Reilly"], ["b"]] },
+    "composition_missing_and_null": { "rows": [["A", "12", "6"], ["B", "", "0"], ["C", "3", "0"], ["D", "0", "8"], ["", "4", "9"]] },
+    "composition_composite_key": { "rows": [["A", "x", "3", "10"], ["A", "y", "3", "0"], ["B", "x", "0", "20"]] },
+    "composition_global_scalar": { "rows": [["6", "30"]] },
+    "aggregate_window_stage": { "rows": [["", "20", "1"]] },
+    "calendar_dst": { "rows": [["2"]] },
+    "wrong_time_grain": { "diagnostic": "metric_time_grain" },
+    "outside_coverage": { "diagnostic": "metric_coverage" },
+    "denied_scope": { "diagnostic": "access_scope" },
+    "bounded_context": { "diagnostic": "search_limit" },
+    "ambiguous_output": { "diagnostic": "invalid_output" },
+    "competing_metric_resolved": { "rows": [["3"]] },
+    "competing_metric_ambiguous": { "diagnostic": "ambiguous_metric" }
+  }
+}

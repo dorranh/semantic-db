@@ -272,12 +272,12 @@ async fn empty_catalogs_and_constant_views_need_no_backend() {
     assert!(backend.calls.lock().unwrap().is_empty());
 }
 
-#[cfg(feature = "compiler")]
+#[cfg(feature = "interpreter")]
 #[tokio::test]
 async fn compiler_uses_team_metadata_and_validates_custom_relations() {
     use semantic_db::{
-        Compiler, GroundingOutcome,
-        compiler::provider::{Message, ModelProvider, ProviderError},
+        GroundingOutcome, Interpreter,
+        interpreter::provider::{Message, ModelProvider, ProviderError},
     };
 
     struct Model;
@@ -303,7 +303,7 @@ async fn compiler_uses_team_metadata_and_validates_custom_relations() {
             }}).to_string())
         }
     }
-    let result = Compiler::new(Model)
+    let result = Interpreter::new(Model)
         .compile(&fixture().await, "Show allowed IDs greater than one")
         .await
         .unwrap();

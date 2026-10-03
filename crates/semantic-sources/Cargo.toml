@@ -28,6 +28,8 @@ futures.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+semantic-compiler.workspace = true
+semantic-plan.workspace = true
 arrow-avro = { version = "59.2", default-features = false }
 flate2 = "1"
 tokio-postgres.workspace = true

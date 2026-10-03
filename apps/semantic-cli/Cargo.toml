@@ -17,9 +17,12 @@ path = "src/main.rs"
 [dependencies]
 semantic-server = { path = "../semantic-server" }
 serde_json.workspace = true
+serde.workspace = true
 semantic-sources = { workspace = true, features = ["clickhouse", "postgres"] }
 semantic-engine.workspace = true
 semantic-compiler.workspace = true
+semantic-interpreter.workspace = true
+semantic-plan.workspace = true
 semantic-ossie.workspace = true
 dotenvy.workspace = true
 clap.workspace = true
