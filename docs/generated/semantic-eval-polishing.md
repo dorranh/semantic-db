@@ -99,11 +99,45 @@ These commands used two jobs, disabled incremental compilation, and set
 enabled. A preceding build exhausted local disk before tests ran; targeted Cargo
 cleanup freed 66.7 GiB. That failed build provides no test result.
 
+## Authored Ossie contracts and terminal reports
+
+The importer preserves authored metric lookup permissions, state, rollup
+dimensions, row filters and explicit result types. It accepts bounded field-only
+MIN/MAX/AVG expressions, business-calendar contracts and parameterized concepts.
+Named Float32/Float64 measurement units are supported; floating currency tags
+remain rejected. Date32 concept parameters accept validated Gregorian dates and
+legacy Date32 literals without accepting ordinary strings. Compiler pipeline 34
+separates the new acceptance boundary from prior cache and replay artifacts.
+
+All 258 Ossie/catalog/compiler tests passed across 82 targets. After the pipeline
+revision change, ten prepared/cache/replay tests passed. Logs:
+`/tmp/semantic-eval-ossie-advanced-all.log` and
+`/tmp/semantic-eval-ossie-pipeline34-tests.log`.
+
+The harness separates decoded execution admission from collected output limits,
+records effective budgets and planned attempt identities, writes reports
+atomically, and keeps running reports unfinalized and incomplete. All 26 evaluator
+tests passed, including inspection of a snapshot while a second model call is
+blocked. All-target Clippy for Ossie, catalog, compiler and evaluator passed with
+warnings denied. Evaluator/CLI build, formatting and whitespace checks passed.
+Logs: `/tmp/semantic-eval-lifecycle-budget-tests.log`,
+`/tmp/semantic-eval-advanced-harness-clippy-final.log`, and
+`/tmp/semantic-eval-advanced-harness-build.log`.
+
+The reviewed commerce catalog exposes exact mean state, completed MIN/MAX,
+lookup role permissions, parameterized active membership and distinct date/UTC
+Swiss calendar rules. Case questions, SQL, golds and canonical source data are
+unchanged from the wording commit. Its live SQL run passed **103/103**, including
+all three error expectations, with successful setup/cleanup and artifact checks:
+`.semantic-eval/commerce-sql-v12-p34/run-244568-18db5ace2f629413/report.json`.
+Digest: `9c8779aaa036a3640119725ac28b4f429adfaa26736037bddd2fca285da08c53`.
+This verifies the integer-overflow fix with the real mixed-source project.
+
 ## Work still in progress
 
-Live acceptance must verify checked arithmetic with both physical connectors.
-Executable Ossie metric contracts and the catalog declarations needed by the
-remaining semantic cases also require implementation and validation.
+Remaining commerce Ask failures require implementation and fresh full-suite
+verification. A bounded model evidence recovery patch is awaiting verification;
+direct compiler span checks remain authoritative.
 
 The additional dataset is the complete Formula 1 family from the canonical
 [BIRD Mini-Dev release](https://huggingface.co/datasets/birdsql/bird_mini_dev):
@@ -113,5 +147,40 @@ the product passes them. Original source versions, annotations, and SQL are
 retained. Independent review identified upstream annotation contradictions;
 the explicit corrections are recorded and all 66 typed golds have been checked
 independently against SQLite and PostgreSQL. This derived suite is not an official
-BIRD leaderboard score. Its authored bundle is reviewed and frozen; product
-acceptance verification is pending.
+BIRD leaderboard score. Its authored bundle is reviewed and frozen.
+
+The first product SQL run attempted all 66 cases: 46 passed, 16 exceeded the
+decoded-byte budget, and four returned mismatched results. All 13 row-count
+fixtures, setup, and cleanup succeeded. The report is incomplete because resource
+exhaustion is not a completed semantic outcome:
+`.semantic-eval/bird-sql-v12/run-209884-18db58aace290bb1/report.json`.
+Artifact digest:
+`9c2b85d1a3abbb899a31e26a758a60ccc3b66afbd83ef7be2cc9fb5fa4695e62`.
+
+Independent investigation found that the harness conflated its 32 MiB collected
+output limit with the engine's decoded scan limit; the product default is 1 GiB.
+The four result differences are reference dialect adaptations: PostgreSQL date
+format tokens are literal text in DataFusion's Chrono formatter, and REAL casts
+produce Float32 intermediates while the SQLite reference computes Float64.
+Reviewed adaptations use explicit year/month extraction and DOUBLE PRECISION.
+Questions, expected rows, and tolerances remain unchanged. Original reports and
+bundle digests remain preserved.
+
+The initial full Luna Ask run attempted all 66 tasks: eight passed, 17 had provider
+failures, and 41 had other failures. Setup, cleanup and artifact checks succeeded.
+Report: `.semantic-eval/bird-luna-v12/run-210719-18db58ba059a4381/report.json`;
+SHA256 `4aa0af473cd81ed390649dc071419c14b75f1766842905a93579c116dcf41d71`.
+It used the original BIRD artifact digest above, pipeline 33 and profile 12, with
+12000-millisecond pacing. It is incomplete and cannot establish full semantic
+coverage. Individual calls reported approximately 66700 input tokens.
+
+The next SQL run against version 1.0.1 passed 57/66:
+`.semantic-eval/bird-sql-v12-p34/run-244569-18db5ace4ed2c19a/report.json`;
+digest `887735e2d5cb2416eadc82e41c7fb75f7c4d8376dc54b8968ead4135d36ce074`.
+Four reference mismatches previously masked by resource exhaustion remained.
+A full-family audit found six remaining REAL casts and one date-format call;
+version 1.0.2 adapts these explicitly, preserving all gold files byte-for-byte.
+The other five failures exhausted the product's 256-request budget: streaming
+400524 lap records in 1024-row PostgreSQL portal fetches requires roughly 392
+actual requests. Dataset-owned, recorded execution limits and a fresh SQL run
+remain required. None of these failures is waived.

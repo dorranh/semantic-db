@@ -321,12 +321,8 @@ async fn http_pg(
     }
     result
 }
-pub(crate) async fn checks(
-    d: &Dataset,
-    o: &RunOptions,
-    env: &BTreeMap<String, String>,
-) -> Vec<PublicCheck> {
-    let selected: Vec<&Case> = if d.manifest.public_cases.is_empty() {
+fn selected_cases(d: &Dataset) -> Vec<&Case> {
+    if d.manifest.public_cases.is_empty() {
         d.cases
             .iter()
             .filter(|c| c.sql.is_some() && eligible(&d.expectations[&c.id]))
@@ -338,7 +334,34 @@ pub(crate) async fn checks(
             .iter()
             .filter_map(|id| d.cases.iter().find(|c| &c.id == id))
             .collect()
-    };
+    }
+}
+pub(crate) fn planned_checks(d: &Dataset) -> Vec<crate::runner::PublicAttempt> {
+    let selected = selected_cases(d);
+    if selected.is_empty() {
+        return vec![crate::runner::PublicAttempt {
+            id: String::new(),
+            interface: "public".into(),
+        }];
+    }
+    selected
+        .into_iter()
+        .flat_map(|case| {
+            ["cli_sql", "cli_typed_ask", "http_typed_pg"]
+                .into_iter()
+                .map(move |interface| crate::runner::PublicAttempt {
+                    id: case.id.clone(),
+                    interface: interface.into(),
+                })
+        })
+        .collect()
+}
+pub(crate) async fn checks(
+    d: &Dataset,
+    o: &RunOptions,
+    env: &BTreeMap<String, String>,
+) -> Vec<PublicCheck> {
+    let selected = selected_cases(d);
     if selected.is_empty() {
         return vec![PublicCheck {
             interface: "public".into(),

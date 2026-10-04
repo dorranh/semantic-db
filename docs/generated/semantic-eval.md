@@ -145,3 +145,19 @@ does not rerun semantic cases or replace failure evidence.
 Public CLI/HTTP subprocess calls are not throttled by this harness option.
 Use an Ask-only run without `--public-interfaces` when collecting paced
 observations of previously provider-blocked cases.
+
+Execution admission and output collection use separate limits. `--max-decoded-bytes`
+sets the engine admission budget (default 1 GiB, matching the product); this includes
+conservative source decoding and scratch estimates, rather than final result size.
+`--max-output-bytes` (default 32 MiB) and `--max-output-rows` (default 100,000) bound
+collected results. SQL and typed Ask receive the same execution budget. Reports retain
+all effective engine budgets and both output limits. Public subprocess checks use the
+product's default execution admission budget; custom harness admission limits do not
+configure those subprocesses.
+
+Reports are atomically replaced, beginning with a running report before setup. Running
+snapshots have `finalized=false` and `complete=false`. The declared `planned_cases`
+contain each requested case/interface/repetition tuple; planned public checks and
+expected/completed counts are recorded separately. `full_coverage` describes selection,
+not completion. Success requires terminal cleanup and digest checks plus the exact
+planned identities and counts. Older reports without finalization evidence cannot pass.

@@ -60,6 +60,9 @@ async fn setup_failure_marks_every_required_attempt_incomplete() {
     assert!(!r.success());
     assert!(!r.complete);
     assert_eq!(r.cases.len(), 4);
+    assert!(r.finalized);
+    assert_eq!(r.expected_case_attempts, 4);
+    assert_eq!(r.completed_case_attempts, 4);
     assert!(r.cases.iter().all(|c| !c.passed && c.incomplete));
     assert!(r.setup_error.is_some());
     std::fs::remove_dir_all(path).unwrap();
@@ -436,4 +439,125 @@ async fn pacing_wait_respects_case_deadline_without_starting_or_retrying_call() 
             .contains("deadline")
     );
     std::fs::remove_dir_all(path).unwrap();
+}
+
+struct BlockingSecond {
+    calls: std::sync::atomic::AtomicUsize,
+    entered: std::sync::Arc<tokio::sync::Notify>,
+    release: std::sync::Arc<tokio::sync::Notify>,
+    response: String,
+}
+impl semantic_interpreter::provider::ModelProvider for BlockingSecond {
+    async fn complete(
+        &self,
+        _: &[semantic_interpreter::provider::Message],
+    ) -> std::result::Result<String, semantic_interpreter::provider::ProviderError> {
+        if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+            self.entered.notify_one();
+            self.release.notified().await;
+        }
+        Ok(self.response.clone())
+    }
+}
+#[tokio::test]
+async fn persisted_running_report_cannot_pass_before_every_attempt_finishes() {
+    let mut dataset = tiny();
+    dataset.cases[0].question =
+        "List sample IDs greater than three in ascending order, retaining duplicates.".into();
+    if let Expected::Result { rows, .. } = dataset.expectations.get_mut("duplicates").unwrap() {
+        rows.remove(0);
+    }
+    let entered = std::sync::Arc::new(tokio::sync::Notify::new());
+    let release = std::sync::Arc::new(tokio::sync::Notify::new());
+    let provider = BlockingSecond {
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        entered: entered.clone(),
+        release: release.clone(),
+        response: serde_json::json!({"status":"query","query":row_proposal()}).to_string(),
+    };
+    let path = output();
+    let artifacts = path.clone();
+    let task = tokio::spawn(async move {
+        run_with_provider(
+            &dataset,
+            RunOptions {
+                interface: Interface::Ask,
+                context: ContextMode::Full,
+                repetitions: 2,
+                artifacts,
+                ..Default::default()
+            },
+            provider,
+        )
+        .await
+        .unwrap()
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(10), entered.notified())
+        .await
+        .unwrap();
+    let dir = std::fs::read_dir(&path)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let snapshot: RunReport =
+        serde_json::from_slice(&std::fs::read(dir.join("report.json")).unwrap()).unwrap();
+    assert_eq!(snapshot.expected_case_attempts, 2);
+    assert_eq!(snapshot.completed_case_attempts, 1);
+    assert!(snapshot.cases[0].passed);
+    assert!(!snapshot.finalized && !snapshot.complete && !snapshot.success());
+    release.notify_one();
+    let mut report = task.await.unwrap();
+    assert!(
+        report.finalized && report.complete && report.success(),
+        "{report:?}"
+    );
+    assert_eq!(report.completed_case_attempts, 2);
+    report.cases[1].repetition = report.cases[0].repetition;
+    assert!(
+        !report.success(),
+        "duplicate identities cannot satisfy coverage"
+    );
+    std::fs::remove_dir_all(path).unwrap();
+}
+#[tokio::test]
+async fn output_budget_is_independent_of_execution_admission_and_old_reports_are_nonterminal() {
+    let path = output();
+    let report = run(
+        &tiny(),
+        RunOptions {
+            interface: Interface::Sql,
+            artifacts: path.clone(),
+            max_bytes: 1,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        report.execution_budgets.max_decoded_bytes,
+        semantic_engine::QueryOptions::default().max_decoded_bytes
+    );
+    assert_eq!(report.output_max_bytes, 1);
+    assert!(report.finalized && !report.complete && !report.success());
+    let mut legacy = serde_json::to_value(&report).unwrap();
+    legacy.as_object_mut().unwrap().remove("finalized");
+    assert!(
+        !serde_json::from_value::<RunReport>(legacy)
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(path).unwrap();
+    assert!(
+        run(
+            &tiny(),
+            RunOptions {
+                max_decoded_bytes: 0,
+                ..Default::default()
+            }
+        )
+        .await
+        .is_err()
+    );
 }

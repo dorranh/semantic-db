@@ -38,6 +38,13 @@ struct Args {
     env_file: Option<PathBuf>,
     #[arg(long, default_value_t = 60)]
     timeout_seconds: u64,
+    /// Execution decoding admission budget, separate from collected output.
+    #[arg(long, default_value_t = semantic_engine::QueryOptions::default().max_decoded_bytes)]
+    max_decoded_bytes: usize,
+    #[arg(long, default_value_t = 32 * 1024 * 1024)]
+    max_output_bytes: usize,
+    #[arg(long, default_value_t = 100_000)]
+    max_output_rows: usize,
     /// Minimum delay between harness model call starts; public subprocess calls are unaffected.
     #[arg(long,default_value_t=0,value_parser=clap::value_parser!(u64).range(0..=60000))]
     model_request_interval_ms: u64,
@@ -85,12 +92,14 @@ async fn execute() -> semantic_eval::Result<()> {
         attach: args.attach,
         keep_environment: args.keep_environment,
         timeout_seconds: args.timeout_seconds,
+        max_decoded_bytes: args.max_decoded_bytes,
+        max_bytes: args.max_output_bytes,
+        max_rows: args.max_output_rows,
         model_request_interval_millis: args.model_request_interval_ms,
         model: args.model,
         env_file: args.env_file,
         cli_binary: args.cli_binary,
         public_interfaces: args.public_interfaces,
-        ..Default::default()
     };
     let report = semantic_eval::run(&dataset, options).await?;
     let passed = report.cases.iter().filter(|c| c.passed).count();

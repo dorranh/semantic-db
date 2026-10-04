@@ -15,7 +15,9 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, clap::ValueEnum, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Debug, Serialize, Deserialize, clap::ValueEnum, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "snake_case")]
 /// Interface contract for artifact format version 1.
 pub enum Interface {
@@ -47,6 +49,8 @@ pub struct RunOptions {
     pub model_request_interval_millis: u64,
     pub max_rows: usize,
     pub max_bytes: usize,
+    /// Execution admission budget, independent of the collected output limit.
+    pub max_decoded_bytes: usize,
     pub model: Option<String>,
     pub env_file: Option<PathBuf>,
     pub cli_binary: Option<PathBuf>,
@@ -67,6 +71,7 @@ impl Default for RunOptions {
             model_request_interval_millis: 0,
             max_rows: 100_000,
             max_bytes: 32 * 1024 * 1024,
+            max_decoded_bytes: semantic_engine::QueryOptions::default().max_decoded_bytes,
             model: None,
             env_file: None,
             cli_binary: None,
@@ -92,6 +97,19 @@ pub struct CaseReport {
     pub compilation: Option<serde_json::Value>,
     pub latency_millis: u128,
 }
+/// Identity of one planned independent case/interface/repetition attempt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CaseAttempt {
+    pub id: String,
+    pub interface: Interface,
+    pub repetition: usize,
+}
+/// Identity of one planned public interface check.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PublicAttempt {
+    pub id: String,
+    pub interface: String,
+}
 #[derive(Debug, Serialize, Deserialize)]
 /// Complete run evidence; success requires all requested checks to pass.
 pub struct RunReport {
@@ -100,6 +118,28 @@ pub struct RunReport {
     pub dataset_version: String,
     pub artifact_digest: String,
     pub complete: bool,
+    /// False in every running snapshot; true only after cleanup and final checks.
+    #[serde(default)]
+    pub finalized: bool,
+    #[serde(default)]
+    pub expected_case_attempts: usize,
+    #[serde(default)]
+    pub completed_case_attempts: usize,
+    #[serde(default)]
+    pub expected_public_checks: usize,
+    #[serde(default)]
+    pub completed_public_checks: usize,
+    #[serde(default)]
+    pub planned_cases: Vec<CaseAttempt>,
+    #[serde(default)]
+    pub planned_public_checks: Vec<PublicAttempt>,
+    /// Effective product execution budgets; decoded admission includes source scratch estimates.
+    #[serde(default)]
+    pub execution_budgets: semantic_engine::QueryOptions,
+    #[serde(default)]
+    pub output_max_rows: usize,
+    #[serde(default)]
+    pub output_max_bytes: usize,
     pub full_coverage: bool,
     pub release: bool,
     pub interface: Interface,
@@ -121,15 +161,74 @@ pub struct RunReport {
 }
 impl RunReport {
     pub fn success(&self) -> bool {
-        self.complete
+        self.finalized
+            && self.complete
+            && self.cohort_complete()
             && self.setup_error.is_none()
             && self.cleanup_error.is_none()
             && self.artifact_error.is_none()
             && self.cases.iter().all(|c| c.passed)
             && self.public_checks.iter().all(|c| c.passed)
     }
+    fn cohort_complete(&self) -> bool {
+        let planned: BTreeSet<_> = self.planned_cases.iter().cloned().collect();
+        let actual: BTreeSet<_> = self
+            .cases
+            .iter()
+            .map(|case| CaseAttempt {
+                id: case.id.clone(),
+                interface: case.interface,
+                repetition: case.repetition,
+            })
+            .collect();
+        let public_planned: BTreeSet<_> = self.planned_public_checks.iter().cloned().collect();
+        let public_actual: BTreeSet<_> = self
+            .public_checks
+            .iter()
+            .map(|check| PublicAttempt {
+                id: check.case_id.clone(),
+                interface: check.interface.clone(),
+            })
+            .collect();
+        self.expected_case_attempts > 0
+            && self.expected_case_attempts == self.planned_cases.len()
+            && planned.len() == self.expected_case_attempts
+            && self.completed_case_attempts == self.expected_case_attempts
+            && self.cases.len() == self.expected_case_attempts
+            && actual == planned
+            && self.expected_public_checks == self.planned_public_checks.len()
+            && public_planned.len() == self.expected_public_checks
+            && self.completed_public_checks == self.expected_public_checks
+            && self.public_checks.len() == self.expected_public_checks
+            && public_actual == public_planned
+    }
     pub fn write(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
-        std::fs::write(path, serde_json::to_vec_pretty(self)?)?;
+        use std::io::Write;
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let path = path.as_ref();
+        let temporary = path.with_file_name(format!(
+            ".{}-{}-{}.tmp",
+            path.file_name()
+                .ok_or("report path needs a filename")?
+                .to_string_lossy(),
+            std::process::id(),
+            COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let result = (|| -> Result<()> {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?;
+            file.write_all(&serde_json::to_vec_pretty(self)?)?;
+            file.sync_all()?;
+            drop(file);
+            std::fs::rename(&temporary, path)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result?;
         Ok(())
     }
 }
@@ -458,6 +557,7 @@ async fn run_inner<P: ModelProvider>(
         || options.timeout_seconds > 86400
         || options.max_rows == 0
         || options.max_bytes == 0
+        || options.max_decoded_bytes == 0
     {
         return Err("run budgets and repetitions must be positive".into());
     }
@@ -515,12 +615,48 @@ async fn run_inner<P: ModelProvider>(
         .or_else(|| getenv("SEMANTIC_EVAL_MODEL"))
         .or_else(|| getenv("OPENAI_MODEL"))
         .filter(|s| !s.trim().is_empty());
+    let mut planned_cases = Vec::new();
+    for repetition in 0..options.repetitions {
+        for case in &selected {
+            for interface in [Interface::Sql, Interface::Ask] {
+                if (options.interface == Interface::Both || options.interface == interface)
+                    && (interface != Interface::Sql || case.sql.is_some())
+                {
+                    planned_cases.push(CaseAttempt {
+                        id: case.id.clone(),
+                        interface,
+                        repetition,
+                    });
+                }
+            }
+        }
+    }
+    let planned_public_checks = if options.release || options.public_interfaces {
+        crate::public::planned_checks(dataset)
+    } else {
+        vec![]
+    };
+    let execution_budgets = semantic_engine::QueryOptions {
+        timeout_seconds: options.timeout_seconds,
+        max_decoded_bytes: options.max_decoded_bytes,
+        ..Default::default()
+    };
     let mut report = RunReport {
         format_version: 1,
         dataset_id: dataset.manifest.id.clone(),
         dataset_version: dataset.manifest.version.clone(),
         artifact_digest: dataset.digest.clone(),
-        complete: true,
+        complete: false,
+        finalized: false,
+        expected_case_attempts: planned_cases.len(),
+        completed_case_attempts: 0,
+        expected_public_checks: planned_public_checks.len(),
+        completed_public_checks: 0,
+        planned_cases,
+        planned_public_checks,
+        execution_budgets,
+        output_max_rows: options.max_rows,
+        output_max_bytes: options.max_bytes,
         full_coverage: options.cases.is_empty(),
         release: options.release,
         interface: options.interface,
@@ -538,6 +674,7 @@ async fn run_inner<P: ModelProvider>(
         limitations: vec![],
         public_checks: vec![],
     };
+    report.write(&report.report_path)?;
     let setup_future = async {
         dataset.verify_digest()?;
         lifecycle.start(dataset).await?;
@@ -551,7 +688,7 @@ async fn run_inner<P: ModelProvider>(
             .engine;
         let mut budgets = engine.query_options().clone();
         budgets.timeout_seconds = options.timeout_seconds;
-        budgets.max_decoded_bytes = options.max_bytes;
+        budgets.max_decoded_bytes = options.max_decoded_bytes;
         engine.set_query_options(budgets)?;
         verify_canonical(dataset, &project, &engine, &options).await?;
         for f in &dataset.manifest.fixtures {
@@ -588,7 +725,10 @@ async fn run_inner<P: ModelProvider>(
         Err(_) => Err("dataset setup deadline exceeded".into()),
     } } => result, _=tokio::signal::ctrl_c()=>{cancelled=true;Err("run cancelled during setup".into())} };
     let engine = match setup {
-        Ok(e) => Some(e),
+        Ok(e) => {
+            report.execution_budgets = e.query_options().clone();
+            Some(e)
+        }
         Err(e) => {
             report.setup_error = Some(e.to_string());
             report.complete = false;
@@ -752,6 +892,7 @@ async fn run_inner<P: ModelProvider>(
                     compilation: actual.compilation,
                     latency_millis: start.elapsed().as_millis(),
                 });
+                report.completed_case_attempts = report.cases.len();
                 report.write(options.artifacts.join("report.json"))?;
             }
         }
@@ -774,6 +915,7 @@ async fn run_inner<P: ModelProvider>(
                 child_env.insert("OPENAI_BASE_URL".into(), base);
             }
             report.public_checks = crate::public::checks(dataset, &options, &child_env).await;
+            report.completed_public_checks = report.public_checks.len();
             if report.public_checks.iter().any(|c| !c.passed) {
                 report.complete = false;
             }
@@ -792,6 +934,13 @@ async fn run_inner<P: ModelProvider>(
         report.artifact_error = Some(error.to_string());
         report.complete = false;
     }
+    report.finalized = true;
+    report.complete = report.cohort_complete()
+        && report.setup_error.is_none()
+        && report.cleanup_error.is_none()
+        && report.artifact_error.is_none()
+        && report.cases.iter().all(|case| !case.incomplete)
+        && report.public_checks.iter().all(|check| check.passed);
     report.write(options.artifacts.join("report.json"))?;
     Ok(report)
 }
