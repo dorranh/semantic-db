@@ -360,6 +360,7 @@ pub(crate) async fn checks(
     d: &Dataset,
     o: &RunOptions,
     env: &BTreeMap<String, String>,
+    budgets: &semantic_engine::QueryOptions,
 ) -> Vec<PublicCheck> {
     let selected = selected_cases(d);
     if selected.is_empty() {
@@ -376,6 +377,13 @@ pub(crate) async fn checks(
     for case in selected {
         for interface in ["cli_sql", "cli_typed_ask", "http_typed_pg"] {
             let attempt = async {
+                let defaults = semantic_engine::QueryOptions::default();
+                if budgets.max_remote_requests != defaults.max_remote_requests
+                    || budgets.max_decoded_bytes != defaults.max_decoded_bytes
+                    || budgets.max_remote_bytes != defaults.max_remote_bytes
+                {
+                    return Err("public subprocess execution budget forwarding is unavailable; custom harness admission limits cannot provide equivalent public evidence".into());
+                }
                 if case
                     .context
                     .as_ref()

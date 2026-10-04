@@ -39,8 +39,12 @@ struct Args {
     #[arg(long, default_value_t = 60)]
     timeout_seconds: u64,
     /// Execution decoding admission budget, separate from collected output.
-    #[arg(long, default_value_t = semantic_engine::QueryOptions::default().max_decoded_bytes)]
-    max_decoded_bytes: usize,
+    #[arg(long)]
+    max_decoded_bytes: Option<usize>,
+    #[arg(long)]
+    max_requests: Option<usize>,
+    #[arg(long)]
+    max_remote_bytes: Option<usize>,
     #[arg(long, default_value_t = 32 * 1024 * 1024)]
     max_output_bytes: usize,
     #[arg(long, default_value_t = 100_000)]
@@ -93,6 +97,8 @@ async fn execute() -> semantic_eval::Result<()> {
         keep_environment: args.keep_environment,
         timeout_seconds: args.timeout_seconds,
         max_decoded_bytes: args.max_decoded_bytes,
+        max_requests: args.max_requests,
+        max_remote_bytes: args.max_remote_bytes,
         max_bytes: args.max_output_bytes,
         max_rows: args.max_output_rows,
         model_request_interval_millis: args.model_request_interval_ms,

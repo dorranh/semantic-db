@@ -50,7 +50,10 @@ pub struct RunOptions {
     pub max_rows: usize,
     pub max_bytes: usize,
     /// Execution admission budget, independent of the collected output limit.
-    pub max_decoded_bytes: usize,
+    pub max_decoded_bytes: Option<usize>,
+    /// Explicit overrides take precedence over artifact capacity and product defaults.
+    pub max_requests: Option<usize>,
+    pub max_remote_bytes: Option<usize>,
     pub model: Option<String>,
     pub env_file: Option<PathBuf>,
     pub cli_binary: Option<PathBuf>,
@@ -71,7 +74,9 @@ impl Default for RunOptions {
             model_request_interval_millis: 0,
             max_rows: 100_000,
             max_bytes: 32 * 1024 * 1024,
-            max_decoded_bytes: semantic_engine::QueryOptions::default().max_decoded_bytes,
+            max_decoded_bytes: None,
+            max_requests: None,
+            max_remote_bytes: None,
             model: None,
             env_file: None,
             cli_binary: None,
@@ -557,7 +562,6 @@ async fn run_inner<P: ModelProvider>(
         || options.timeout_seconds > 86400
         || options.max_rows == 0
         || options.max_bytes == 0
-        || options.max_decoded_bytes == 0
     {
         return Err("run budgets and repetitions must be positive".into());
     }
@@ -582,6 +586,19 @@ async fn run_inner<P: ModelProvider>(
     {
         return Err("release requires full SQL+Ask auto coverage, >=3 repetitions, fresh cleaned environment".into());
     }
+    let mut execution_budgets = semantic_engine::QueryOptions {
+        timeout_seconds: options.timeout_seconds,
+        ..Default::default()
+    };
+    if let Some(limits) = &dataset.manifest.execution {
+        limits.apply(&mut execution_budgets)?;
+    }
+    crate::ExecutionLimits {
+        max_requests: options.max_requests,
+        max_decoded_bytes: options.max_decoded_bytes,
+        max_remote_bytes: options.max_remote_bytes,
+    }
+    .apply(&mut execution_budgets)?;
     options.artifacts = output_directory(dataset, &options.artifacts)?;
     std::fs::create_dir_all(&options.artifacts)?;
     let nonce = std::time::SystemTime::now()
@@ -636,11 +653,6 @@ async fn run_inner<P: ModelProvider>(
     } else {
         vec![]
     };
-    let execution_budgets = semantic_engine::QueryOptions {
-        timeout_seconds: options.timeout_seconds,
-        max_decoded_bytes: options.max_decoded_bytes,
-        ..Default::default()
-    };
     let mut report = RunReport {
         format_version: 1,
         dataset_id: dataset.manifest.id.clone(),
@@ -686,10 +698,7 @@ async fn run_inner<P: ModelProvider>(
             .load(&semantic_sources::Registry::standard(), &resolver)
             .await?
             .engine;
-        let mut budgets = engine.query_options().clone();
-        budgets.timeout_seconds = options.timeout_seconds;
-        budgets.max_decoded_bytes = options.max_decoded_bytes;
-        engine.set_query_options(budgets)?;
+        engine.set_query_options(report.execution_budgets.clone())?;
         verify_canonical(dataset, &project, &engine, &options).await?;
         for f in &dataset.manifest.fixtures {
             let e: Expected =
@@ -914,7 +923,9 @@ async fn run_inner<P: ModelProvider>(
             if let Some(base) = getenv("SEMANTIC_EVAL_BASE_URL") {
                 child_env.insert("OPENAI_BASE_URL".into(), base);
             }
-            report.public_checks = crate::public::checks(dataset, &options, &child_env).await;
+            report.public_checks =
+                crate::public::checks(dataset, &options, &child_env, &report.execution_budgets)
+                    .await;
             report.completed_public_checks = report.public_checks.len();
             if report.public_checks.iter().any(|c| !c.passed) {
                 report.complete = false;

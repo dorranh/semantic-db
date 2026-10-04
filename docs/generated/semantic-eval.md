@@ -147,13 +147,14 @@ Use an Ask-only run without `--public-interfaces` when collecting paced
 observations of previously provider-blocked cases.
 
 Execution admission and output collection use separate limits. `--max-decoded-bytes`
-sets the engine admission budget (default 1 GiB, matching the product); this includes
+overrides the engine admission budget (product fallback 1 GiB); this includes
 conservative source decoding and scratch estimates, rather than final result size.
 `--max-output-bytes` (default 32 MiB) and `--max-output-rows` (default 100,000) bound
 collected results. SQL and typed Ask receive the same execution budget. Reports retain
 all effective engine budgets and both output limits. Public subprocess checks use the
-product's default execution admission budget; custom harness admission limits do not
-configure those subprocesses.
+product's default execution admission budgets. Custom effective request/byte limits
+are currently unsupported in those subprocesses: their public checks fail explicitly
+before launching a child, rather than claiming equivalent evidence.
 
 Reports are atomically replaced, beginning with a running report before setup. Running
 snapshots have `finalized=false` and `complete=false`. The declared `planned_cases`
@@ -161,3 +162,18 @@ contain each requested case/interface/repetition tuple; planned public checks an
 expected/completed counts are recorded separately. `full_coverage` describes selection,
 not completion. Success requires terminal cleanup and digest checks plus the exact
 planned identities and counts. Older reports without finalization evidence cannot pass.
+
+A manifest may declare artifact capacity independently of output collection:
+
+```json
+"execution": { "max_requests": 1024, "max_decoded_bytes": 1073741824, "max_remote_bytes": 268435456 }
+```
+
+Every field is optional. Explicit `RunOptions` or CLI `--max-requests`,
+`--max-decoded-bytes`, and `--max-remote-bytes` overrides take precedence over the
+manifest; absent values use product defaults (256 requests, 1 GiB decoded admission,
+256 MiB remote bytes). Admission counts genuine source operations such as each
+PostgreSQL cursor fetch. Capacity must be positive, bounded to 1,000,000 requests and
+1 TiB per byte limit, and pass the engine's query-budget validation. Invalid artifact
+capacity fails offline validation. This configuration applies to every selected case
+and both in-process interfaces. Reports retain the resolved budgets.

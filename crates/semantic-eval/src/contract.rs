@@ -22,11 +22,44 @@ pub struct Manifest {
     pub public_cases: Vec<String>,
     pub context: Context,
     #[serde(default)]
+    pub execution: Option<ExecutionLimits>,
+    #[serde(default)]
     pub environment: Option<Environment>,
     #[serde(default)]
     pub fixtures: Vec<Fixture>,
     pub schemas: Option<PathBuf>,
     pub canonical_data: Option<PathBuf>,
+}
+/// Optional artifact execution capacity; output collection limits remain run-owned.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionLimits {
+    pub max_requests: Option<usize>,
+    pub max_decoded_bytes: Option<usize>,
+    pub max_remote_bytes: Option<usize>,
+}
+impl ExecutionLimits {
+    pub(crate) fn apply(&self, budgets: &mut semantic_engine::QueryOptions) -> Result<()> {
+        if self.max_requests.is_some_and(|n| n == 0 || n > 1_000_000)
+            || [self.max_decoded_bytes, self.max_remote_bytes]
+                .into_iter()
+                .flatten()
+                .any(|n| n == 0 || n as u128 > (1u128 << 40))
+        {
+            return Err("execution capacity must be positive, at most 1000000 requests and 1 TiB per byte limit".into());
+        }
+        if let Some(n) = self.max_requests {
+            budgets.max_remote_requests = n;
+        }
+        if let Some(n) = self.max_decoded_bytes {
+            budgets.max_decoded_bytes = n;
+        }
+        if let Some(n) = self.max_remote_bytes {
+            budgets.max_remote_bytes = n;
+        }
+        budgets.validate()?;
+        Ok(())
+    }
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -172,6 +205,9 @@ impl Dataset {
         let path = std::fs::canonicalize(path)?;
         let root = path.parent().ok_or("manifest has no parent")?.to_owned();
         let manifest: Manifest = read(&path)?;
+        if let Some(limits) = &manifest.execution {
+            limits.apply(&mut semantic_engine::QueryOptions::default())?;
+        }
         if manifest.format_version != 1
             || !valid_id(&manifest.id)
             || manifest.version.trim().is_empty()

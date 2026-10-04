@@ -553,11 +553,124 @@ async fn output_budget_is_independent_of_execution_admission_and_old_reports_are
         run(
             &tiny(),
             RunOptions {
-                max_decoded_bytes: 0,
+                max_decoded_bytes: Some(0),
                 ..Default::default()
             }
         )
         .await
         .is_err()
     );
+}
+
+#[tokio::test]
+async fn artifact_execution_capacity_and_explicit_overrides_are_recorded() {
+    let mut dataset = tiny();
+    dataset.manifest.execution = Some(ExecutionLimits {
+        max_requests: Some(1024),
+        max_decoded_bytes: Some(128 * 1024 * 1024),
+        max_remote_bytes: None,
+    });
+    for override_requests in [None, Some(512)] {
+        let path = output();
+        let report = run(
+            &dataset,
+            RunOptions {
+                interface: Interface::Sql,
+                artifacts: path.clone(),
+                max_requests: override_requests,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(report.success(), "{report:?}");
+        assert_eq!(
+            report.execution_budgets.max_remote_requests,
+            override_requests.unwrap_or(1024)
+        );
+        assert_eq!(
+            report.execution_budgets.max_decoded_bytes,
+            128 * 1024 * 1024
+        );
+        assert_eq!(
+            report.execution_budgets.max_remote_bytes,
+            semantic_engine::QueryOptions::default().max_remote_bytes
+        );
+        assert_eq!(report.output_max_bytes, 32 * 1024 * 1024);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+    let path = output();
+    let report = run(
+        &dataset,
+        RunOptions {
+            interface: Interface::Sql,
+            artifacts: path.clone(),
+            public_interfaces: true,
+            cli_binary: Some("binary-must-not-be-launched".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!report.success());
+    assert_eq!(report.public_checks.len(), 3);
+    assert!(report.public_checks.iter().all(|check| {
+        !check.passed
+            && check
+                .diagnostic
+                .as_deref()
+                .unwrap()
+                .contains("budget forwarding")
+    }));
+    std::fs::remove_dir_all(path).unwrap();
+}
+#[test]
+fn malformed_execution_capacity_fails_artifact_loading_offline() {
+    let dataset = tiny();
+    let path = output();
+    std::fs::create_dir_all(path.join("expected")).unwrap();
+    for name in [
+        "samples.csv",
+        "cases.json",
+        "semantic-db.yaml",
+        "expected/duplicates.json",
+    ] {
+        std::fs::copy(dataset.root.join(name), path.join(name)).unwrap();
+    }
+    let original: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dataset.root.join("manifest.json")).unwrap())
+            .unwrap();
+    for limits in [
+        serde_json::json!({"max_requests":0}),
+        serde_json::json!({"max_requests":1_000_001}),
+        serde_json::json!({"max_decoded_bytes":0}),
+        serde_json::json!({"max_remote_bytes":1u64<<41}),
+        serde_json::json!({"unknown":1}),
+    ] {
+        let mut manifest = original.clone();
+        manifest["execution"] = limits;
+        std::fs::write(
+            path.join("manifest.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(Dataset::load(path.join("manifest.json")).is_err());
+    }
+    let mut manifest = original;
+    manifest["execution"] = serde_json::json!({"max_requests":1024});
+    std::fs::write(
+        path.join("manifest.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        Dataset::load(path.join("manifest.json"))
+            .unwrap()
+            .manifest
+            .execution
+            .unwrap()
+            .max_requests,
+        Some(1024)
+    );
+    std::fs::remove_dir_all(path).unwrap();
 }
