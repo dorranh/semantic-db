@@ -944,24 +944,17 @@ impl RelationalPlan {
                         Ok(output)
                     }
                     Operator::Related { relationship } => {
-                        let mut right = engine
-                            .plan_generated_sql(&related_scan(relationship, &[]))
-                            .await
-                            .map_err(backend_error)?;
-                        if let Some(predicate) = &relationship.predicate {
-                            right = right
-                                .filter(df_predicate_aliased(predicate, "rhs"))
-                                .map_err(backend_error)?;
-                        }
+                        let (right, right_alias) =
+                            related_frame(engine, relationship, &mut 0).await?;
                         let on = relationship.keys.iter().map(|(left, right)| {
                             if relationship.null_keys_match {
                                 Expr::BinaryExpr(datafusion::logical_expr::expr::BinaryExpr::new(
                                     Box::new(df_field(left)),
                                     datafusion::logical_expr::Operator::IsNotDistinctFrom,
-                                    Box::new(df_field_aliased(right, "rhs")),
+                                    Box::new(df_field_aliased(right, &right_alias)),
                                 ))
                             } else {
-                                df_field(left).eq(df_field_aliased(right, "rhs"))
+                                df_field(left).eq(df_field_aliased(right, &right_alias))
                             }
                         });
                         input.join_on(
@@ -1660,6 +1653,16 @@ fn df_aggregate(aggregate: &Aggregation) -> Expr {
 }
 
 fn sql_relationship(relationship: &BoundRelationship, parameters: &mut Vec<Literal>) -> ast::Expr {
+    sql_relationship_scoped(relationship, parameters, None, &mut 0)
+}
+fn sql_relationship_scoped(
+    relationship: &BoundRelationship,
+    parameters: &mut Vec<Literal>,
+    parent: Option<&str>,
+    counter: &mut usize,
+) -> ast::Expr {
+    let scope_alias = format!("__semantic_related_{}", *counter);
+    *counter += 1;
     let mut skeleton = Parser::parse_sql(&GenericDialect {}, "SELECT 1 FROM t AS rhs")
         .expect("static existence skeleton");
     let ast::Statement::Query(query) = &mut skeleton[0] else {
@@ -1668,16 +1671,18 @@ fn sql_relationship(relationship: &BoundRelationship, parameters: &mut Vec<Liter
     let ast::SetExpr::Select(select) = query.body.as_mut() else {
         unreachable!()
     };
-    let ast::TableFactor::Table { name, .. } = &mut select.from[0].relation else {
+    let ast::TableFactor::Table { name, alias, .. } = &mut select.from[0].relation else {
         unreachable!()
     };
     *name = ast::ObjectName::from(vec![ident(&relationship.right.id)]);
+    alias.as_mut().expect("static alias").name = ident(&scope_alias);
     let mut predicates = relationship
         .keys
         .iter()
         .map(|(left, right)| {
-            let left = sql_field(left);
-            let right = sql_field_aliased(right, "rhs");
+            let left =
+                parent.map_or_else(|| sql_field(left), |alias| sql_field_aliased(left, alias));
+            let right = sql_field_aliased(right, &scope_alias);
             if relationship.null_keys_match {
                 ast::Expr::IsNotDistinctFrom(Box::new(left), Box::new(right))
             } else {
@@ -1686,7 +1691,20 @@ fn sql_relationship(relationship: &BoundRelationship, parameters: &mut Vec<Liter
         })
         .collect::<Vec<_>>();
     if let Some(predicate) = &relationship.predicate {
-        predicates.push(sql_predicate_aliased(predicate, parameters, "rhs"));
+        predicates.push(sql_predicate_aliased(predicate, parameters, &scope_alias));
+    }
+    if let Some(target) = &relationship.target {
+        for requirement in &target.requirements {
+            predicates.push(match &requirement.operation {
+                BoundOperation::Filter { predicate } => {
+                    sql_predicate_aliased(predicate, parameters, &scope_alias)
+                }
+                BoundOperation::Related {
+                    relationship: child,
+                } => sql_relationship_scoped(child, parameters, Some(&scope_alias), counter),
+                _ => unreachable!("checked target subset"),
+            });
+        }
     }
     select.selection = predicates
         .into_iter()
@@ -1719,6 +1737,17 @@ fn related_scan(relationship: &BoundRelationship, extras: &[&BoundField]) -> Str
         .collect();
     if let Some(predicate) = &relationship.predicate {
         collect(predicate, &mut fields);
+    }
+    if let Some(target) = &relationship.target {
+        for requirement in &target.requirements {
+            match &requirement.operation {
+                BoundOperation::Filter { predicate } => collect(predicate, &mut fields),
+                BoundOperation::Related {
+                    relationship: child,
+                } => fields.extend(child.keys.iter().map(|(left, _)| left.field.name().clone())),
+                _ => unreachable!("checked target subset"),
+            }
+        }
     }
     for field in extras {
         fields.insert(field.field.name().clone());
@@ -1828,4 +1857,70 @@ fn sql_utc_month(bucket: &CalendarBucketExpression) -> ast::Expr {
         sql_field(&bucket.source),
     ))];
     ast::Expr::Function(function.clone())
+}
+
+async fn related_frame(
+    engine: &Engine,
+    relationship: &BoundRelationship,
+    counter: &mut usize,
+) -> Result<(DataFrame, String), CompileDiagnostic> {
+    let scope_alias = format!("__semantic_related_{}", *counter);
+    *counter += 1;
+    let mut frame = engine
+        .plan_generated_sql(&related_scan(relationship, &[]))
+        .await
+        .map_err(backend_error)?
+        .alias(&scope_alias)
+        .map_err(backend_error)?;
+    if let Some(predicate) = &relationship.predicate {
+        frame = frame
+            .filter(df_predicate_aliased(predicate, &scope_alias))
+            .map_err(backend_error)?;
+    }
+    if let Some(target) = &relationship.target {
+        for requirement in &target.requirements {
+            frame = match &requirement.operation {
+                BoundOperation::Filter { predicate } => frame
+                    .filter(df_predicate_aliased(predicate, &scope_alias))
+                    .map_err(backend_error)?,
+                BoundOperation::Related {
+                    relationship: child,
+                } => {
+                    let (right, right_alias) =
+                        Box::pin(related_frame(engine, child, counter)).await?;
+                    let on = child.keys.iter().map(|(left, right)| {
+                        let left = df_field_aliased(left, &scope_alias);
+                        let right = df_field_aliased(right, &right_alias);
+                        if child.null_keys_match {
+                            Expr::BinaryExpr(datafusion::logical_expr::expr::BinaryExpr::new(
+                                Box::new(left),
+                                datafusion::logical_expr::Operator::IsNotDistinctFrom,
+                                Box::new(right),
+                            ))
+                        } else {
+                            left.eq(right)
+                        }
+                    });
+                    frame
+                        .join_on(
+                            right,
+                            if child.mode == ExistenceMode::Exists {
+                                datafusion::logical_expr::JoinType::LeftSemi
+                            } else {
+                                datafusion::logical_expr::JoinType::LeftAnti
+                            },
+                            on,
+                        )
+                        .map_err(backend_error)?
+                }
+                _ => {
+                    return Err(diagnostic(
+                        "invalid_plan",
+                        "Unsupported checked related target",
+                    ));
+                }
+            };
+        }
+    }
+    Ok((frame, scope_alias))
 }

@@ -4,7 +4,7 @@
 use super::*;
 
 pub(super) const PASS_ID: &str = "semantic.row_lower";
-pub(super) const PASS_VERSION: u32 = 7;
+pub(super) const PASS_VERSION: u32 = 8;
 pub(super) const COMPARISON_PROFILE: &str = "datafusion-55/sql-null-logic/utf8-binary";
 
 /// The row lowerer is one fixed pass. Its input is a bound, ordered unary
@@ -416,6 +416,39 @@ impl AbstractSchema {
         }
     }
 
+    fn related_target(relationship: &BoundRelationship) -> Result<(), CompileDiagnostic> {
+        let Some(target) = &relationship.target else {
+            return Ok(());
+        };
+        if target.input != relationship.right || target.instance != relationship.instance {
+            return Err(invalid_schema());
+        }
+        for requirement in &target.requirements {
+            match &requirement.operation {
+                BoundOperation::Filter { predicate } => {
+                    Self::right_predicate(predicate, &relationship.instance)?
+                }
+                BoundOperation::Related {
+                    relationship: child,
+                } => {
+                    for (left, right) in &child.keys {
+                        if left.instance != relationship.instance
+                            || right.instance != child.instance
+                            || left.field.data_type() != right.field.data_type()
+                        {
+                            return Err(invalid_schema());
+                        }
+                    }
+                    if let Some(predicate) = &child.predicate {
+                        Self::right_predicate(predicate, &child.instance)?;
+                    }
+                    Self::related_target(child)?;
+                }
+                _ => return Err(invalid_schema()),
+            }
+        }
+        Ok(())
+    }
     fn right_predicate(
         predicate: &BoundPredicate,
         right_instance: &str,
@@ -519,6 +552,7 @@ impl AbstractSchema {
                 }
             }
             Operator::Related { relationship } => {
+                Self::related_target(relationship)?;
                 if let Some(predicate) = &relationship.predicate {
                     Self::right_predicate(predicate, &relationship.instance)?;
                 }
@@ -1118,6 +1152,7 @@ mod tests {
                         null_keys_match: false,
                         predicate: None,
                         policies: vec![],
+                        target: None,
                     },
                     value: right_value,
                     output: output.clone(),
@@ -1196,6 +1231,7 @@ mod tests {
                 }],
             }),
             policies: vec![],
+            target: None,
         };
 
         let mut related = scan_plan();

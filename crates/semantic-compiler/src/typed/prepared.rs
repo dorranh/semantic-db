@@ -102,19 +102,29 @@ impl PreparedRows {
             }
         }
         let mut uses = BTreeMap::<String, usize>::new();
-        for requirement in &query.requirements {
-            match &requirement.operation {
-                RowOperation::Filter { predicate }
-                | RowOperation::Related {
-                    predicate: Some(predicate),
-                    ..
-                } => count_uses(predicate, 0, &mut uses)?,
-                RowOperation::FilterOutput { predicate, .. } => {
-                    count_uses(predicate, 0, &mut uses)?
+        semantic_plan::typed::visit_requirements(
+            &query.requirements,
+            &mut |requirement, depth, _| {
+                if depth > options.max_depth {
+                    return Err(diagnostic(
+                        "work_limit",
+                        "Related parameter depth exhausted",
+                    ));
                 }
-                _ => {}
-            }
-        }
+                match &requirement.operation {
+                    RowOperation::Filter { predicate }
+                    | RowOperation::Related {
+                        predicate: Some(predicate),
+                        ..
+                    } => count_uses(predicate, 0, &mut uses)?,
+                    RowOperation::FilterOutput { predicate, .. } => {
+                        count_uses(predicate, 0, &mut uses)?
+                    }
+                    _ => {}
+                }
+                Ok(())
+            },
+        )?;
         if let Some(reference) = &reference {
             let context = RequestContext {
                 reference_unix_millis: 0,
@@ -196,17 +206,29 @@ impl PreparedRows {
             ));
         }
         let mut query = self.query.clone();
-        for requirement in &mut query.requirements {
-            match &mut requirement.operation {
-                RowOperation::Filter { predicate }
-                | RowOperation::Related {
-                    predicate: Some(predicate),
-                    ..
-                } => substitute(predicate, &values, 0)?,
-                RowOperation::FilterOutput { predicate, .. } => substitute(predicate, &values, 0)?,
-                _ => {}
-            }
-        }
+        semantic_plan::typed::visit_requirements_mut(
+            &mut query.requirements,
+            &mut |requirement, depth, _| {
+                if depth > self.options.max_depth {
+                    return Err(diagnostic(
+                        "work_limit",
+                        "Related parameter depth exhausted",
+                    ));
+                }
+                match &mut requirement.operation {
+                    RowOperation::Filter { predicate }
+                    | RowOperation::Related {
+                        predicate: Some(predicate),
+                        ..
+                    } => substitute(predicate, &values, 0)?,
+                    RowOperation::FilterOutput { predicate, .. } => {
+                        substitute(predicate, &values, 0)?
+                    }
+                    _ => {}
+                }
+                Ok(())
+            },
+        )?;
         let mut options = self.options.clone();
         options.allowed_relations = match (&self.options.allowed_relations, current_scope) {
             (Some(prepared), Some(current)) => {

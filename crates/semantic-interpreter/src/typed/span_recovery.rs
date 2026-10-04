@@ -160,9 +160,21 @@ pub(super) fn row(
             "Evidence normalization entry budget exhausted",
         ));
     }
-    let ids: BTreeSet<_> = query.requirements.iter().map(|r| &r.id).collect();
+    let mut requirements = Vec::new();
+    semantic_plan::typed::visit_requirements(&query.requirements, &mut |requirement, depth, _| {
+        options.compiler.check()?;
+        if depth > options.compiler.max_depth || requirements.len() >= options.compiler.max_nodes {
+            return Err(diagnostic(
+                "work_limit",
+                "Related normalization budget exhausted",
+            ));
+        }
+        requirements.push(requirement);
+        Ok(())
+    })?;
+    let ids: BTreeSet<_> = requirements.iter().map(|r| &r.id).collect();
     // Leave duplicate requirements and orphan/missing mappings for strict rejection.
-    if ids.len() != query.requirements.len()
+    if ids.len() != requirements.len()
         || evidence.requirement_spans.len() != ids.len()
         || evidence
             .requirement_spans
@@ -172,7 +184,7 @@ pub(super) fn row(
         return Ok(());
     }
     let result = (|| {
-        for (position, requirement) in query.requirements.iter().enumerate() {
+        for (position, requirement) in requirements.iter().enumerate() {
             if let Some(spans) = evidence.requirement_spans.get_mut(&requirement.id) {
                 normalize(
                     &evidence.original_request,
@@ -232,12 +244,28 @@ pub(super) fn graph(
                     .find(|n| &n.id == node)
                     .and_then(|n| match &n.operation {
                         GraphOperation::Rows { query } => {
-                            let matching: Vec<_> = query
-                                .requirements
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, r)| &r.id == requirement)
-                                .collect();
+                            let mut matching = Vec::new();
+                            let mut position = 0usize;
+                            semantic_plan::typed::visit_requirements(
+                                &query.requirements,
+                                &mut |r, depth, _| {
+                                    options.compiler.check()?;
+                                    if depth > options.compiler.max_depth
+                                        || position >= options.compiler.max_nodes
+                                    {
+                                        return Err(diagnostic(
+                                            "work_limit",
+                                            "Related normalization budget exhausted",
+                                        ));
+                                    }
+                                    if &r.id == requirement {
+                                        matching.push((position, r));
+                                    }
+                                    position += 1;
+                                    Ok(())
+                                },
+                            )
+                            .ok()?;
                             if matching.len() == 1 {
                                 Some((matching[0].0, matching[0].1.source_text.as_str()))
                             } else {

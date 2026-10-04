@@ -142,6 +142,9 @@ pub enum RowOperation {
         instance: String,
         mode: ExistenceMode,
         predicate: Option<RowPredicate>,
+        /// Conjunctive target-scoped Filter, ConceptFilter, or Related requirements.
+        #[serde(default)]
+        target_requirements: Vec<Requirement>,
     },
     Metric {
         name: String,
@@ -535,4 +538,58 @@ pub enum LookupUsage {
     #[default]
     Project,
     Group,
+}
+
+/// Visit every request requirement in stable depth-first order. The visitor
+/// runs before descent, allowing callers to enforce their depth/work budget.
+pub fn visit_requirements<'a, E>(
+    requirements: &'a [Requirement],
+    visitor: &mut impl FnMut(&'a Requirement, usize, &[usize]) -> Result<(), E>,
+) -> Result<(), E> {
+    fn walk<'a, E>(
+        requirements: &'a [Requirement],
+        path: &mut Vec<usize>,
+        visitor: &mut impl FnMut(&'a Requirement, usize, &[usize]) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for (index, requirement) in requirements.iter().enumerate() {
+            path.push(index);
+            visitor(requirement, path.len(), path)?;
+            if let RowOperation::Related {
+                target_requirements,
+                ..
+            } = &requirement.operation
+            {
+                walk(target_requirements, path, visitor)?;
+            }
+            path.pop();
+        }
+        Ok(())
+    }
+    walk(requirements, &mut Vec::new(), visitor)
+}
+/// Mutable counterpart of visit_requirements, with the same stable ordering.
+pub fn visit_requirements_mut<E>(
+    requirements: &mut [Requirement],
+    visitor: &mut impl FnMut(&mut Requirement, usize, &[usize]) -> Result<(), E>,
+) -> Result<(), E> {
+    fn walk<E>(
+        requirements: &mut [Requirement],
+        path: &mut Vec<usize>,
+        visitor: &mut impl FnMut(&mut Requirement, usize, &[usize]) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for (index, requirement) in requirements.iter_mut().enumerate() {
+            path.push(index);
+            visitor(requirement, path.len(), path)?;
+            if let RowOperation::Related {
+                target_requirements,
+                ..
+            } = &mut requirement.operation
+            {
+                walk(target_requirements, path, visitor)?;
+            }
+            path.pop();
+        }
+        Ok(())
+    }
+    walk(requirements, &mut Vec::new(), visitor)
 }

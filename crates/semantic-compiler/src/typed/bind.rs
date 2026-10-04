@@ -320,6 +320,7 @@ pub(super) struct BoundRelationship {
     pub null_keys_match: bool,
     pub predicate: Option<BoundPredicate>,
     pub policies: Vec<ObjectRef>,
+    pub target: Option<Box<BoundQuery>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -357,6 +358,15 @@ pub(super) fn bind(
     query: &RowQuery,
     options: &CompileOptions,
     work: &mut Work,
+) -> Result<BoundQuery, CompileDiagnostic> {
+    bind_scoped(snapshot, query, options, work, false)
+}
+fn bind_scoped(
+    snapshot: &CatalogSnapshot,
+    query: &RowQuery,
+    options: &CompileOptions,
+    work: &mut Work,
+    target_scope: bool,
 ) -> Result<BoundQuery, CompileDiagnostic> {
     if !super::allowed(&query.input.relation, options) {
         return Err(diagnostic(
@@ -1293,6 +1303,7 @@ pub(super) fn bind(
                     instance,
                     mode,
                     predicate,
+                    target_requirements,
                 } => {
                     if instance.trim().is_empty()
                         || instance.starts_with('$')
@@ -1303,7 +1314,7 @@ pub(super) fn bind(
                             "Related occurrences need distinct nonempty instance IDs",
                         ));
                     }
-                    let relationship = binder.relationship(
+                    let mut relationship = binder.relationship(
                         snapshot,
                         relationship,
                         role,
@@ -1311,7 +1322,33 @@ pub(super) fn bind(
                         *mode,
                         predicate.as_ref(),
                     )?;
+                    if !target_requirements.is_empty() {
+                        let mut target_options = options.clone();
+                        target_options.max_depth =
+                            target_options.max_depth.checked_sub(1).ok_or_else(|| {
+                                diagnostic("work_limit", "Related depth budget exhausted")
+                            })?;
+                        let target = bind_scoped(
+                            snapshot,
+                            &RowQuery {
+                                version: ROW_QUERY_VERSION,
+                                input: RelationInput {
+                                    relation: relationship.right.id.clone(),
+                                    instance: instance.clone(),
+                                },
+                                requirements: target_requirements.clone(),
+                                unresolved: vec![],
+                            },
+                            &target_options,
+                            binder.work,
+                            true,
+                        )?;
+                        definitions.push(target.input.clone());
+                        definitions.extend(target.definitions.iter().cloned());
+                        relationship.target = Some(Box::new(target));
+                    }
                     definitions.push(relationship.definition.clone());
+                    definitions.push(relationship.right.clone());
                     definitions.extend(relationship.policies.iter().cloned());
                     BoundOperation::Related { relationship }
                 }
@@ -1602,7 +1639,7 @@ pub(super) fn bind(
         })?;
         requirements.push(bound);
     }
-    if aliases.is_empty() {
+    if aliases.is_empty() && !target_scope {
         return Err(diagnostic(
             "missing_projection",
             "At least one explicit projection is required",
@@ -2160,6 +2197,7 @@ impl Binder<'_> {
             null_keys_match: relationship.null_keys_match,
             predicate,
             policies,
+            target: None,
         })
     }
     fn visit(&mut self, depth: usize) -> Result<(), CompileDiagnostic> {

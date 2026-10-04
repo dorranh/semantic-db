@@ -24,14 +24,26 @@ pub(super) fn validate(
         &evidence.original_request,
         &evidence.unresolved_alternatives,
     )?;
-    if evidence.requirement_spans.len() != query.requirements.len() {
+    let mut requirements = Vec::new();
+    semantic_plan::typed::visit_requirements(&query.requirements, &mut |requirement, depth, _| {
+        options.check()?;
+        if depth > options.max_depth || requirements.len() >= options.max_nodes {
+            return Err(diagnostic(
+                "work_limit",
+                "Related evidence budget exhausted",
+            ));
+        }
+        requirements.push(requirement);
+        Ok(())
+    })?;
+    if evidence.requirement_spans.len() != requirements.len() {
         return Err(diagnostic(
             "request_coverage",
             "Every mandatory requirement must have source spans and no orphan span mappings",
         ));
     }
     let mut total = 0usize;
-    for (position, requirement) in query.requirements.iter().enumerate() {
+    for (position, requirement) in requirements.into_iter().enumerate() {
         options.check()?;
         let spans = evidence
             .requirement_spans

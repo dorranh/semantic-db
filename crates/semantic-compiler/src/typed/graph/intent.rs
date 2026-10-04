@@ -43,15 +43,25 @@ pub(super) fn requirements<'a>(
         )?;
         match &node.operation {
             GraphOperation::Rows { query } => {
-                for requirement in &query.requirements {
-                    add(
-                        GraphRequirementRef::Leaf {
-                            node: node.id.clone(),
-                            requirement: requirement.id.clone(),
-                        },
-                        Some(requirement.source_text.as_str()),
-                    )?;
-                }
+                semantic_plan::typed::visit_requirements(
+                    &query.requirements,
+                    &mut |requirement, depth, _| {
+                        if depth > options.max_depth {
+                            return Err(diagnostic(
+                                "work_limit",
+                                "Related evidence depth exhausted",
+                            ));
+                        }
+                        add(
+                            GraphRequirementRef::Leaf {
+                                node: node.id.clone(),
+                                requirement: requirement.id.clone(),
+                            },
+                            Some(requirement.source_text.as_str()),
+                        )?;
+                        Ok(())
+                    },
+                )?;
             }
             GraphOperation::Set { columns, .. } => {
                 for column in columns {
@@ -304,15 +314,33 @@ fn requirement_locations(
         };
         match &node.operation {
             GraphOperation::Rows { query } => {
-                for (index, requirement) in query.requirements.iter().enumerate() {
-                    locations.insert(
-                        GraphRequirementRef::Leaf {
-                            node: node.id.clone(),
-                            requirement: requirement.id.clone(),
-                        },
-                        format!("query/nodes/{node_index}/operation/query/requirements/{index}"),
-                    );
-                }
+                semantic_plan::typed::visit_requirements(
+                    &query.requirements,
+                    &mut |requirement, depth, path| {
+                        options.check()?;
+                        if depth > options.max_depth {
+                            return Err(diagnostic(
+                                "work_limit",
+                                "Related evidence depth exhausted",
+                            ));
+                        }
+                        let mut location = format!(
+                            "query/nodes/{node_index}/operation/query/requirements/{}",
+                            path[0]
+                        );
+                        for index in &path[1..] {
+                            location.push_str(&format!("/operation/target_requirements/{index}"));
+                        }
+                        locations.insert(
+                            GraphRequirementRef::Leaf {
+                                node: node.id.clone(),
+                                requirement: requirement.id.clone(),
+                            },
+                            location,
+                        );
+                        Ok(())
+                    },
+                )?;
             }
             GraphOperation::Set { columns, .. } => {
                 for (index, column) in columns.iter().enumerate() {

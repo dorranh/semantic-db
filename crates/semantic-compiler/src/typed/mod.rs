@@ -489,6 +489,9 @@ fn bound_required_relations(bound: &BoundQuery) -> BTreeSet<String> {
         match &requirement.operation {
             bind::BoundOperation::Related { relationship } => {
                 relations.insert(relationship.right.id.clone());
+                if let Some(target) = &relationship.target {
+                    relations.extend(bound_required_relations(target));
+                }
             }
             bind::BoundOperation::Lookup { lookup, .. } => {
                 relations.insert(lookup.relationship.right.id.clone());
@@ -708,23 +711,60 @@ fn preflight(query: &RowQuery, options: &CompileOptions) -> Result<(), CompileDi
     if let Some(context) = &options.request_context {
         context.validate()?;
     }
-    if query.requirements.len() > options.max_nodes {
-        return Err(diagnostic("work_limit", "Requirement budget exhausted"));
-    }
-    let mut count = query.requirements.len();
-    for requirement in &query.requirements {
+    let mut count = 0usize;
+    let mut ids = BTreeSet::new();
+    let mut instances = BTreeSet::from([query.input.instance.clone()]);
+    semantic_plan::typed::visit_requirements(&query.requirements, &mut |requirement, depth, _| {
+        options.check()?;
+        count = count.saturating_add(1);
+        if depth > options.max_depth || count > options.max_nodes {
+            return Err(diagnostic(
+                "work_limit",
+                "Related requirement depth or node budget exhausted",
+            ));
+        }
+        if !ids.insert(requirement.id.clone()) {
+            return Err(diagnostic(
+                "invalid_requirement",
+                "Requirement identities must be globally unique",
+            ));
+        }
+        if depth > 1
+            && !matches!(
+                requirement.operation,
+                RowOperation::Filter { .. }
+                    | RowOperation::ConceptFilter { .. }
+                    | RowOperation::Related { .. }
+            )
+        {
+            return Err(diagnostic(
+                "invalid_requirement",
+                "Related targets permit only conjunctive filter, concept_filter, and related requirements",
+            ));
+        }
+        if let RowOperation::Related { instance, .. } = &requirement.operation
+            && !instances.insert(instance.clone())
+        {
+            return Err(diagnostic(
+                "invalid_scope",
+                "Related occurrence identities must be globally unique",
+            ));
+        }
+        let mut scoped = options.clone();
+        scoped.max_depth = scoped.max_depth.saturating_sub(depth - 1);
         if let RowOperation::Filter { predicate }
         | RowOperation::Related {
             predicate: Some(predicate),
             ..
         } = &requirement.operation
         {
-            predicate_preflight(predicate, options, &mut count)?;
+            predicate_preflight(predicate, &scoped, &mut count)?;
         }
         if let RowOperation::FilterOutput { predicate, .. } = &requirement.operation {
-            predicate_preflight(predicate, options, &mut count)?;
+            predicate_preflight(predicate, &scoped, &mut count)?;
         }
-    }
+        Ok(())
+    })?;
     if let Some(evidence) = &options.request_evidence {
         intent::validate(query, evidence, options)?;
     }
@@ -884,9 +924,8 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: Requi
         .definition_refs
         .sort_by(|a, b| (&a.id, &a.revision).cmp(&(&b.id, &b.revision)));
     record.definition_refs.dedup();
-    record.requirement_dispositions = bound
-        .requirements
-        .iter()
+    record.requirement_dispositions = bound_requirement_tree(bound)
+        .into_iter()
         .map(|requirement| RequirementDisposition {
             requirement_id: safe_requirement_id(&match scope {
                 RequirementScope::Row => serde_json::json!({
@@ -948,4 +987,20 @@ fn allowed(name: &str, options: &CompileOptions) -> bool {
         .allowed_relations
         .as_ref()
         .is_none_or(|scope| scope.contains(name))
+}
+
+fn bound_requirement_tree(bound: &BoundQuery) -> Vec<&bind::BoundRequirement> {
+    fn collect<'a>(bound: &'a BoundQuery, result: &mut Vec<&'a bind::BoundRequirement>) {
+        for requirement in &bound.requirements {
+            result.push(requirement);
+            if let bind::BoundOperation::Related { relationship } = &requirement.operation
+                && let Some(target) = &relationship.target
+            {
+                collect(target, result);
+            }
+        }
+    }
+    let mut result = Vec::new();
+    collect(bound, &mut result);
+    result
 }

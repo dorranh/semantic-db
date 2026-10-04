@@ -1698,6 +1698,7 @@ fn related(mode: ExistenceMode, predicate: Option<RowPredicate>) -> Requirement 
             instance: "o".into(),
             mode,
             predicate,
+            target_requirements: vec![],
         },
     )
 }
