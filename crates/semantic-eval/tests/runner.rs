@@ -599,30 +599,6 @@ async fn artifact_execution_capacity_and_explicit_overrides_are_recorded() {
         assert_eq!(report.output_max_bytes, 32 * 1024 * 1024);
         std::fs::remove_dir_all(path).unwrap();
     }
-    let path = output();
-    let report = run(
-        &dataset,
-        RunOptions {
-            interface: Interface::Sql,
-            artifacts: path.clone(),
-            public_interfaces: true,
-            cli_binary: Some("binary-must-not-be-launched".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    assert!(!report.success());
-    assert_eq!(report.public_checks.len(), 3);
-    assert!(report.public_checks.iter().all(|check| {
-        !check.passed
-            && check
-                .diagnostic
-                .as_deref()
-                .unwrap()
-                .contains("budget forwarding")
-    }));
-    std::fs::remove_dir_all(path).unwrap();
 }
 #[test]
 fn malformed_execution_capacity_fails_artifact_loading_offline() {

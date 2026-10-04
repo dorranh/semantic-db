@@ -29,12 +29,56 @@ pub struct ServerArgs {
     /// Deadline for each query, including all remote pages and local processing.
     #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
     pub query_timeout_seconds: u64,
+    /// Maximum source requests, including each remote cursor fetch.
+    #[arg(long, value_parser = positive_query_limit)]
+    pub query_max_requests: Option<usize>,
+    /// Maximum admitted decoding bytes, including source scratch estimates.
+    #[arg(long, value_parser = positive_query_limit)]
+    pub query_max_decoded_bytes: Option<usize>,
+    /// Maximum remote bytes admitted by the query.
+    #[arg(long, value_parser = positive_query_limit)]
+    pub query_max_remote_bytes: Option<usize>,
+}
+fn positive_query_limit(value: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| "query limit must be a positive integer".into())
+}
+fn query_options(
+    current: &semantic_db::QueryOptions,
+    seconds: u64,
+    requests: Option<usize>,
+    decoded: Option<usize>,
+    remote: Option<usize>,
+) -> Result<semantic_db::QueryOptions, Box<dyn std::error::Error>> {
+    let mut options = current.clone();
+    options.timeout_seconds = seconds;
+    if let Some(value) = requests {
+        options.max_remote_requests = value;
+    }
+    if let Some(value) = decoded {
+        options.max_decoded_bytes = value;
+    }
+    if let Some(value) = remote {
+        options.max_remote_bytes = value;
+    }
+    options.validate()?;
+    Ok(options)
 }
 /// Serve a project with an application-owned connector registry.
 pub async fn run_with_registry(
     args: ServerArgs,
     registry: Registry,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    query_options(
+        &semantic_db::QueryOptions::default(),
+        args.query_timeout_seconds,
+        args.query_max_requests,
+        args.query_max_decoded_bytes,
+        args.query_max_remote_bytes,
+    )?;
     let project_path = match args.config {
         Some(path) => path,
         None => {
@@ -66,10 +110,13 @@ pub async fn run_with_registry(
     for warning in warnings {
         eprintln!("Warning: {warning}");
     }
-    engine.set_query_options(semantic_db::QueryOptions {
-        timeout_seconds: args.query_timeout_seconds,
-        ..Default::default()
-    })?;
+    engine.set_query_options(query_options(
+        engine.query_options(),
+        args.query_timeout_seconds,
+        args.query_max_requests,
+        args.query_max_decoded_bytes,
+        args.query_max_remote_bytes,
+    )?)?;
     let engine = Arc::new(engine);
     let compiler = if let Some(key) = secret("OPENAI_API_KEY").filter(|s| !s.is_empty()) {
         let model = secret("OPENAI_MODEL").ok_or("set OPENAI_MODEL when enabling Ask")?;
@@ -174,5 +221,50 @@ mod tests {
         let error = engine.query("SELECT id FROM items").await.err().unwrap();
         assert!(error.to_string().contains("missing.csv"));
         let _ = std::fs::remove_dir_all(directory);
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    #[test]
+    fn controls_preserve_cache_policy_and_unmodified_admission_limits() {
+        let current = semantic_db::QueryOptions {
+            max_remote_requests: 1024,
+            bypass_materialization: true,
+            max_cache_age_ms: Some(456),
+            refresh_materializations: vec!["facts".into()],
+            ..Default::default()
+        };
+        let resolved = query_options(&current, 120, None, Some(999999), None).unwrap();
+        assert_eq!(resolved.max_remote_requests, 1024);
+        assert_eq!(resolved.max_decoded_bytes, 999999);
+        assert_eq!(resolved.max_remote_bytes, current.max_remote_bytes);
+        assert_eq!(resolved.timeout_seconds, 120);
+        assert!(resolved.bypass_materialization);
+        assert_eq!(resolved.max_cache_age_ms, current.max_cache_age_ms);
+        assert_eq!(
+            resolved.refresh_materializations,
+            current.refresh_materializations
+        );
+    }
+    #[tokio::test]
+    async fn invalid_capacity_is_rejected_before_project_or_provider_loading() {
+        let args = ServerArgs {
+            config: Some("project-must-not-be-opened.yaml".into()),
+            port: 0,
+            http_port: 0,
+            query_timeout_seconds: 30,
+            query_max_requests: Some(0),
+            query_max_decoded_bytes: None,
+            query_max_remote_bytes: None,
+        };
+        let error = run_with_registry(args, Registry::standard())
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("invalid query budgets"),
+            "{error}"
+        );
     }
 }

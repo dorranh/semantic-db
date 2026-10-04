@@ -40,6 +40,8 @@ impl HttpState {
     }
     fn options(&self) -> semantic_db::compiler::typed::CompileOptions {
         let mut options = semantic_db::compiler::typed::CompileOptions::default();
+        options.timeout =
+            std::time::Duration::from_secs(self.engine.query_options().timeout_seconds);
         options.metrics = Some(self.metrics.clone());
         options
     }

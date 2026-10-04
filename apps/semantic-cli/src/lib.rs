@@ -61,6 +61,46 @@ struct ReadPolicyArgs {
     )]
     read_cache: Option<ReadCacheArg>,
 }
+#[derive(ClapArgs, Default)]
+struct QueryBudgetArgs {
+    /// Maximum source requests, including each remote cursor fetch.
+    #[arg(long, value_parser = positive_query_limit)]
+    query_max_requests: Option<usize>,
+    /// Maximum admitted decoding bytes, including source scratch estimates.
+    #[arg(long, value_parser = positive_query_limit)]
+    query_max_decoded_bytes: Option<usize>,
+    /// Maximum remote bytes admitted by the query.
+    #[arg(long, value_parser = positive_query_limit)]
+    query_max_remote_bytes: Option<usize>,
+}
+fn positive_query_limit(value: &str) -> std::result::Result<usize, String> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| "query limit must be a positive integer".into())
+}
+impl QueryBudgetArgs {
+    fn resolve(
+        &self,
+        current: &semantic_engine::QueryOptions,
+        seconds: u64,
+    ) -> Result<semantic_engine::QueryOptions> {
+        let mut options = current.clone();
+        options.timeout_seconds = seconds;
+        if let Some(value) = self.query_max_requests {
+            options.max_remote_requests = value;
+        }
+        if let Some(value) = self.query_max_decoded_bytes {
+            options.max_decoded_bytes = value;
+        }
+        if let Some(value) = self.query_max_remote_bytes {
+            options.max_remote_bytes = value;
+        }
+        options.validate()?;
+        Ok(options)
+    }
+}
 
 #[derive(ClapArgs)]
 struct ReplArgs {
@@ -88,6 +128,8 @@ struct ReplArgs {
 #[derive(ClapArgs)]
 #[command(group(ArgGroup::new("input").args(["sql", "file"]).required(true)))]
 struct SqlArgs {
+    #[command(flatten)]
+    query_budget: QueryBudgetArgs,
     /// Emit lossless typed schema and rows as JSON.
     #[arg(long, conflicts_with_all = ["plan", "explain", "read_report", "read_consistency", "read_cache"])]
     output_json: bool,
@@ -132,6 +174,8 @@ enum TypedPresentation {
 
 #[derive(ClapArgs)]
 struct AskArgs {
+    #[command(flatten)]
+    query_budget: QueryBudgetArgs,
     /// Emit lossless typed schema and rows as JSON (typed modes only).
     #[arg(long, conflicts_with_all = ["compile_only", "read_report", "read_consistency", "read_cache"])]
     output_json: bool,
@@ -431,10 +475,8 @@ async fn load_engine(path: Option<PathBuf>, registry: Registry) -> Result<Engine
 }
 
 fn set_timeout(engine: &mut Engine, seconds: u64) -> Result<()> {
-    engine.set_query_options(semantic_engine::QueryOptions {
-        timeout_seconds: seconds,
-        ..Default::default()
-    })?;
+    engine
+        .set_query_options(QueryBudgetArgs::default().resolve(engine.query_options(), seconds)?)?;
     Ok(())
 }
 
@@ -458,6 +500,10 @@ async fn run_repl(args: ReplArgs, registry: Registry) -> Result<()> {
 }
 
 async fn run_sql_command(args: SqlArgs, registry: Registry) -> Result<()> {
+    args.query_budget.resolve(
+        &semantic_engine::QueryOptions::default(),
+        args.query_timeout_seconds,
+    )?;
     let sql = match (args.sql, args.file) {
         (Some(sql), None) if sql == "-" => {
             let mut input = String::new();
@@ -500,7 +546,10 @@ async fn run_sql_command(args: SqlArgs, registry: Registry) -> Result<()> {
         return Err("mutation SQL requires a project with an explicit write binding".into());
     }
     let mut engine = load_engine(path, registry).await?;
-    set_timeout(&mut engine, args.query_timeout_seconds)?;
+    engine.set_query_options(
+        args.query_budget
+            .resolve(engine.query_options(), args.query_timeout_seconds)?,
+    )?;
     if args.output_json {
         if write {
             return Err("--output-json accepts read SQL only".into());
@@ -522,6 +571,10 @@ async fn run_sql_command(args: SqlArgs, registry: Registry) -> Result<()> {
 }
 
 async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
+    args.query_budget.resolve(
+        &semantic_engine::QueryOptions::default(),
+        args.query_timeout_seconds,
+    )?;
     if args.compile_only
         && (args.read.read_consistency.is_some()
             || args.read.read_cache.is_some()
@@ -531,7 +584,10 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
     }
     let path = required_project_path(args.project)?;
     let mut engine = load_engine(Some(path), registry).await?;
-    set_timeout(&mut engine, args.query_timeout_seconds)?;
+    engine.set_query_options(
+        args.query_budget
+            .resolve(engine.query_options(), args.query_timeout_seconds)?,
+    )?;
     let compiler = Interpreter::new(config::provider()?);
     let request_context = match (&args.reference_time, &args.timezone) {
         (Some(time), Some(timezone)) => {
@@ -931,6 +987,8 @@ async fn run_typed_ask(
     use semantic_compiler::typed::TypedOutcome;
     use semantic_interpreter::typed::{InterpretOptions, SelectionMode};
     let mut options = InterpretOptions::default();
+    options.compiler.timeout =
+        std::time::Duration::from_secs(engine.query_options().timeout_seconds);
     options.selection_mode = match mode {
         CompilerMode::TypedFull => SelectionMode::Full,
         CompilerMode::TypedRetrieved => SelectionMode::Retrieved,
@@ -1064,6 +1122,8 @@ async fn run_typed_machine(
     use semantic_compiler::typed::TypedOutcome;
     use semantic_interpreter::typed::{InterpretOptions, SelectionMode};
     let mut options = InterpretOptions::default();
+    options.compiler.timeout =
+        std::time::Duration::from_secs(engine.query_options().timeout_seconds);
     options.request_context = context;
     options.selection_mode = match mode {
         CompilerMode::TypedAuto => SelectionMode::Auto,
@@ -1107,5 +1167,66 @@ async fn run_typed_machine(
             batches.iter().map(|b| b.num_rows()).sum::<usize>()
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod query_budget_tests {
+    use super::*;
+    #[test]
+    fn timeout_and_partial_budget_controls_preserve_existing_query_policy() {
+        let current = semantic_engine::QueryOptions {
+            timeout_seconds: 17,
+            max_remote_requests: 512,
+            max_decoded_bytes: 123456,
+            max_remote_bytes: 456789,
+            bypass_materialization: true,
+            max_cache_age_ms: Some(123),
+            refresh_materializations: vec!["orders".into()],
+        };
+        let mut engine = Engine::new();
+        engine.set_query_options(current.clone()).unwrap();
+        set_timeout(&mut engine, 43).unwrap();
+        assert_eq!(engine.query_options().max_remote_requests, 512);
+        let resolved = QueryBudgetArgs {
+            query_max_requests: Some(1024),
+            ..Default::default()
+        }
+        .resolve(engine.query_options(), 120)
+        .unwrap();
+        assert_eq!(resolved.timeout_seconds, 120);
+        assert_eq!(resolved.max_remote_requests, 1024);
+        assert_eq!(resolved.max_decoded_bytes, current.max_decoded_bytes);
+        assert_eq!(resolved.max_remote_bytes, current.max_remote_bytes);
+        assert!(resolved.bypass_materialization);
+        assert_eq!(resolved.max_cache_age_ms, current.max_cache_age_ms);
+        assert_eq!(
+            resolved.refresh_materializations,
+            current.refresh_materializations
+        );
+    }
+    #[test]
+    fn invalid_query_controls_fail_without_changing_policy() {
+        let current = semantic_engine::QueryOptions::default();
+        for controls in [
+            QueryBudgetArgs {
+                query_max_requests: Some(0),
+                ..Default::default()
+            },
+            QueryBudgetArgs {
+                query_max_decoded_bytes: Some(0),
+                ..Default::default()
+            },
+            QueryBudgetArgs {
+                query_max_remote_bytes: Some(0),
+                ..Default::default()
+            },
+        ] {
+            assert!(controls.resolve(&current, 30).is_err());
+        }
+        assert!(QueryBudgetArgs::default().resolve(&current, 0).is_err());
+        assert!(positive_query_limit("0").is_err());
+        assert!(positive_query_limit("-1").is_err());
+        assert_eq!(positive_query_limit("1024").unwrap(), 1024);
     }
 }

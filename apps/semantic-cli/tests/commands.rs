@@ -240,3 +240,50 @@ fn sql_json_preserves_unsigned_window_output() {
     assert_eq!(value["columns"][0]["type"], "uint64");
     assert_eq!(value["rows"], serde_json::json!([["1"], ["2"]]));
 }
+
+#[test]
+fn query_budget_flags_reject_zero_before_loading_sources_or_contacting_models() {
+    for command in ["sql", "ask", "server"] {
+        for limit in [
+            "--query-max-requests",
+            "--query-max-decoded-bytes",
+            "--query-max-remote-bytes",
+        ] {
+            let mut args = vec![
+                command,
+                "--project-config",
+                "project-must-not-be-opened.yaml",
+                limit,
+                "0",
+            ];
+            if command == "sql" {
+                args.push("SELECT 1");
+            }
+            if command == "ask" {
+                args.push("List IDs");
+            }
+            let output = run(&args);
+            assert!(!output.status.success());
+            let diagnostic = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                diagnostic.contains("positive integer"),
+                "{command} {limit}: {diagnostic}"
+            );
+            assert!(!diagnostic.contains("No such file"), "{diagnostic}");
+        }
+    }
+    let output = run(&[
+        "sql",
+        "--query-max-requests",
+        "1",
+        "--query-max-decoded-bytes",
+        "1",
+        "--query-max-remote-bytes",
+        "1",
+        "--output-json",
+        "SELECT 7 AS value",
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["rows"][0][0], "7");
+}

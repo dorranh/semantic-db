@@ -151,10 +151,11 @@ overrides the engine admission budget (product fallback 1 GiB); this includes
 conservative source decoding and scratch estimates, rather than final result size.
 `--max-output-bytes` (default 32 MiB) and `--max-output-rows` (default 100,000) bound
 collected results. SQL and typed Ask receive the same execution budget. Reports retain
-all effective engine budgets and both output limits. Public subprocess checks use the
-product's default execution admission budgets. Custom effective request/byte limits
-are currently unsupported in those subprocesses: their public checks fail explicitly
-before launching a child, rather than claiming equivalent evidence.
+all effective engine budgets and both output limits. Public subprocess checks forward the same effective deadline and all three admission
+limits to CLI SQL, typed Ask and the HTTP/PostgreSQL server. The generic product
+flags are `--query-timeout-seconds`, `--query-max-requests`,
+`--query-max-decoded-bytes` and `--query-max-remote-bytes`. Absent product limit flags
+preserve the engine's configured budgets and cache/materialization policy.
 
 Reports are atomically replaced, beginning with a running report before setup. Running
 snapshots have `finalized=false` and `complete=false`. The declared `planned_cases`

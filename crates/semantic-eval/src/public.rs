@@ -40,6 +40,18 @@ fn write_sanitized(path: &PathBuf, data: &[u8], env: &BTreeMap<String, String>) 
     std::fs::write(path, text)?;
     Ok(())
 }
+fn query_controls(budgets: &semantic_engine::QueryOptions) -> [String; 8] {
+    [
+        "--query-timeout-seconds".into(),
+        budgets.timeout_seconds.to_string(),
+        "--query-max-requests".into(),
+        budgets.max_remote_requests.to_string(),
+        "--query-max-decoded-bytes".into(),
+        budgets.max_decoded_bytes.to_string(),
+        "--query-max-remote-bytes".into(),
+        budgets.max_remote_bytes.to_string(),
+    ]
+}
 async fn cli(
     binary: &PathBuf,
     env: &BTreeMap<String, String>,
@@ -47,6 +59,7 @@ async fn cli(
     c: &Case,
     o: &RunOptions,
     ask: bool,
+    budgets: &semantic_engine::QueryOptions,
 ) -> Result<()> {
     let interface = if ask { "cli_typed_ask" } else { "cli_sql" };
     let mut command = command(binary, env);
@@ -55,8 +68,7 @@ async fn cli(
         .arg("--project-config")
         .arg(d.resolve(&d.manifest.project)?)
         .arg("--output-json")
-        .arg("--query-timeout-seconds")
-        .arg(o.timeout_seconds.to_string());
+        .args(query_controls(budgets));
     if ask {
         let context = c.context.as_ref().unwrap_or(&d.manifest.context);
         command.args([
@@ -260,11 +272,13 @@ async fn http_pg(
     d: &Dataset,
     c: &Case,
     o: &RunOptions,
+    budgets: &semantic_engine::QueryOptions,
 ) -> Result<()> {
     let port = free_port()?;
     let http = free_port()?;
     let mut child = command(binary, env)
         .arg("server")
+        .args(query_controls(budgets))
         .arg("--project-config")
         .arg(d.resolve(&d.manifest.project)?)
         .arg("--port")
@@ -377,13 +391,6 @@ pub(crate) async fn checks(
     for case in selected {
         for interface in ["cli_sql", "cli_typed_ask", "http_typed_pg"] {
             let attempt = async {
-                let defaults = semantic_engine::QueryOptions::default();
-                if budgets.max_remote_requests != defaults.max_remote_requests
-                    || budgets.max_decoded_bytes != defaults.max_decoded_bytes
-                    || budgets.max_remote_bytes != defaults.max_remote_bytes
-                {
-                    return Err("public subprocess execution budget forwarding is unavailable; custom harness admission limits cannot provide equivalent public evidence".into());
-                }
                 if case
                     .context
                     .as_ref()
@@ -396,9 +403,9 @@ pub(crate) async fn checks(
                     );
                 }
                 match interface {
-                    "cli_sql" => cli(&binary, env, d, case, o, false).await,
-                    "cli_typed_ask" => cli(&binary, env, d, case, o, true).await,
-                    _ => http_pg(&binary, env, d, case, o).await,
+                    "cli_sql" => cli(&binary, env, d, case, o, false, budgets).await,
+                    "cli_typed_ask" => cli(&binary, env, d, case, o, true, budgets).await,
+                    _ => http_pg(&binary, env, d, case, o, budgets).await,
                 }
             };
             let result = match tokio::time::timeout(
@@ -432,4 +439,33 @@ pub(crate) async fn checks(
         }
     }
     reports
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    #[test]
+    fn subprocess_controls_include_effective_deadline_and_every_admission_budget() {
+        let budgets = semantic_engine::QueryOptions {
+            timeout_seconds: 123,
+            max_remote_requests: 1024,
+            max_decoded_bytes: 987654,
+            max_remote_bytes: 456789,
+            ..Default::default()
+        };
+        assert_eq!(
+            query_controls(&budgets),
+            [
+                "--query-timeout-seconds",
+                "123",
+                "--query-max-requests",
+                "1024",
+                "--query-max-decoded-bytes",
+                "987654",
+                "--query-max-remote-bytes",
+                "456789"
+            ]
+            .map(String::from)
+        );
+    }
 }
