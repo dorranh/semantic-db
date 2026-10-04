@@ -1,0 +1,73 @@
+{
+  "status": "documentation only; do not author while parent Cargo references frozen bundles",
+  "baseline_version": "1.0.3",
+  "planned_nl_version": "1.0.4",
+  "cases_sha256": "17337bbf2452724127f340404289cd2b5f30cc6e34fa2664f338853a25ea3d95",
+  "manifest_sha256": "be1fa74461dd94bb9a7d03d22218bf1212702fc0cd11979a1c4a1c9cdb9111b7",
+  "existing_erratum_sha256": "ef8f280435f52e21e27170e5bdec396ba53ee6648ae4f47da4fd65fc8b669f67",
+  "changes": [
+    {
+      "case_id": "fanout.order_refund_count",
+      "previous_question": "Return each known buyer name, completed order count, then linked refund event count, by buyer ID.",
+      "planned_effective_question": "Return each known billed buyer name, completed order count, then linked refund event count, by buyer ID.",
+      "reason": "Role precision only: counts/refunds use billed buyer attribution, without a newly invented global customer default.",
+      "reference_sql_sha256": "3585ab65a693eb093fb61fe5451164563cf28198f5bbf4342c5b7e5dd4de18e6",
+      "expected_file": "expected/fanout.order_refund_count.json",
+      "expected_file_sha256": "1a9b0f4b69a0dd7a6d58fe051ac745ff0757c102acbcd10eeadb0a3fe44f35db"
+    },
+    {
+      "case_id": "window.per_buyer",
+      "previous_question": "Return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+      "planned_effective_question": "For completed orders, return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+      "reason": "Population contradiction correction: prior wording lacks completed restriction while reference SQL filters status completed; pending/cancelled rows otherwise change both row population and ranks.",
+      "reference_sql_sha256": "cc2c17894d0ddd66a54964102fc4819c29b261ee972d28f57dc276164a421941",
+      "expected_file": "expected/window.per_buyer.json",
+      "expected_file_sha256": "bd7ba9204b583a748a2640a231c923b00e999fe1456aeac1a08e0fc03ab4e362"
+    },
+    {
+      "case_id": "sets.intersect",
+      "previous_question": "Return distinct known customer IDs that are both completed buyers and subscribers of any status, ascending.",
+      "planned_effective_question": "Return distinct known customer IDs that are both completed billed buyers and subscribers of any status, ascending.",
+      "reason": "Role precision: ordinary buyer usually means payer, but explicit billed binds the existing intended role under current catalog vocabulary. Model clarification is not proof the original was necessarily ambiguous.",
+      "reference_sql_sha256": "1408f5f2e10cbb7693d4cb7acd4114221a5df9d6f39f1a0861776f11903444b4",
+      "expected_file": "expected/sets.intersect.json",
+      "expected_file_sha256": "9fcaf2d54008378383610040c6b4c5c0ce4a06300fb5e4bc6e34d9dc8d531763"
+    },
+    {
+      "case_id": "sets.except",
+      "previous_question": "Return known completed buyer IDs who have no subscription of any status, ascending.",
+      "planned_effective_question": "Return known completed billed buyer IDs who have no subscription of any status, ascending.",
+      "reason": "Role precision only: make the existing billing participation role explicit, without changing known customer/subscription populations.",
+      "reference_sql_sha256": "fe5fc8c6e6df2e6c74b13949b11f08809e1d15ac1161b8a13765c0a7a3141ac2",
+      "expected_file": "expected/sets.except.json",
+      "expected_file_sha256": "73b57162095fcef11430f4b04dce8f25f290e78e0147eea4ab007959b9a0846b"
+    },
+    {
+      "case_id": "fanout.orders_subscriptions",
+      "previous_question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, by ID.",
+      "planned_effective_question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, 2024, by ID.",
+      "reason": "Optional explicit-year precision consistent with independently authored reference date; current pinned clock may reasonably resolve the previous partial date.",
+      "reference_sql_sha256": "32784f6f70dfcb9a39b39df907590927e32d0a67bfb77a7676de19fc8001b782",
+      "expected_file": "expected/fanout.orders_subscriptions.json",
+      "expected_file_sha256": "2a01b5f49ad7728893bfc595a0e10eb5c709acaae2afa781ba3f822579619382"
+    },
+    {
+      "case_id": "calculation.exchange",
+      "previous_question": "For each leap-day exchange rate, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+      "planned_effective_question": "For each exchange rate on February 29, 2024, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+      "reason": "Optional explicit-date precision; pinned 2024 clock permits contextual reading, so this is not a proven original contradiction or an IR workaround.",
+      "reference_sql_sha256": "d88fda7040123737ce8d57cc0f5d7ce32eaef0dc61b2d62e57af797b9879b1bf",
+      "expected_file": "expected/calculation.exchange.json",
+      "expected_file_sha256": "a1a7029c362460bcfbca56329570136ec59c2c94e9ff5e33ee8329cce55a1167"
+    },
+    {
+      "case_id": "reject.duplicate_rate",
+      "previous_question": "Convert 100 EUR to CHF on leap day using the quarantined exchange_rates_duplicate lookup.",
+      "planned_effective_question": "Convert 100 EUR to CHF on February 29, 2024 using the quarantined exchange_rates_duplicate lookup.",
+      "reason": "Optional explicit-date precision only; its coarse negative expectation is untouched pending separate typed-runtime migration.",
+      "reference_sql_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected_file": "expected/reject.duplicate_rate.json",
+      "expected_file_sha256": "466afe9c7e77edeb186b127d08ae591b9d38720c7200c88c5deb053e54a2e0b1"
+    }
+  ]
+}

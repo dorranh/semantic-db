@@ -1426,7 +1426,7 @@
       "multiple_facts",
       "cross_source"
     ],
-    "question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, by ID.",
+    "question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, 2024, by ID.",
     "sql": "WITH o AS (SELECT billing_customer_id,SUM(total_minor) AS cents FROM orders WHERE status='completed' GROUP BY billing_customer_id),s AS (SELECT customer_id,SUM(monthly_minor) AS cents FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date) GROUP BY customer_id) SELECT c.name,COALESCE(o.cents,0),COALESCE(s.cents,0) FROM customers c LEFT JOIN o ON c.customer_id=o.billing_customer_id LEFT JOIN s ON c.customer_id=s.customer_id ORDER BY c.customer_id",
     "expected": "expected/fanout.orders_subscriptions.json",
     "comparison": {
@@ -1495,7 +1495,7 @@
       "multiple_facts",
       "cross_source"
     ],
-    "question": "Return each known buyer name, completed order count, then linked refund event count, by buyer ID.",
+    "question": "Return each known billed buyer name, completed order count, then linked refund event count, by buyer ID.",
     "sql": "WITH r AS (SELECT order_id,COUNT(*) AS events FROM refunds GROUP BY order_id) SELECT c.name,COUNT(o.order_id),SUM(COALESCE(r.events,0)) FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id LEFT JOIN r ON o.order_id=r.order_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
     "expected": "expected/fanout.order_refund_count.json",
     "comparison": {
@@ -1946,7 +1946,7 @@
       "windows",
       "cross_source"
     ],
-    "question": "Return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+    "question": "For completed orders, return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
     "sql": "SELECT c.name,o.order_id,ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY o.order_date DESC,o.order_id DESC) AS position FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' ORDER BY c.customer_id,position",
     "expected": "expected/window.per_buyer.json",
     "comparison": {
@@ -2125,7 +2125,7 @@
       "sets",
       "cross_source"
     ],
-    "question": "Return distinct known customer IDs that are both completed buyers and subscribers of any status, ascending.",
+    "question": "Return distinct known customer IDs that are both completed billed buyers and subscribers of any status, ascending.",
     "sql": "SELECT c.customer_id FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' INTERSECT SELECT customer_id FROM subscriptions ORDER BY customer_id",
     "expected": "expected/sets.intersect.json",
     "comparison": {
@@ -2148,7 +2148,7 @@
       "sets",
       "cross_source"
     ],
-    "question": "Return known completed buyer IDs who have no subscription of any status, ascending.",
+    "question": "Return known completed billed buyer IDs who have no subscription of any status, ascending.",
     "sql": "SELECT c.customer_id FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' EXCEPT SELECT customer_id FROM subscriptions ORDER BY customer_id",
     "expected": "expected/sets.except.json",
     "comparison": {
@@ -2236,7 +2236,7 @@
     "tags": [
       "sets"
     ],
-    "question": "For each leap-day exchange rate, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+    "question": "For each exchange rate on February 29, 2024, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
     "sql": "SELECT currency,CAST(ROUND(chf_per_unit*CAST(100 AS DECIMAL(18,0)),2) AS DECIMAL(18,2)) AS chf_value,CAST(ROUND(chf_per_unit*CAST(-100 AS DECIMAL(18,0)),2) AS DECIMAL(18,2)) AS negative_chf_value FROM exchange_rates WHERE rate_date=DATE '2024-02-29' ORDER BY currency",
     "expected": "expected/calculation.exchange.json",
     "comparison": {
@@ -2421,7 +2421,7 @@
       "companion",
       "rejected"
     ],
-    "question": "Convert 100 EUR to CHF on leap day using the quarantined exchange_rates_duplicate lookup.",
+    "question": "Convert 100 EUR to CHF on February 29, 2024 using the quarantined exchange_rates_duplicate lookup.",
     "expected": "expected/reject.duplicate_rate.json",
     "comparison": {
       "ordered": false,

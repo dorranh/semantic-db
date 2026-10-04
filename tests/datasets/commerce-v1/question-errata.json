@@ -4,5 +4,47 @@
     "previous_question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, by month.",
     "effective_question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, ordered by month ascending.",
     "reason": "Visible clarification of existing ascending row presentation; by month could mean grouping. Independent reviewer approved; SQL, gold, tolerance, comparison and data unchanged."
+  },
+  {
+    "case_id": "fanout.order_refund_count",
+    "previous_question": "Return each known buyer name, completed order count, then linked refund event count, by buyer ID.",
+    "effective_question": "Return each known billed buyer name, completed order count, then linked refund event count, by buyer ID.",
+    "reason": "Role precision only: counts/refunds use billed buyer attribution, without a newly invented global customer default."
+  },
+  {
+    "case_id": "window.per_buyer",
+    "previous_question": "Return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+    "effective_question": "For completed orders, return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+    "reason": "Population contradiction correction: prior wording lacks completed restriction while reference SQL filters status completed; pending/cancelled rows otherwise change both row population and ranks."
+  },
+  {
+    "case_id": "sets.intersect",
+    "previous_question": "Return distinct known customer IDs that are both completed buyers and subscribers of any status, ascending.",
+    "effective_question": "Return distinct known customer IDs that are both completed billed buyers and subscribers of any status, ascending.",
+    "reason": "Role precision: ordinary buyer usually means payer, but explicit billed binds the existing intended role under current catalog vocabulary. Model clarification is not proof the original was necessarily ambiguous."
+  },
+  {
+    "case_id": "sets.except",
+    "previous_question": "Return known completed buyer IDs who have no subscription of any status, ascending.",
+    "effective_question": "Return known completed billed buyer IDs who have no subscription of any status, ascending.",
+    "reason": "Role precision only: make the existing billing participation role explicit, without changing known customer/subscription populations."
+  },
+  {
+    "case_id": "fanout.orders_subscriptions",
+    "previous_question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, by ID.",
+    "effective_question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, 2024, by ID.",
+    "reason": "Optional explicit-year precision consistent with independently authored reference date; current pinned clock may reasonably resolve the previous partial date."
+  },
+  {
+    "case_id": "calculation.exchange",
+    "previous_question": "For each leap-day exchange rate, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+    "effective_question": "For each exchange rate on February 29, 2024, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+    "reason": "Optional explicit-date precision; pinned 2024 clock permits contextual reading, so this is not a proven original contradiction or an IR workaround."
+  },
+  {
+    "case_id": "reject.duplicate_rate",
+    "previous_question": "Convert 100 EUR to CHF on leap day using the quarantined exchange_rates_duplicate lookup.",
+    "effective_question": "Convert 100 EUR to CHF on February 29, 2024 using the quarantined exchange_rates_duplicate lookup.",
+    "reason": "Optional explicit-date precision only; its coarse negative expectation is untouched pending separate typed-runtime migration."
   }
 ]

@@ -1,0 +1,26 @@
+{
+  "version": "1.0.4",
+  "artifact_digest": "8510bea61d5e660344f6978979b52d88c6513f48feb8124bd5615ac369dead0d",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "0edccf34e0f2a06cca1e26c8f0b8cf5dccc3349cf07da5d6c0b6a94c816a76ad",
+      "after": "a93b4a335ee7a0596af352445adc1614fbd1a5914044e3c5dcf49f1fe9ab0535"
+    },
+    "cases.json": {
+      "before": "17337bbf2452724127f340404289cd2b5f30cc6e34fa2664f338853a25ea3d95",
+      "after": "7191379e1466a29c5cae9cc2efb1f791bc6946c33e0f340b2409838b5623ce9b"
+    },
+    "manifest.json": {
+      "before": "be1fa74461dd94bb9a7d03d22218bf1212702fc0cd11979a1c4a1c9cdb9111b7",
+      "after": "9b0a78aa7ba839263f109ab2bdbc2ff007c546731805c08e037ed73bf35b50ef"
+    },
+    "question-errata.json": {
+      "before": "ef8f280435f52e21e27170e5bdec396ba53ee6648ae4f47da4fd65fc8b669f67",
+      "after": "8503be3231f3c727be726c51d03c1b85ff643ddc6c397b4dbe4880b88063d104"
+    }
+  },
+  "unchanged_file_count": 145,
+  "isolated_regeneration_all_files_equal": 149,
+  "only_case_fields_changed": "seven reviewed question fields",
+  "existing_month_erratum_preserved": true
+}
