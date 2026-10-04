@@ -137,6 +137,9 @@ impl Engine {
                 )
                 .with_runtime_env(self.context.runtime_env())
                 .with_default_features()
+                .with_analyzer_rule(Arc::new(
+                    crate::checked_arithmetic::CheckedIntegerArithmetic,
+                ))
                 .with_optimizer_rules(crate::federation::optimizer_rules())
                 .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
                 .build(),

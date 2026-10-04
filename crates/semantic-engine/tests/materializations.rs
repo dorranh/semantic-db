@@ -81,6 +81,23 @@ async fn value(engine: &Engine, options: QueryOptions) -> i64 {
         .value(0)
 }
 #[tokio::test]
+async fn materialization_queries_reject_scalar_integer_overflow() {
+    let path = std::env::temp_dir().join(format!(
+        "semantic-engine-checked-cache-{}",
+        semantic_runtime::unique_id()
+    ));
+    let engine = engine(&path, i64::MAX, "SELECT x FROM source").await;
+    let result = engine
+        .execute("SELECT x * 2::bigint FROM summary", QueryOptions::default())
+        .await;
+    let error = match result {
+        Err(error) => error.to_string(),
+        Ok(execution) => execution.collect().await.unwrap_err().to_string(),
+    };
+    assert!(error.to_lowercase().contains("overflow"), "{error}");
+    std::fs::remove_dir_all(path).unwrap();
+}
+#[tokio::test]
 async fn source_and_view_generations_are_resolved_before_planning() {
     let path = std::env::temp_dir().join(format!(
         "semantic-engine-cache-{}",

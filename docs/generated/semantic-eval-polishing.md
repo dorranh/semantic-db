@@ -76,19 +76,42 @@ rules, tags, and case coverage remained unchanged. The live artifact digest
 above includes this wording revision; original baseline reports retain the
 original artifact digest.
 
+## Checked integer arithmetic
+
+The engine rewrites signed and unsigned integer addition, subtraction and
+multiplication, and signed unary negation, after native type coercion and before
+constant folding. Arrow checked kernels report overflow instead of wrapping.
+The rule applies to normal and materialization sessions, preserves native
+nullability and unary field metadata, and marks its functions local for
+federation. Floating-point and decimal arithmetic keep their existing behavior.
+The execution profile is `semantic-datafusion-typed-v12`.
+
+The parent ran the complete engine/compiler test suites: 205 tests passed across
+68 targets with no failures or ignored tests. After the final unary metadata
+correction, all nine focused arithmetic/materialization tests passed. All-target
+Clippy for both crates passed with warnings denied. Logs:
+`/tmp/semantic-eval-checked-integer-broad.log`,
+`/tmp/semantic-eval-checked-integer-focused-final.log`, and
+`/tmp/semantic-eval-checked-integer-clippy.log`.
+
+These commands used two jobs, disabled incremental compilation, and set
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0`. Debug assertions remain
+enabled. A preceding build exhausted local disk before tests ran; targeted Cargo
+cleanup freed 66.7 GiB. That failed build provides no test result.
+
 ## Work still in progress
 
-Checked integer arithmetic must prevent constant and column overflow in the
-engine, including materialization sessions and federation placement. Executable
-Ossie metric contracts and the catalog declarations needed by the remaining
-semantic cases also require implementation and validation.
+Live acceptance must verify checked arithmetic with both physical connectors.
+Executable Ossie metric contracts and the catalog declarations needed by the
+remaining semantic cases also require implementation and validation.
 
 The additional dataset is the complete Formula 1 family from the canonical
 [BIRD Mini-Dev release](https://huggingface.co/datasets/birdsql/bird_mini_dev):
 66 tasks, 13 tables, and all 493257 source rows, routed through CSV and PostgreSQL.
 This preserves a coherent database family without selecting cases by whether
 the product passes them. Original source versions, annotations, and SQL are
-retained. Independent review is identifying upstream annotation contradictions;
-any corrected references must be recorded explicitly and checked independently
-against SQLite and PostgreSQL. This derived suite is not an official BIRD
-leaderboard score. Its authoring and acceptance verification are not complete.
+retained. Independent review identified upstream annotation contradictions;
+the explicit corrections are recorded and all 66 typed golds have been checked
+independently against SQLite and PostgreSQL. This derived suite is not an official
+BIRD leaderboard score. Its authored bundle is reviewed and frozen; product
+acceptance verification is pending.

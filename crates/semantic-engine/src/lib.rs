@@ -3,6 +3,7 @@
 mod allocation;
 mod business_calendar;
 mod calendar;
+mod checked_arithmetic;
 mod checked_distinct;
 mod checked_mean;
 mod checked_snapshot;
@@ -227,6 +228,7 @@ impl Engine {
             .with_config(config)
             .with_runtime_env(runtime)
             .with_default_features()
+            .with_analyzer_rule(Arc::new(checked_arithmetic::CheckedIntegerArithmetic))
             .with_optimizer_rules(federation::optimizer_rules())
             .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
             .build();

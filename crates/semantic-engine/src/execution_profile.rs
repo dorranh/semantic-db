@@ -6,7 +6,7 @@
 
 /// Stable identity recorded by compiler artifacts and connector capability
 /// declarations. Change this value whenever an observable semantic below changes.
-pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v11";
+pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v12";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IntegerSumSemantics {
@@ -88,7 +88,7 @@ pub struct FunctionCapability {
     pub placement: FunctionPlacement,
 }
 
-static COMPILER_FUNCTIONS: [FunctionCapability; 16] = [
+static COMPILER_FUNCTIONS: [FunctionCapability; 44] = [
     FunctionCapability {
         name: "semantic_ratio_i64_v1",
         kind: FunctionKind::Scalar,
@@ -169,6 +169,146 @@ static COMPILER_FUNCTIONS: [FunctionCapability; 16] = [
         kind: FunctionKind::Window,
         placement: FunctionPlacement::LocalOnly,
     },
+    FunctionCapability {
+        name: "semantic_checked_add_int8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_int16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_int32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_int64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_uint8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_uint16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_uint32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_add_uint64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_int8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_int16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_int32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_int64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_uint8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_uint16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_uint32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_sub_uint64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_int8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_int16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_int32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_int64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_uint8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_uint16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_uint32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_mul_uint64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_neg_int8_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_neg_int16_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_neg_int32_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_checked_neg_int64_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -217,7 +357,7 @@ mod tests {
 
     #[test]
     fn every_compiler_function_is_explicitly_local() {
-        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 16);
+        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 44);
         assert!(
             MVP_EXECUTION_PROFILE
                 .compiler_functions()
