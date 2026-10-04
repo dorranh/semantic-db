@@ -1,6 +1,8 @@
 # Shared model context
 
-Draft implementation; runtime integration and verification are pending.
+Implemented and verified: 118 interpreter tests passed, all-target Clippy passed,
+and evaluator/CLI builds passed. Full live acceptance runs are in progress; live
+provider token measurements remain pending.
 
 Context payload version 2 retains model-level description and AI context once in a
 `shared_model_contexts` map. Each selected relation references its exact model context
@@ -17,3 +19,7 @@ each reference to the pinned model definition and rejects stale, missing, mismat
 or orphan shared entries. Cache renderer and selection revisions change with the new
 payload, and the model protocol explains how references apply to relations. No
 instructions, examples, synonyms or knowledge are truncated or selected using golds.
+
+The regression fixture compares the referenced payload with an equivalently audited
+legacy inline payload and verifies a reduction exceeding 100,000 UTF-8 JSON bytes.
+This measures serialized context bytes, not provider token usage.

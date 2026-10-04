@@ -136,8 +136,9 @@ This verifies the integer-overflow fix with the real mixed-source project.
 ## Work still in progress
 
 Remaining commerce Ask failures require implementation and fresh full-suite
-verification. A bounded model evidence recovery patch is awaiting verification;
-direct compiler span checks remain authoritative.
+verification. Bounded model evidence recovery and artifact execution capacity are implemented
+and verified by the test/build evidence below; strict compiler span checks remain
+authoritative. Fresh full Ask acceptance remains required.
 
 The additional dataset is the complete Formula 1 family from the canonical
 [BIRD Mini-Dev release](https://huggingface.co/datasets/birdsql/bird_mini_dev):
@@ -188,8 +189,8 @@ remain required. None of these failures is waived.
 ## Full SQL evidence after portability, capacity and role vocabulary repairs
 
 Fresh real mixed-source runs are complete and finalized with full coverage:
-commerce passed103/103 SQL-bearing cases, including all three intended error
-companions, and BIRD passed66/66 required tasks. Both reports have no setup,
+commerce passed 103/103 SQL-bearing cases, including all three intended error
+companions, and BIRD passed 66/66 required tasks. Both reports have no setup,
 cleanup or artifact errors. Reports:
 `.semantic-eval/commerce-sql-roles/run-251955-18db5cb4c88a0f55/report.json`
 (artifact `79bc641044762043ad84c5eee984cc299c7f55425753c505f028be46be993cf0`)
@@ -202,3 +203,36 @@ source hashes matched and no bytecode files were generated. Previous SQL/Ask
 failures remain historical evidence. Fresh Ask verification and remaining
 semantic-profile implementation are still required; SQL success is not an Ask
 waiver.
+
+## Verified span recovery and execution capacity
+
+Commits `3f261f4` and `0576202` passed 142 tests across 18 targets with no failures:
+`/tmp/semantic-eval-span-capacity-tests-final.log`. Interpreter and evaluator
+all-target Clippy with warnings denied passed:
+`/tmp/semantic-eval-span-capacity-clippy.log`. Evaluator/CLI build passed:
+`/tmp/semantic-eval-span-capacity-build.log`. These logs were independently read
+without running Cargo in the business-analyst agent. Shared deduplication was verified separately: 118 tests across 14 targets passed
+(`/tmp/semantic-eval-shared-context-tests-final.log`), all-target Clippy passed
+(`/tmp/semantic-eval-shared-context-clippy.log`), and evaluator/CLI build passed
+(`/tmp/semantic-eval-shared-context-build.log`). The span logs above do not cover
+that separate verification.
+
+The terminal focused Luna Ask report
+`.semantic-eval/commerce-span-contracts/run-253650-18db5cc95d168111/report.json`
+passed 4/5 with complete/finalized true for its filtered scope and no provider
+errors. MIN/MAX, billing roles and two active-membership requests passed;
+concept.active recorded two unique exact span normalizations and the other four
+requests recorded zero. calendar.previous_month asked whether unmatched payer
+identities should be retained: the original question genuinely omitted that
+population policy. The failure remains recorded and full Ask coverage remains
+required.
+
+Seven independently reviewed commerce question errata now explicitly state
+matching customer/product identities where the existing SQL requires INNER JOIN,
+while preserving missing historical matches where SQL uses LEFT JOIN. These are
+precise authored request contracts, not a new global default or compiler waiver.
+Names/regions are not required to be nonnull merely because identity must match.
+Questions already retaining unknowns and companion ambiguity expectations remain
+untouched. Only those seven question strings changed; every SQL/gold/tolerance
+and coverage count is unchanged. New cases SHA256
+`ae766425740387c6f69659956964a72f8e479a212a534e9e72aba02f67b15ce6`.
