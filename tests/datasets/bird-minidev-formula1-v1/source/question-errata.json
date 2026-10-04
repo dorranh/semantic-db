@@ -1,0 +1,9 @@
+[
+  {
+    "question_id": 978,
+    "original_question": "How many times the circuits were held in Austria? Please give their location and coordinates.",
+    "effective_question": "How many distinct circuit venues are located in Austria, treating a venue as a distinct (location, latitude, longitude) combination? Return the total venue count followed by each venue's location, latitude and longitude, repeating the total count on each row.",
+    "reason": "Visible clarification of previously independently reviewed geographic venue counting grain and repeated-total output shape; original held-times phrasing is ambiguous. No SQL, gold, data or tolerance changes.",
+    "review_disposition": "Independent reviewer approved; derived variant, not official BIRD leaderboard wording"
+  }
+]

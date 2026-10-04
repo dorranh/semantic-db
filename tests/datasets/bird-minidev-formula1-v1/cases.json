@@ -1530,7 +1530,7 @@
       "formula1",
       "simple"
     ],
-    "question": "How many times the circuits were held in Austria? Please give their location and coordinates.",
+    "question": "How many distinct circuit venues are located in Austria, treating a venue as a distinct (location, latitude, longitude) combination? Return the total venue count followed by each venue's location, latitude and longitude, repeating the total count on each row.",
     "sql": "WITH venues AS (SELECT DISTINCT location, lat, lng FROM circuits WHERE country = 'Austria') SELECT COUNT(*) OVER () AS venue_count, location, lat, lng FROM venues ORDER BY location, lat, lng",
     "expected": "expected/bird.formula1.978.json",
     "comparison": {

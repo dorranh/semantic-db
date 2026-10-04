@@ -38,3 +38,8 @@ Readonly authoring reproducibility was verified by regenerating a temporary copy
 ## Terminal BIRD shared-context evidence
 
 The frozen v1.0.2 full run passed SQL 66/66 and Ask 18/66 (84/132 total); finalized/full coverage are true, complete is false due to one HTTP 429. There are 47 nonprovider Ask failures. Setup, cleanup and artifact errors are null. The separate 884 transport retry returned unsupported with no provider failure and is a filtered report, not a replacement full score. Per-call input median 37944 and maximum 38468 over 67 calls confirms input reduction without an accuracy causation claim. Full paths, report checksums and every untruncated failure diagnostic/difference are recorded in [the terminal failure ledger](bird-minidev-formula1-v1-shared-context-failure-ledger.md). Earlier baselines remain preserved.
+
+
+## Derived v1.0.3 visible venue-count clarification
+
+Case 978 effective NL now explicitly asks distinct geographic venue count and repeats the total beside each location/coordinate row, matching the previously independently reviewed derived task. Immutable upstream PG/SQLite NL, evidence and SQL remain unchanged. No other question, any SQL, gold, tolerance or data changed. Generator/manifest and source erratum provenance record changed; provenance checksums pin the erratum. Artifact digest `51e7b79cf0b89866f8c0bf965d38781a916ab819147d587af035a0bd3143f2bc`. This is a visible derived-variant annotation clarification, not official leaderboard wording or an acceptance exemption. Bundle refrozen for review and parent validation.

@@ -1,0 +1,30 @@
+{
+  "version": "1.0.3",
+  "artifact_digest": "51e7b79cf0b89866f8c0bf965d38781a916ab819147d587af035a0bd3143f2bc",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "2ae13b0a818c6dae66474c8fb73f5b28e0e650aacec3e444221fadddd236645f",
+      "after": "48f8e172838a69d77fdb31b2898ef4f9926e29622237a2a8dca4ced2303e7dc4"
+    },
+    "cases.json": {
+      "before": "4d34d6977100db104522ff3974aaee0c221d11bc9838bc39b6fbb4d3ad8f5935",
+      "after": "4f69f98bc76f25de1cf74fabea2a0b9fabf7e2bfa7bd9b9e4ae9c2dfdbfef752"
+    },
+    "manifest.json": {
+      "before": "621950b592b37d71f77abed717d782378fbf4b2d0acfb8c7dfc43f332b96d71c",
+      "after": "051b3c3edb75f44e3dad4b6ca64351d353cd939f2af171510080ad833a953cd2"
+    },
+    "source/provenance.json": {
+      "before": "27f1c735e053237a80230f6eccf03b04b430ef86b5ac88b08a7bfa47c58030df",
+      "after": "5cedfe3dedbd843a3e4f2eaaaf55fe4e5c335957a2050fa37f079654ed69d70c"
+    },
+    "source/question-errata.json": {
+      "before": null,
+      "after": "560d7e48ef58a7752221e9b73c7d8d62c891e4be005514570e1742706cee8f64"
+    }
+  },
+  "only_effective_question_changed": [
+    "bird.formula1.978"
+  ],
+  "unchanged_files": 134
+}
