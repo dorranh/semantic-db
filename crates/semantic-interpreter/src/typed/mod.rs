@@ -5,6 +5,8 @@
 mod capture;
 mod context;
 mod context_manifest;
+mod span_recovery;
+pub use span_recovery::SpanNormalization;
 
 pub use capture::{
     CaptureLimits, CaptureRecorder, ModelTranscript, RecordingProvider, TranscriptProvider,
@@ -212,6 +214,8 @@ impl Drop for InterpretationGuard {
 
 #[derive(Debug, Default, Serialize)]
 pub struct Work {
+    pub span_normalizations: usize,
+    pub span_normalization_bytes: usize,
     pub context_relations: usize,
     pub context_fields: usize,
     pub context_bytes: usize,
@@ -255,6 +259,7 @@ pub struct InterpretationRecord {
     pub cache_status: &'static str,
     pub contexts: Vec<ContextManifest>,
     pub model_attempts: Vec<ModelAttempt>,
+    pub span_normalizations: Vec<SpanNormalization>,
     pub token_accounting: TokenAccounting,
     pub work: Work,
     pub stages: Vec<StageRecord>,
@@ -278,6 +283,7 @@ impl InterpretationRecord {
             cache_status: "disabled",
             contexts: Vec::new(),
             model_attempts: Vec::new(),
+            span_normalizations: Vec::new(),
             token_accounting: TokenAccounting::default(),
             work: Work::default(),
             stages: Vec::new(),
@@ -553,7 +559,10 @@ impl<P: ModelProvider> Interpreter<P> {
             record.stage("decode", started, &proposal);
             let mut compiler_options = options.compile_options();
             let proposal = proposal.and_then(|proposal| match proposal {
-                TypedProposal::GraphIntent { query, evidence } => {
+                TypedProposal::GraphIntent {
+                    query,
+                    mut evidence,
+                } => {
                     if evidence.original_request != request {
                         return Err(diagnostic(
                             "request_evidence",
@@ -570,10 +579,16 @@ impl<P: ModelProvider> Interpreter<P> {
                             "Model evidence cannot replace the host graph requirement ledger",
                         ));
                     }
+                    if options.graph_request_evidence.is_none() {
+                        span_recovery::graph(&query, &mut evidence, options, record)?;
+                    }
                     compiler_options.graph_request_evidence = Some(evidence);
                     Ok(TypedProposal::Graph { query })
                 }
-                TypedProposal::Intent { query, evidence } => {
+                TypedProposal::Intent {
+                    query,
+                    mut evidence,
+                } => {
                     if evidence.original_request != request {
                         return Err(diagnostic(
                             "request_evidence",
@@ -589,6 +604,9 @@ impl<P: ModelProvider> Interpreter<P> {
                             "request_evidence",
                             "Model evidence cannot replace the host requirement ledger",
                         ));
+                    }
+                    if options.request_evidence.is_none() {
+                        span_recovery::row(&query, &mut evidence, options, record)?;
                     }
                     compiler_options.request_evidence = Some(evidence);
                     Ok(TypedProposal::Query { query })
@@ -763,8 +781,12 @@ fn compiler_result_at_snapshot(
     snapshot_id: &str,
     compilation: TypedCompilation,
 ) -> Result<TypedCompilation, CompileDiagnostic> {
-    if compilation.record.snapshot_id.as_deref() != Some(snapshot_id)
-        || engine.catalog().snapshot().id() != snapshot_id
+    if engine.catalog().snapshot().id() != snapshot_id
+        || compilation
+            .record
+            .snapshot_id
+            .as_deref()
+            .is_some_and(|recorded| recorded != snapshot_id)
     {
         return Err(diagnostic(
             "snapshot_mismatch",
@@ -775,6 +797,10 @@ fn compiler_result_at_snapshot(
         TypedOutcome::Rejected { ref diagnostic }
         | TypedOutcome::Unresolved { ref diagnostic }
         | TypedOutcome::ProviderFailure { ref diagnostic } => Err(diagnostic.clone()),
+        _ if compilation.record.snapshot_id.as_deref() != Some(snapshot_id) => Err(diagnostic(
+            "snapshot_mismatch",
+            "Successful compilation did not retain the pinned catalog snapshot",
+        )),
         _ => Ok(compilation),
     }
 }

@@ -4463,3 +4463,180 @@ async fn graph_intent_repairs_preserve_host_evidence_and_clear_previous_attempt_
     assert_eq!(result.interpretation.work.model_calls, 2);
     assert!(result.record.request_spans_validated);
 }
+
+#[tokio::test]
+async fn model_unique_span_offsets_recover_without_changing_query_or_call_accounting() {
+    let engine = fixture();
+    for request in ["List IDs", "Montrér IDs", "private secret IDs"] {
+        let mut intent = traced_intent();
+        intent.evidence.original_request = request.into();
+        intent.evidence.requirement_spans.get_mut("ids").unwrap()[0] =
+            RequestSpan { start: 0, end: 1 };
+        let response = serde_json::to_string(&TypedProposal::Intent {
+            query: intent.query.clone(),
+            evidence: intent.evidence.clone(),
+        })
+        .unwrap();
+        let model = compiler(vec![response.clone()]);
+        let result = model
+            .compile_typed(&engine, request, InterpretOptions::default())
+            .await;
+        assert!(
+            matches!(result.outcome, TypedOutcome::Compiled { .. }),
+            "{:?}",
+            result.outcome
+        );
+        assert!(result.record.request_spans_validated);
+        assert_eq!(result.interpretation.work.model_calls, 1);
+        assert_eq!(
+            result.interpretation.work.model_output_bytes,
+            response.len()
+        );
+        assert_eq!(result.interpretation.span_normalizations.len(), 1);
+        let event = &result.interpretation.span_normalizations[0];
+        assert_eq!(
+            event.replacement,
+            RequestSpan {
+                start: request.find("IDs").unwrap(),
+                end: request.len()
+            }
+        );
+        let serialized = serde_json::to_string(&result.interpretation.span_normalizations).unwrap();
+        assert!(!serialized.contains("private") && !serialized.contains("ids"));
+        if let TypedOutcome::Compiled { query } = result.outcome {
+            assert_eq!(query.intent(), &intent.query);
+        }
+    }
+}
+#[tokio::test]
+async fn host_ledgers_ambiguous_sources_and_missing_mappings_remain_strict() {
+    let engine = fixture();
+    for mode in ["host", "ambiguous", "missing", "empty", "paraphrase"] {
+        let mut intent = traced_intent();
+        intent.evidence.requirement_spans.get_mut("ids").unwrap()[0] =
+            RequestSpan { start: 0, end: 1 };
+        let mut options = InterpretOptions::default();
+
+        match mode {
+            "host" => options.request_evidence = Some(intent.evidence.clone()),
+            "ambiguous" => intent.evidence.original_request = "IDs plus IDs".into(),
+            "missing" => intent.evidence.requirement_spans.clear(),
+            "empty" => intent
+                .evidence
+                .requirement_spans
+                .get_mut("ids")
+                .unwrap()
+                .clear(),
+            "paraphrase" => intent.query.requirements[0].source_text = "identifiers".into(),
+            _ => unreachable!(),
+        }
+        let response = serde_json::to_string(&TypedProposal::Intent {
+            query: intent.query,
+            evidence: intent.evidence.clone(),
+        })
+        .unwrap();
+        let result = compiler(vec![response])
+            .with_max_repairs(0)
+            .compile_typed(&engine, &intent.evidence.original_request, options)
+            .await;
+        assert!(
+            !matches!(result.outcome, TypedOutcome::Compiled { .. }),
+            "{mode}"
+        );
+        assert!(
+            result.interpretation.span_normalizations.is_empty(),
+            "{mode}"
+        );
+        assert_eq!(result.interpretation.work.model_calls, 1);
+        if mode == "empty" {
+            assert!(
+                matches!(result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "request_coverage")
+            );
+        }
+    }
+}
+#[tokio::test]
+async fn graph_node_and_leaf_offsets_recover_but_output_offsets_do_not() {
+    use semantic_plan::graph::GraphRequirementRef;
+    let engine = fixture();
+    let mut intent = traced_graph_intent();
+    let mut changed = 0;
+    for entry in &mut intent.evidence.requirements {
+        if matches!(&entry.target, GraphRequirementRef::Node { node } if node == "a/b")
+            || matches!(&entry.target, GraphRequirementRef::Leaf { node, .. } if node == "a/b")
+        {
+            entry.source_spans = vec![RequestSpan { start: 0, end: 1 }];
+            changed += 1;
+        }
+    }
+    let response = serde_json::to_string(&TypedProposal::GraphIntent {
+        query: intent.query.clone(),
+        evidence: intent.evidence.clone(),
+    })
+    .unwrap();
+    let result = compiler(vec![response])
+        .with_max_repairs(0)
+        .compile_typed(
+            &engine,
+            &intent.evidence.original_request,
+            InterpretOptions::default(),
+        )
+        .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::CompiledGraph { .. }),
+        "{:?}",
+        result.outcome
+    );
+    assert_eq!(result.interpretation.span_normalizations.len(), changed);
+    let output = intent
+        .evidence
+        .requirements
+        .iter_mut()
+        .find(|e| matches!(e.target, GraphRequirementRef::Output { .. }))
+        .unwrap();
+    output.source_spans = vec![RequestSpan {
+        start: 1000,
+        end: 1001,
+    }];
+    let response = serde_json::to_string(&TypedProposal::GraphIntent {
+        query: intent.query,
+        evidence: intent.evidence.clone(),
+    })
+    .unwrap();
+    let options = InterpretOptions::default();
+    let result = compiler(vec![response])
+        .with_max_repairs(0)
+        .compile_typed(&engine, &intent.evidence.original_request, options)
+        .await;
+    assert!(!matches!(
+        result.outcome,
+        TypedOutcome::CompiledGraph { .. }
+    ));
+}
+
+#[tokio::test]
+async fn graph_empty_spans_remain_absent_evidence_without_normalization() {
+    let engine = fixture();
+    let mut intent = traced_graph_intent();
+    intent.evidence.requirements[0].source_spans.clear();
+    let response = serde_json::to_string(&TypedProposal::GraphIntent {
+        query: intent.query,
+        evidence: intent.evidence.clone(),
+    })
+    .unwrap();
+    let result = compiler(vec![response])
+        .with_max_repairs(0)
+        .compile_typed(
+            &engine,
+            &intent.evidence.original_request,
+            InterpretOptions::default(),
+        )
+        .await;
+    assert!(
+        matches!(&result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "request_coverage"),
+        "{:?}",
+        result.outcome
+    );
+    assert!(result.interpretation.span_normalizations.is_empty());
+    assert_eq!(result.interpretation.work.model_calls, 1);
+}
