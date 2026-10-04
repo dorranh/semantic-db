@@ -229,7 +229,7 @@
     "tags": [
       "projection"
     ],
-    "question": "Return names of French-region customers, ordered by customer ID.",
+    "question": "Return names of customers whose current region code is exactly FR, ordered by customer ID.",
     "sql": "SELECT name FROM customers WHERE region='FR' ORDER BY customer_id",
     "expected": "expected/projection.unicode.json",
     "comparison": {
@@ -562,7 +562,7 @@
       "concepts",
       "cross_source"
     ],
-    "question": "Return current billed-client region then gross booked sales cents, ordered by region.",
+    "question": "Return current billed-client region then gross booked sales cents, excluding orders without a matching billed-client record; sort by region.",
     "sql": "SELECT c.region,SUM(o.total_minor) AS gross_minor FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' GROUP BY c.region ORDER BY c.region",
     "expected": "expected/concept.gross_by_region.json",
     "comparison": {
@@ -769,7 +769,7 @@
       "relationships",
       "cross_source"
     ],
-    "question": "List subscription ID then subscriber name, by subscription ID.",
+    "question": "List subscription ID then subscriber name for subscriptions with a matching customer record, excluding missing customers; sort by subscription ID.",
     "sql": "SELECT s.subscription_id,c.name FROM subscriptions s JOIN customers c ON s.customer_id=c.customer_id ORDER BY s.subscription_id",
     "expected": "expected/relationships.subscribers.json",
     "comparison": {
@@ -1403,7 +1403,7 @@
     "tags": [
       "multiple_facts"
     ],
-    "question": "For order 101 return line number, line cents, then total refund cents, by line number.",
+    "question": "For every line of order 101 return line number, line cents, then total refund cents, using zero for lines without refunds; sort by line number.",
     "sql": "WITH r AS (SELECT order_id,line_no,SUM(refund_minor) AS cents FROM refunds GROUP BY order_id,line_no) SELECT i.line_no,i.line_minor,COALESCE(r.cents,0) AS refunded FROM order_items i LEFT JOIN r ON i.order_id=r.order_id AND i.line_no=r.line_no WHERE i.order_id=101 ORDER BY i.line_no",
     "expected": "expected/fanout.line_refunds.json",
     "comparison": {
@@ -2036,7 +2036,7 @@
       "windows",
       "cross_source"
     ],
-    "question": "Return known buyer name then their largest completed order ID, by buyer ID.",
+    "question": "Return known billed buyer name then the ID of their completed order with the highest total cents, choosing the lower order ID on equal totals; sort by buyer ID.",
     "sql": "WITH ranked AS (SELECT c.customer_id,c.name,o.order_id,ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY o.total_minor DESC,o.order_id ASC) AS rn FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed') SELECT name,order_id FROM ranked WHERE rn=1 ORDER BY customer_id",
     "expected": "expected/window.top_per_buyer.json",
     "comparison": {
@@ -2080,7 +2080,7 @@
     "tags": [
       "sets"
     ],
-    "question": "Return buyer IDs from completed orders plus buyer IDs from active subscriptions on April 1, retaining duplicates; output order does not matter.",
+    "question": "Return billed buyer IDs from completed orders plus subscriber customer IDs from active subscriptions on April 1,2024, retaining duplicates; output order does not matter.",
     "sql": "SELECT billing_customer_id AS customer_id FROM orders WHERE status='completed' UNION ALL SELECT customer_id FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date)",
     "expected": "expected/sets.union_all.json",
     "comparison": {
@@ -2102,7 +2102,7 @@
     "tags": [
       "sets"
     ],
-    "question": "Return distinct buyer IDs occurring in completed orders or active subscriptions on April 1, sorted by ID.",
+    "question": "Return distinct billed buyer IDs occurring in completed orders or subscriber customer IDs from active subscriptions on April 1,2024, sorted by ID.",
     "sql": "SELECT billing_customer_id AS customer_id FROM orders WHERE status='completed' UNION SELECT customer_id FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date) ORDER BY customer_id",
     "expected": "expected/sets.union.json",
     "comparison": {
