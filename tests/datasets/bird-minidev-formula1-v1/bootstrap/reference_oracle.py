@@ -3,6 +3,8 @@
 Run with uv run --with sqlglot --with 'psycopg[binary]' python ...
 Uses an isolated temporary PostgreSQL container and always tears it down.
 """
+import sys
+sys.dont_write_bytecode = True
 import argparse,csv,datetime,hashlib,json,os,shlex,sqlite3,subprocess,time
 from decimal import Decimal
 from pathlib import Path

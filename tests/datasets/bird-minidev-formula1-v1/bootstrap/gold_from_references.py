@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Native-engine agreement is mandatory before typed gold publication."""
+import sys
+sys.dont_write_bytecode = True
 import json,math,argparse
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]

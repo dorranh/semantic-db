@@ -5,6 +5,9 @@
   "project": "semantic-db.yaml",
   "cases": "cases.json",
   "schemas": "schemas.json",
+  "execution": {
+    "max_requests": 1024
+  },
   "required_paired_cases": 66,
   "required_companion_cases": 0,
   "context": {
