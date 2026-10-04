@@ -144,6 +144,7 @@ impl Engine {
                 .with_query_planner(Arc::new(datafusion_federation::FederatedQueryPlanner::new()))
                 .build(),
         );
+        session.register_udf((*crate::semantic_decimal_rate_v1()).clone());
         let mut generations: BTreeMap<String, Manifest> = BTreeMap::new();
         let mut revisions: BTreeMap<String, String> = BTreeMap::new();
         let mut acquired: BTreeMap<String, u64> = BTreeMap::new();

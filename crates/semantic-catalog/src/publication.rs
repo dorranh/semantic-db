@@ -534,6 +534,19 @@ fn validate_definitions<'a>(
                 .or_default()
                 .insert(relation.name.clone());
         }
+        for (name, rule) in &semantics.exact_decimal_rates {
+            *edges = edges.checked_add(4).ok_or(PublicationError::WorkLimit)?;
+            if *edges > limits.max_edges {
+                return Err(PublicationError::WorkLimit);
+            }
+            if name.trim().is_empty()
+                || !identities.insert(rule.id.as_str())
+                || rule.rate_relation != relation.name
+                || rule.validate(&snapshot, None).is_err()
+            {
+                return Err(invalid("invalid_exact_decimal_rate"));
+            }
+        }
         for (name, rule) in &semantics.currency_rates {
             *edges = edges.checked_add(12).ok_or(PublicationError::WorkLimit)?;
             if *edges > limits.max_edges {

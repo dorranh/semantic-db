@@ -21,7 +21,9 @@ pub use conversion::*;
 mod business_calendar;
 pub use business_calendar::*;
 mod currency_rate;
+mod exact_decimal_rate;
 pub use currency_rate::*;
+pub use exact_decimal_rate::{DecimalRounding, ExactDecimalRateRule, NullRatePolicy};
 mod allocation;
 pub use allocation::*;
 mod metric_state;
@@ -93,6 +95,8 @@ pub struct RelationSemantics {
     pub conversions: BTreeMap<String, UnitConversion>,
     pub business_calendars: BTreeMap<String, BusinessCalendarRule>,
     pub currency_rates: BTreeMap<String, CurrencyRateRule>,
+    #[serde(default)]
+    pub exact_decimal_rates: BTreeMap<String, ExactDecimalRateRule>,
     pub allocations: BTreeMap<String, AllocationContract>,
     pub value_mappings: BTreeMap<String, ValueMapping>,
     pub concepts: BTreeMap<String, ConceptDefinition>,

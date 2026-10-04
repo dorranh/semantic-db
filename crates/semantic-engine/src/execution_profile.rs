@@ -6,7 +6,7 @@
 
 /// Stable identity recorded by compiler artifacts and connector capability
 /// declarations. Change this value whenever an observable semantic below changes.
-pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v12";
+pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v13";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IntegerSumSemantics {
@@ -88,7 +88,7 @@ pub struct FunctionCapability {
     pub placement: FunctionPlacement,
 }
 
-static COMPILER_FUNCTIONS: [FunctionCapability; 44] = [
+static COMPILER_FUNCTIONS: [FunctionCapability; 45] = [
     FunctionCapability {
         name: "semantic_ratio_i64_v1",
         kind: FunctionKind::Scalar,
@@ -101,6 +101,11 @@ static COMPILER_FUNCTIONS: [FunctionCapability; 44] = [
     },
     FunctionCapability {
         name: "semantic_assert_exactly_one_v1",
+        kind: FunctionKind::Scalar,
+        placement: FunctionPlacement::LocalOnly,
+    },
+    FunctionCapability {
+        name: "semantic_decimal_rate_v1",
         kind: FunctionKind::Scalar,
         placement: FunctionPlacement::LocalOnly,
     },
@@ -357,7 +362,7 @@ mod tests {
 
     #[test]
     fn every_compiler_function_is_explicitly_local() {
-        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 44);
+        assert_eq!(MVP_EXECUTION_PROFILE.compiler_functions().len(), 45);
         assert!(
             MVP_EXECUTION_PROFILE
                 .compiler_functions()

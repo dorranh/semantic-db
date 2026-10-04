@@ -281,3 +281,41 @@ mod tests {
         assert_ne!(fingerprint(&[b"ab", b"c"]), fingerprint(&[b"a", b"bc"]));
     }
 }
+
+/// Stable semantic data conditions raised during a pinned execution read.
+/// Messages intentionally exclude queried keys, SQL, row values and credentials.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticDataCondition {
+    MissingExactRate,
+    NonUniqueRate,
+    RateValueMissing,
+    InvalidRate,
+}
+impl SemanticDataCondition {
+    /// Stable machine code independent of diagnostic wording.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::MissingExactRate => "missing_exact_rate",
+            Self::NonUniqueRate => "non_unique_rate",
+            Self::RateValueMissing => "rate_value_missing",
+            Self::InvalidRate => "invalid_rate",
+        }
+    }
+    /// Preserve typed provenance through DataFusion execution wrappers.
+    pub fn into_datafusion(self) -> DataFusionError {
+        DataFusionError::External(Box::new(self))
+    }
+}
+
+impl std::fmt::Display for SemanticDataCondition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::MissingExactRate => "required exact rate is unavailable",
+            Self::NonUniqueRate => "exact rate lookup is nonunique",
+            Self::RateValueMissing => "required rate value is unavailable",
+            Self::InvalidRate => "rate value violates its authored contract",
+        })
+    }
+}
+impl std::error::Error for SemanticDataCondition {}

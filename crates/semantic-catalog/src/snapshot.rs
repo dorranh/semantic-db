@@ -124,6 +124,16 @@ impl SnapshotRelation {
                     }
                 }
             }
+            if let Some(rates) = semantics
+                .get_mut("exact_decimal_rates")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                for rule in rates.values_mut() {
+                    if let Some(rule) = rule.as_object_mut() {
+                        rule.remove("source_refs");
+                    }
+                }
+            }
             if let Some(currency_rates) = semantics
                 .get_mut("currency_rates")
                 .and_then(serde_json::Value::as_object_mut)
@@ -211,6 +221,9 @@ impl SnapshotRelation {
             }
             for (name, allocation) in &semantics.allocations {
                 definitions.insert(format!("allocation/{name}"), allocation.reference());
+            }
+            for (name, rule) in &semantics.exact_decimal_rates {
+                definitions.insert(format!("exact_decimal_rate/{name}"), rule.reference());
             }
             for (name, rule) in &semantics.currency_rates {
                 definitions.insert(format!("currency_rate/{name}"), rule.reference());
