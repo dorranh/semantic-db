@@ -1036,6 +1036,34 @@
           }
         },
         {
+          "name": "orders_calendar",
+          "from": "orders",
+          "to": "business_calendar",
+          "from_columns": [
+            "order_date"
+          ],
+          "to_columns": [
+            "calendar_date"
+          ],
+          "ai_context": {
+            "instructions": "Authored calendar row for the civil order date. Calendar month reporting uses month_key. Checked lookup must reject duplicate date matches before aggregating; missing exclude preserves inner-join reporting population."
+          }
+        },
+        {
+          "name": "calendar_same_month",
+          "from": "business_calendar",
+          "to": "business_calendar",
+          "from_columns": [
+            "month_key"
+          ],
+          "to_columns": [
+            "month_key"
+          ],
+          "ai_context": {
+            "instructions": "Calendar dates belonging to the same authored month. Multiple raw dates can share the month; this is not a unique raw-row lookup. Independently grouped month populations can align by this exact key for sparse zero-filled reporting."
+          }
+        },
+        {
           "name": "refund_item",
           "from": "refunds",
           "to": "order_items",
@@ -1162,7 +1190,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"order_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"order_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"orders_calendar\",\"field\":\"month_key\",\"missing\":\"exclude\"}]}"
             }
           ]
         },

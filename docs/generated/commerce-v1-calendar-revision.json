@@ -1,0 +1,54 @@
+{
+  "version": "1.0.2",
+  "artifact_digest": "06471654721c975d5f139d5f6988aca3a22e50df470c1220ea00c7c0c55f5f72",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "0a62e71d7a2ddc7e8e17d01c2a34621ed50d4e90b806257d737993de70c99d79",
+      "after": "54f5f51df273a92b92bbf8584c222f25ac6514d296b5aafcfd35304da77aa7ec"
+    },
+    "manifest.json": {
+      "before": "990c8b57c404557d7081e6d07b3847d067419dea43357003c5e95b7eba6f4041",
+      "after": "2e48a567c07ef5917f35806014764e0cf16f34be0533e0cb1ef84d568908fbcc"
+    },
+    "model.ossie.yaml": {
+      "before": "ff53d7c83b5ce7775de918da9fa66c074da1a4083732a30e870a14bed7098e25",
+      "after": "075852226c6a9d5827dab148f3f733f795fb99659e224c7c747b8f1713cc5cbf"
+    }
+  },
+  "unchanged_files": 145,
+  "relationships": [
+    {
+      "name": "orders_calendar",
+      "from": "orders",
+      "to": "business_calendar",
+      "from_columns": [
+        "order_date"
+      ],
+      "to_columns": [
+        "calendar_date"
+      ],
+      "ai_context": {
+        "instructions": "Authored calendar row for the civil order date. Calendar month reporting uses month_key. Checked lookup must reject duplicate date matches before aggregating; missing exclude preserves inner-join reporting population."
+      }
+    },
+    {
+      "name": "calendar_same_month",
+      "from": "business_calendar",
+      "to": "business_calendar",
+      "from_columns": [
+        "month_key"
+      ],
+      "to_columns": [
+        "month_key"
+      ],
+      "ai_context": {
+        "instructions": "Calendar dates belonging to the same authored month. Multiple raw dates can share the month; this is not a unique raw-row lookup. Independently grouped month populations can align by this exact key for sparse zero-filled reporting."
+      }
+    }
+  ],
+  "added_gross_lookup_dimension": {
+    "relationship": "orders_calendar",
+    "field": "month_key",
+    "missing": "exclude"
+  }
+}

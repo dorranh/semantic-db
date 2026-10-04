@@ -62,6 +62,8 @@ rel('shipping_customer','orders','customers',['shipping_customer_id'],['customer
 rel('item_order','order_items','orders',['order_id'],['order_id'],'Order totals must not be repeated per item.')
 rel('item_product','order_items','products',['product_id'],['product_id'],'Product 999 deliberately unmatched; left join preserves it.')
 rel('product_items','products','order_items',['product_id'],['product_id'],'Item lines referencing this catalog product. Multiple lines or no matching lines are possible. Sale qualification uses item quantity and the referenced order status; the equality relationship itself imposes neither condition.')
+rel('orders_calendar','orders','business_calendar',['order_date'],['calendar_date'],'Authored calendar row for the civil order date. Calendar month reporting uses month_key. Checked lookup must reject duplicate date matches before aggregating; missing exclude preserves inner-join reporting population.')
+rel('calendar_same_month','business_calendar','business_calendar',['month_key'],['month_key'],'Calendar dates belonging to the same authored month. Multiple raw dates can share the month; this is not a unique raw-row lookup. Independently grouped month populations can align by this exact key for sparse zero-filled reporting.')
 rel('refund_item','refunds','order_items',['order_id','line_no'],['order_id','line_no'],'Both key components required. Several refunds may apply to one line.')
 rel('subscriber','subscriptions','customers',['customer_id'],['customer_id'],'Subscriptions aggregate independently before combining with orders.')
 rel('billed_orders','customers','orders',['customer_id'],['billing_customer_id'],'Orders attributed to this billed buyer. Reverse traversal can return many orders; retain customers without orders when zero-filled customer reporting is requested.')
@@ -94,6 +96,7 @@ lookup_roles={'orders':{'billing_customer':['customer_id','name','region'],'ship
 for metric in m['metrics']:
  contract=json.loads(metric['custom_extensions'][0]['data']);ds=contract['dataset']
  contract['lookup_dimensions']=[{'relationship':role,'field':field,'missing':missing} for role,fields in lookup_roles.get(ds,{}).items() for field in fields for missing in ['null','exclude']]
+ if metric['name']=='gross_sales_minor':contract['lookup_dimensions'].append({'relationship':'orders_calendar','field':'month_key','missing':'exclude'})
  metric['custom_extensions'][0]=ext(contract)
 completed_filter=[{'field':'status','operator':'eq','value':{'type':'utf8','value':'completed'}}]
 order_dims=['status','billing_customer_id','shipping_customer_id','order_date','currency']
@@ -279,7 +282,7 @@ companion('error.division_zero','execution_error','Divide order101 total cents b
 companion('error.overflow','execution_error','Multiply the maximum signed64-bit integer by two as a bigint.','Checked signed integer overflow must fail, not wrap or coerce to float.',sql='SELECT CAST(9223372036854775807 AS BIGINT) * CAST(2 AS BIGINT) AS overflow_value')
 
 write('cases.json',cases)
-manifest={'format_version':1,'id':'commerce-v1','version':'1.0.1','project':'semantic-db.yaml','cases':'cases.json','required_paired_cases':100,'required_companion_cases':15,'public_cases':['projection.empty','roles.billing','calendar.previous_month'],'context':{'reference_time':'2024-04-01T00:00:00Z','timezone':'Europe/Zurich'},'environment':{'compose_files':['compose.yaml'],'services':['postgres'],'bootstrap_service':'bootstrap','startup_timeout_seconds':120,'bootstrap_timeout_seconds':120,'bindings':{'EVAL_DATABASE_URL':{'service':'postgres','port':5432,'template':'postgres://commerce:commerce@{host}:{port}/commerce?sslmode=disable'}}},'schemas':'schemas.json','canonical_data':'data/canonical.json','fixtures':[{'sql':'SELECT COUNT(*) AS row_count FROM '+n,'expected':'expected/fixture-'+n+'.json'} for n in tables]};write('manifest.json',manifest)
+manifest={'format_version':1,'id':'commerce-v1','version':'1.0.2','project':'semantic-db.yaml','cases':'cases.json','required_paired_cases':100,'required_companion_cases':15,'public_cases':['projection.empty','roles.billing','calendar.previous_month'],'context':{'reference_time':'2024-04-01T00:00:00Z','timezone':'Europe/Zurich'},'environment':{'compose_files':['compose.yaml'],'services':['postgres'],'bootstrap_service':'bootstrap','startup_timeout_seconds':120,'bootstrap_timeout_seconds':120,'bindings':{'EVAL_DATABASE_URL':{'service':'postgres','port':5432,'template':'postgres://commerce:commerce@{host}:{port}/commerce?sslmode=disable'}}},'schemas':'schemas.json','canonical_data':'data/canonical.json','fixtures':[{'sql':'SELECT COUNT(*) AS row_count FROM '+n,'expected':'expected/fixture-'+n+'.json'} for n in tables]};write('manifest.json',manifest)
 for n,(_,_,rows) in tables.items():write('expected/fixture-'+n+'.json',{'outcome':'result','columns':[{'name':'row_count','type':'int64'}],'rows':[[str(len(rows))]]})
 print('Authored',len(cases),'cases')
 
