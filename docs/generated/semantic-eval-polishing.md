@@ -184,3 +184,21 @@ The other five failures exhausted the product's 256-request budget: streaming
 400524 lap records in 1024-row PostgreSQL portal fetches requires roughly 392
 actual requests. Dataset-owned, recorded execution limits and a fresh SQL run
 remain required. None of these failures is waived.
+
+## Full SQL evidence after portability, capacity and role vocabulary repairs
+
+Fresh real mixed-source runs are complete and finalized with full coverage:
+commerce passed103/103 SQL-bearing cases, including all three intended error
+companions, and BIRD passed66/66 required tasks. Both reports have no setup,
+cleanup or artifact errors. Reports:
+`.semantic-eval/commerce-sql-roles/run-251955-18db5cb4c88a0f55/report.json`
+(artifact `79bc641044762043ad84c5eee984cc299c7f55425753c505f028be46be993cf0`)
+and `.semantic-eval/bird-sql-capacity/run-251915-18db5cb4a0764b64/report.json`
+(artifact `1a88e121488ce099e5ea97cc9efcdba90edf7d2b56c58dfadc3b1569ca550c01`).
+The request capacity is authored for the entire BIRD artifact, with real provider
+fetch accounting and unchanged batch sizes. Readonly regeneration in temporary
+copies reproduced every file in both frozen bundles byte-for-byte; all BIRD
+source hashes matched and no bytecode files were generated. Previous SQL/Ask
+failures remain historical evidence. Fresh Ask verification and remaining
+semantic-profile implementation are still required; SQL success is not an Ask
+waiver.
