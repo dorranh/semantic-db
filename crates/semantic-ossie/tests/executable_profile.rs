@@ -1878,3 +1878,147 @@ fn concept_predicates_and_metric_contracts_are_bounded() {
     }));
     error_code(value, "invalid_metric_contract");
 }
+
+#[tokio::test]
+async fn imported_representation_profiles_do_not_forbid_typed_aggregation() {
+    let mut value = model();
+    value["semantic_model"][0]["custom_extensions"].as_array_mut().unwrap().push(extension(json!({
+        "kind":"view_lineage","name":"selected_items","source_dataset":"items","columns":{"id":"id","state":"state"}
+    })));
+    let document = OssieDocument::parse(&value.to_string()).unwrap();
+    let imported = document.load(None, &bindings()).unwrap();
+    for (name, profile) in [
+        ("items", "ossie/source-bound-dataset"),
+        ("selected_items", "ossie/direct-projection-view"),
+    ] {
+        let context = semantic_interpreter::catalog_context(imported.engine.catalog());
+        let relation = context
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"] == name)
+            .unwrap();
+        assert_eq!(relation["semantics"]["capability"]["profile"], profile);
+        assert_eq!(relation["semantics"]["capability"]["revision"], "2");
+        let mut requirements = vec![Requirement {
+            id: "count".into(),
+            source_text: "count items".into(),
+            operation: RowOperation::Aggregate {
+                function: AggregateFunction::Count,
+                field: None,
+                distinct: false,
+                alias: "count".into(),
+            },
+        }];
+        if name == "items" {
+            requirements.insert(
+                0,
+                Requirement {
+                    id: "open".into(),
+                    source_text: "open items".into(),
+                    operation: RowOperation::Filter {
+                        predicate: RowPredicate::Compare {
+                            field: FieldRef {
+                                instance: "i".into(),
+                                field: "state".into(),
+                            },
+                            operator: Comparison::Eq,
+                            value: Literal::Utf8("open".into()),
+                        },
+                    },
+                },
+            );
+            requirements.insert(
+                1,
+                Requirement {
+                    id: "state".into(),
+                    source_text: "by state".into(),
+                    operation: RowOperation::Group {
+                        field: FieldRef {
+                            instance: "i".into(),
+                            field: "state".into(),
+                        },
+                        alias: "state".into(),
+                    },
+                },
+            );
+        }
+        let result = compile_rows(
+            &imported.engine,
+            RowQuery {
+                version: 1,
+                input: RelationInput {
+                    relation: name.into(),
+                    instance: "i".into(),
+                },
+                requirements,
+                unresolved: vec![],
+            },
+            CompileOptions::default(),
+        )
+        .await;
+        let TypedOutcome::Compiled { query } = result.outcome else {
+            panic!("{name}: {:?}", result.outcome)
+        };
+        let batches = query
+            .execute(&imported.engine, QueryOptions::default())
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        assert_eq!(batches.iter().map(RecordBatch::num_rows).sum::<usize>(), 1);
+        let last = batches[0].num_columns() - 1;
+        assert_eq!(
+            array_value_to_string(batches[0].column(last).as_ref(), 0).unwrap(),
+            if name == "items" { "2" } else { "3" }
+        );
+    }
+}
+
+#[tokio::test]
+async fn representation_profile_guidance_keeps_nonexecutable_capability_gate() {
+    let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+    let batch =
+        RecordBatch::try_new(schema.clone(), vec![Arc::new(Int64Array::from(vec![1]))]).unwrap();
+    let mut relation = semantic_catalog::Relation::base("descriptive", schema.clone(), "memory");
+    relation.semantics = Some(semantic_catalog::RelationSemantics {
+        capability: Some(semantic_catalog::Capability::DescriptiveOnly {
+            reason: "inspection only".into(),
+        }),
+        ..Default::default()
+    });
+    let mut engine = semantic_engine::Engine::new();
+    engine
+        .register_table(
+            relation,
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+    let result = compile_rows(
+        &engine,
+        RowQuery {
+            version: 1,
+            input: RelationInput {
+                relation: "descriptive".into(),
+                instance: "d".into(),
+            },
+            requirements: vec![Requirement {
+                id: "count".into(),
+                source_text: "count rows".into(),
+                operation: RowOperation::Aggregate {
+                    function: AggregateFunction::Count,
+                    field: None,
+                    distinct: false,
+                    alias: "count".into(),
+                },
+            }],
+            unresolved: vec![],
+        },
+        CompileOptions::default(),
+    )
+    .await;
+    assert!(
+        matches!(result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "catalog_capability")
+    );
+}

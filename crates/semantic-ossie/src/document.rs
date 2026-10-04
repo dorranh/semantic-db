@@ -292,8 +292,8 @@ impl OssieDocument {
                     .map(|n| n.origins.clone())
                     .unwrap_or_default(),
                 capability: Some(semantic_catalog::Capability::Executable {
-                    profile: "ossie/column-projection".into(),
-                    revision: "1".into(),
+                    profile: "ossie/source-bound-dataset".into(),
+                    revision: "2".into(),
                 }),
                 model_description: model.description.clone(),
                 model_ai_context: model_ai.clone(),
@@ -847,8 +847,8 @@ impl OssieDocument {
                 view_lineage: Some(lineage),
                 source_refs: view.source_refs,
                 capability: Some(semantic_catalog::Capability::Executable {
-                    profile: "ossie/view-direct-projection".into(),
-                    revision: "1".into(),
+                    profile: "ossie/direct-projection-view".into(),
+                    revision: "2".into(),
                 }),
                 ..Default::default()
             });
