@@ -1,0 +1,8 @@
+[
+  {
+    "case_id": "calendar.missing_month",
+    "previous_question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, by month.",
+    "effective_question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, ordered by month ascending.",
+    "reason": "Visible clarification of existing ascending row presentation; by month could mean grouping. Independent reviewer approved; SQL, gold, tolerance, comparison and data unchanged."
+  }
+]

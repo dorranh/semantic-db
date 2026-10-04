@@ -155,3 +155,11 @@ Added only the authentic product_items equality role from products.product_id to
 ## Commerce v1.0.2 authored calendar lookup route
 
 Added genuine orders_calendar date equality and calendar_same_month self-month equality, with honest multiple/missing semantics and no inferred cardinality. The gross_sales_minor governed metric now permits only the added month_key lookup under missing exclude, preserving original inner-join population. The implemented existing checked lookup/composition contracts were confirmed read-only; runtime success is still pending. Generator and manifest version changed to 1.0.2; all 145 other files remain byte-identical, including questions, SQL, golds, tolerances and data. Artifact digest `06471654721c975d5f139d5f6988aca3a22e50df470c1220ea00c7c0c55f5f72`; detailed hashes in commerce-v1-calendar-revision.json and calendar-baseline-hashes.json. Bundle refrozen for independent review and parent validation. No Date32 computation or new physical column was introduced.
+
+
+## Commerce v1.0.3 visible month ordering clarification
+
+calendar.missing_month now explicitly ends “ordered by month ascending,” clarifying the existing ordered comparison/reference SQL. Previous and effective wording are preserved in question-errata.json. No other question or any SQL/gold/tolerance/comparison/data/model changed; all 145 other existing files remain byte-identical. Generator and manifest reproduce v1.0.3. Artifact digest `da95e740c30ebcc8325417ef8682f633809a0b3f6e861a5345f3435c6aff4c7d`; detailed evidence in commerce-v1-month-order-revision.json and month-order-baseline-hashes.json. Refrozen for independent review and parent validation.
+
+
+Fresh v1.0.3 SQL verification passed 103/103; focused pipeline 38 SQL+Ask passed 13/14, with both month queries passing and concept.zero_active retaining an extra client_id. Exact report paths/hashes, artifact identity and filtered coverage limits are recorded in [the pipeline 38 receipt](commerce-v1-pipeline38-verification.md). No full Ask success is claimed.

@@ -1,0 +1,26 @@
+{
+  "version": "1.0.3",
+  "artifact_digest": "da95e740c30ebcc8325417ef8682f633809a0b3f6e861a5345f3435c6aff4c7d",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "54f5f51df273a92b92bbf8584c222f25ac6514d296b5aafcfd35304da77aa7ec",
+      "after": "0edccf34e0f2a06cca1e26c8f0b8cf5dccc3349cf07da5d6c0b6a94c816a76ad"
+    },
+    "cases.json": {
+      "before": "ae766425740387c6f69659956964a72f8e479a212a534e9e72aba02f67b15ce6",
+      "after": "17337bbf2452724127f340404289cd2b5f30cc6e34fa2664f338853a25ea3d95"
+    },
+    "manifest.json": {
+      "before": "2e48a567c07ef5917f35806014764e0cf16f34be0533e0cb1ef84d568908fbcc",
+      "after": "be1fa74461dd94bb9a7d03d22218bf1212702fc0cd11979a1c4a1c9cdb9111b7"
+    },
+    "question-errata.json": {
+      "before": null,
+      "after": "ef8f280435f52e21e27170e5bdec396ba53ee6648ae4f47da4fd65fc8b669f67"
+    }
+  },
+  "only_question_changed": [
+    "calendar.missing_month"
+  ],
+  "unchanged_existing_files": 145
+}

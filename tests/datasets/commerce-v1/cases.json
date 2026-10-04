@@ -1678,7 +1678,7 @@
       "temporal",
       "cross_source"
     ],
-    "question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, by month.",
+    "question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, ordered by month ascending.",
     "sql": "WITH m AS (SELECT DISTINCT month_key FROM business_calendar),o AS (SELECT c.month_key,SUM(o.total_minor) AS cents FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' GROUP BY c.month_key) SELECT m.month_key,COALESCE(o.cents,0) FROM m LEFT JOIN o ON m.month_key=o.month_key ORDER BY m.month_key",
     "expected": "expected/calendar.missing_month.json",
     "comparison": {
