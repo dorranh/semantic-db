@@ -237,9 +237,14 @@ untouched. Only those seven question strings changed; every SQL/gold/tolerance
 and coverage count is unchanged. New cases SHA256
 `ae766425740387c6f69659956964a72f8e479a212a534e9e72aba02f67b15ce6`.
 
-Initial in-flight calls after shared-context deduplication reported approximately 33,020 input tokens for commerce versus the earlier 41,300, and 37,950 for BIRD versus 66,700. These were preliminary call observations from `/tmp/semantic-eval-commerce-luna-shared-context.log` and `/tmp/semantic-eval-bird-luna-shared-context.log`, not final averages or full acceptance outcomes. At that historical checkpoint both full live runs were in progress. BIRD has since finished, as recorded below; commerce remained in progress at this documentation update.
+Initial in-flight calls after shared-context deduplication reported approximately 33,020 input tokens for commerce versus the earlier 41,300, and 37,950 for BIRD versus 66,700. These were preliminary call observations from `/tmp/semantic-eval-commerce-luna-shared-context.log` and `/tmp/semantic-eval-bird-luna-shared-context.log`, not final averages or full acceptance outcomes. At that historical checkpoint both full live runs were in progress. Both runs have since finished; their separate terminal evidence is recorded below.
 
 
 ## Terminal BIRD shared-context evidence
 
 The frozen v1.0.2 full run passed SQL 66/66 and Ask 18/66 (84/132 total); finalized/full coverage are true, complete is false due to one HTTP 429. There are 47 nonprovider Ask failures. Setup, cleanup and artifact errors are null. The separate 884 transport retry returned unsupported with no provider failure and is a filtered report, not a replacement full score. Per-call input median 37944 and maximum 38468 over 67 calls confirms input reduction without an accuracy causation claim. Full paths, report checksums and every untruncated failure diagnostic/difference are recorded in [the terminal failure ledger](bird-minidev-formula1-v1-shared-context-failure-ledger.md). Earlier baselines remain preserved.
+
+
+## Terminal commerce shared-context evidence
+
+The frozen full run passed SQL 103/103 and Ask 51/115 (154/218 total), with no provider errors and null setup/cleanup/artifact errors. Finalized/full coverage are true; complete is false due to five unresolved expansion-limit outcomes. All 64 failed Ask cases and full diagnostics/differences appear in [the terminal commerce failure ledger](commerce-v1-shared-context-failure-ledger.md), alongside separate integer-width focused evidence (2/4, SQL only passing). The 122 provider calls have input median 33015 and maximum 33927. Historical baselines remain preserved; these results do not claim full Ask acceptance.
