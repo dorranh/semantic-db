@@ -666,14 +666,18 @@ impl OssieDocument {
                             .fields
                             .get(&field.name)
                             .and_then(|meaning| meaning.unit.as_ref())
-                            .is_some()
-                            && !matches!(
-                                physical.data_type(),
-                                DataType::Int16
-                                    | DataType::Int32
-                                    | DataType::Int64
-                                    | DataType::Decimal128(_, _)
-                            )
+                            .is_some_and(|unit| {
+                                !(matches!(
+                                    physical.data_type(),
+                                    DataType::Int16
+                                        | DataType::Int32
+                                        | DataType::Int64
+                                        | DataType::Decimal128(_, _)
+                                ) || matches!(
+                                    physical.data_type(),
+                                    DataType::Float32 | DataType::Float64
+                                ) && matches!(unit, semantic_catalog::Unit::Named { .. }))
+                            })
                         {
                             issue(
                                 &mut errors,

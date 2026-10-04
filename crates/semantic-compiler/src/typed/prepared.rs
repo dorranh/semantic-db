@@ -31,7 +31,7 @@ impl PreparedType {
             | (Self::Int64, Literal::Int64(_))
             | (Self::Float64, Literal::Float64(_))
             | (Self::Utf8, Literal::Utf8(_))
-            | (Self::Date32, Literal::Date32(_)) => true,
+            | (Self::Date32, Literal::Date32(_) | Literal::GregorianDate(_)) => true,
             (
                 Self::TimestampMicrosUtc,
                 Literal::Timestamp {

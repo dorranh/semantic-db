@@ -380,13 +380,16 @@ fn validate_definitions<'a>(
             if let Some(unit) = &meaning.unit {
                 check_field(field, edges)?;
                 if !crate::valid_unit(unit)
-                    || !matches!(
+                    || !(matches!(
                         entry.field(field).expect("checked unit field").data_type(),
                         crate::DataType::Int16
                             | crate::DataType::Int32
                             | crate::DataType::Int64
                             | crate::DataType::Decimal128(_, _)
-                    )
+                    ) || matches!(
+                        entry.field(field).expect("checked unit field").data_type(),
+                        crate::DataType::Float32 | crate::DataType::Float64
+                    ) && matches!(unit, crate::Unit::Named { .. }))
                 {
                     return Err(invalid("invalid_field_unit"));
                 }
@@ -685,6 +688,7 @@ fn validate_definitions<'a>(
                                 crate::DataType::Boolean
                                     | crate::DataType::Int64
                                     | crate::DataType::Utf8
+                                    | crate::DataType::Date32
                             )
                             || *data_type == crate::DataType::Boolean
                                 && !matches!(

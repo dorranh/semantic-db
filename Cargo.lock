@@ -4779,6 +4779,7 @@ dependencies = [
 name = "semantic-ossie"
 version = "0.1.0"
 dependencies = [
+ "chrono-tz",
  "datafusion",
  "jsonschema",
  "semantic-catalog",

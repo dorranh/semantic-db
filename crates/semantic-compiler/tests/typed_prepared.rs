@@ -425,6 +425,87 @@ fn temporal_engine() -> Engine {
     engine
 }
 
+#[tokio::test]
+async fn prepared_civil_dates_bind_to_date32_and_reject_strings_or_invalid_dates() {
+    let engine = temporal_engine();
+    let mut proposal = filtered();
+    proposal.input.relation = "temporal_scores".into();
+    proposal.requirements[0].operation = RowOperation::Filter {
+        predicate: RowPredicate::CompareParameter {
+            field: field("i", "day"),
+            operator: Comparison::LtEq,
+            parameter: "minimum".into(),
+        },
+    };
+    let prepared = PreparedRows::prepare(
+        &engine,
+        proposal,
+        vec![declaration("minimum", PreparedType::Date32)],
+        None,
+        CompileOptions::default(),
+    )
+    .unwrap();
+    for value in [
+        Literal::Date32(19763),
+        Literal::GregorianDate("2024-02-10".into()),
+    ] {
+        let result = prepared
+            .bind_values(&engine, BTreeMap::from([("minimum".into(), value)]), None)
+            .await
+            .unwrap();
+        let TypedOutcome::Compiled { query } = result.outcome else {
+            panic!("{:?}", result.outcome)
+        };
+        assert_eq!(query.sql().parameters(), &[Literal::Date32(19763)]);
+        assert_eq!(
+            ids(&query
+                .plan_direct(&engine)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap()),
+            vec![1, 2]
+        );
+        assert_eq!(
+            ids(&query
+                .execute(&engine, QueryOptions::default())
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap()),
+            vec![1, 2]
+        );
+    }
+    assert_eq!(
+        prepared
+            .bind_values(
+                &engine,
+                BTreeMap::from([("minimum".into(), Literal::Utf8("2024-02-10".into()))]),
+                None
+            )
+            .await
+            .unwrap_err()
+            .code,
+        "parameter_type"
+    );
+    let invalid = prepared
+        .bind_values(
+            &engine,
+            BTreeMap::from([(
+                "minimum".into(),
+                Literal::GregorianDate("2024-02-30".into()),
+            )]),
+            None,
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(invalid.outcome,TypedOutcome::Rejected { diagnostic } if diagnostic.code == "date_literal")
+    );
+}
+
 fn temporal_query() -> RowQuery {
     RowQuery {
         version: 1,

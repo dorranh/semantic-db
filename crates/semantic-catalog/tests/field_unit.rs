@@ -55,6 +55,23 @@ fn valid_numeric_field_units_publish_and_change_snapshot_identity() {
 }
 
 #[test]
+fn floating_measurements_preserve_named_units_without_currency_promotion() {
+    for ty in [DataType::Float32, DataType::Float64] {
+        let kg = Catalog::from_relations([relation(ty.clone(), Unit::Named { id: "kg".into() })])
+            .unwrap();
+        kg.validate(&PublicationLimits::default()).unwrap();
+        let lb = Catalog::from_relations([relation(ty.clone(), Unit::Named { id: "lb".into() })])
+            .unwrap();
+        lb.validate(&PublicationLimits::default()).unwrap();
+        assert_ne!(kg.snapshot().id(), lb.snapshot().id());
+        assert_eq!(
+            code(relation(ty, Unit::Dimensionless)),
+            "invalid_field_unit"
+        );
+    }
+}
+
+#[test]
 fn nonnumeric_physical_fields_and_invalid_units_reject_publication() {
     for ty in [DataType::Utf8, DataType::Float64, DataType::Int8] {
         assert_eq!(

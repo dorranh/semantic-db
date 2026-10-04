@@ -38,6 +38,16 @@ struct MetricContract {
     dimensions: BTreeSet<String>,
     unit: Unit,
     empty: EmptyBehavior,
+    #[serde(default)]
+    lookup_dimensions: Vec<semantic_catalog::MetricLookupDimension>,
+    #[serde(default)]
+    sum_rollup_dimensions: Option<BTreeSet<String>>,
+    #[serde(default)]
+    state: Option<semantic_catalog::MetricStateContract>,
+    #[serde(default)]
+    row_filters: Vec<semantic_catalog::GovernedFilter>,
+    #[serde(default)]
+    result_type: Option<DataType>,
 }
 
 #[derive(Deserialize)]
@@ -48,6 +58,129 @@ struct ConceptContract {
     name: String,
     description: String,
     predicate: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BusinessCalendarContract {
+    kind: String,
+    dataset: String,
+    name: String,
+    rule: semantic_catalog::BusinessCalendarRule,
+}
+
+fn apply_business_calendar(
+    document: &OssieDocument,
+    definitions: &mut [(Dataset, String, RelationSemantics)],
+    value: Value,
+    path: &str,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Ok(mut contract) = serde_json::from_value::<BusinessCalendarContract>(value) else {
+        issue(
+            errors,
+            "invalid_extension",
+            path,
+            "expected complete SEMANTIC_DB business-calendar contract",
+        );
+        return;
+    };
+    let rule = &contract.rule;
+    let declared = |relation: &str, name: &str, datatype: &str| {
+        definitions
+            .iter()
+            .find(|(dataset, _, _)| dataset.name == relation)
+            .is_some_and(|(dataset, _, _)| {
+                dataset
+                    .fields
+                    .iter()
+                    .any(|field| field.name == name && field.datatype.as_deref() == Some(datatype))
+            })
+    };
+    let source_datatype = match rule.source_basis {
+        semantic_catalog::CalendarSourceBasis::Date32 => "Date",
+        semantic_catalog::CalendarSourceBasis::UtcInstantMicros => "DateTimeTz",
+    };
+    if contract.kind != "business_calendar"
+        || !identifier(&contract.name)
+        || rule.version != semantic_catalog::BUSINESS_CALENDAR_VERSION
+        || rule.source_relation != contract.dataset
+        || rule.id.trim().is_empty()
+        || rule.id.len() > 256
+        || rule.mapping_revision.trim().is_empty()
+        || rule.mapping_revision.len() > 256
+        || rule.timezone.len() > 128
+        || rule.timezone.parse::<chrono_tz::Tz>().is_err()
+        || !declared(&contract.dataset, &rule.source_date_field, source_datatype)
+        || !declared(&rule.calendar_relation, &rule.calendar_date_field, "Date")
+        || !declared(&rule.calendar_relation, &rule.fiscal_year_field, "Integer")
+        || !declared(
+            &rule.calendar_relation,
+            &rule.fiscal_period_field,
+            "Integer",
+        )
+        || !declared(&rule.calendar_relation, &rule.business_day_field, "Boolean")
+    {
+        issue(
+            errors,
+            "invalid_business_calendar_contract",
+            path,
+            "calendar rule requires a bounded identity/revision, valid IANA timezone, and declared fields of matching logical types",
+        );
+        return;
+    }
+    contract.rule.source_refs = document
+        .normalized
+        .pointer(path)
+        .map(|node| node.origins.clone())
+        .unwrap_or_default();
+    let (_, _, semantics) = definitions
+        .iter_mut()
+        .find(|(dataset, _, _)| dataset.name == contract.dataset)
+        .expect("checked calendar source");
+    if semantics.business_calendars.contains_key(&contract.name) {
+        issue(
+            errors,
+            "duplicate_name",
+            path,
+            "duplicate business-calendar name",
+        );
+        return;
+    }
+    semantics
+        .business_calendars
+        .insert(contract.name, contract.rule);
+}
+
+fn metric_datatype_matches(datatype: Option<&str>, result: &DataType) -> bool {
+    match result {
+        DataType::Int8
+        | DataType::Int16
+        | DataType::Int32
+        | DataType::Int64
+        | DataType::UInt8
+        | DataType::UInt16
+        | DataType::UInt32
+        | DataType::UInt64 => datatype == Some("Integer"),
+        DataType::Decimal128(precision, scale) => {
+            datatype == Some("Decimal")
+                && (1..=38).contains(precision)
+                && *scale >= 0
+                && *scale <= *precision as i8
+        }
+        DataType::Float32 | DataType::Float64 => datatype == Some("Float"),
+        DataType::Utf8 => datatype == Some("String"),
+        DataType::Date32 => datatype == Some("Date"),
+        DataType::Timestamp(_, timezone) => {
+            datatype
+                == Some(if timezone.is_some() {
+                    "DateTimeTz"
+                } else {
+                    "DateTime"
+                })
+        }
+        _ => false,
+    }
 }
 
 #[derive(Deserialize)]
@@ -550,7 +683,9 @@ pub(super) fn field_meanings(
                     continue;
                 };
                 if contract.kind != "unit"
-                    || !matches!(datatype, Some("Integer" | "Decimal"))
+                    || !(matches!(datatype, Some("Integer" | "Decimal"))
+                        || datatype == Some("Float")
+                            && matches!(&contract.unit, Unit::Named { .. }))
                     || !semantic_catalog::valid_unit(&contract.unit)
                     || meanings.unit.is_some()
                 {
@@ -628,6 +763,12 @@ fn aggregate(expression: &str) -> Option<(&'static str, Option<String>)> {
         "sum"
     } else if function.name.to_string().eq_ignore_ascii_case("COUNT") {
         "count"
+    } else if function.name.to_string().eq_ignore_ascii_case("MIN") {
+        "min"
+    } else if function.name.to_string().eq_ignore_ascii_case("MAX") {
+        "max"
+    } else if function.name.to_string().eq_ignore_ascii_case("AVG") {
+        "avg"
     } else {
         return None;
     };
@@ -667,6 +808,26 @@ fn bounded_predicate(
             .get("field")
             .and_then(Value::as_str)
             .is_some_and(|field| fields.contains(field)),
+        Some("compare_parameter") => {
+            object
+                .get("field")
+                .and_then(Value::as_str)
+                .is_some_and(|field| fields.contains(field))
+                && object
+                    .get("parameter")
+                    .and_then(Value::as_str)
+                    .is_some_and(|parameter| {
+                        !parameter.is_empty()
+                            && parameter.len() <= 64
+                            && parameter
+                                .bytes()
+                                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                            && parameter
+                                .as_bytes()
+                                .first()
+                                .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+                    })
+        }
         Some("all" | "any") => object
             .get("predicates")
             .and_then(Value::as_array)
@@ -706,6 +867,10 @@ pub(super) fn apply(
         }
         if data.get("kind").and_then(Value::as_str) == Some("conversion") {
             apply_conversion(document, definitions, data, &ep, errors);
+            continue;
+        }
+        if data.get("kind").and_then(Value::as_str) == Some("business_calendar") {
+            apply_business_calendar(document, definitions, data, &ep, errors);
             continue;
         }
         if data.get("kind").and_then(Value::as_str) == Some("view_lineage") {
@@ -921,16 +1086,17 @@ pub(super) fn apply(
             );
             continue;
         };
+        let result_type = contract.result_type.clone().unwrap_or(DataType::Int64);
         if contract.kind != "metric"
             || contract.source_grain.keys.is_empty()
             || !semantic_catalog::valid_unit(&contract.unit)
-            || value.get("datatype").and_then(Value::as_str) != Some("Integer")
+            || !metric_datatype_matches(value.get("datatype").and_then(Value::as_str), &result_type)
         {
             issue(
                 errors,
                 "invalid_metric_contract",
                 &ep,
-                "metric needs explicit grain, unit, and Integer result type",
+                "metric needs explicit grain, unit, and a matching result type",
             );
             continue;
         }
@@ -965,6 +1131,39 @@ pub(super) fn apply(
             .iter()
             .map(|field| field.name.as_str())
             .collect();
+        if contract.state.as_ref().is_some_and(|state| {
+            state.validate().is_err()
+                || !state.merge_dimensions.is_subset(&contract.dimensions)
+                || contract.sum_rollup_dimensions.is_some()
+        }) || contract
+            .sum_rollup_dimensions
+            .as_ref()
+            .is_some_and(|dimensions| !dimensions.is_subset(&contract.dimensions))
+            || contract.row_filters.len() > 32
+            || contract
+                .row_filters
+                .iter()
+                .any(|filter| !fields.contains(filter.field.as_str()))
+            || contract.lookup_dimensions.len() > 32
+            || contract
+                .lookup_dimensions
+                .iter()
+                .enumerate()
+                .any(|(index, dimension)| {
+                    contract.lookup_dimensions[..index].contains(dimension)
+                        || !semantics
+                            .relationships
+                            .contains_key(&dimension.relationship)
+                })
+        {
+            issue(
+                errors,
+                "invalid_metric_contract",
+                &ep,
+                "metric state, rollup, filters or lookup dimensions contradict the declared source contract",
+            );
+            continue;
+        }
         let unique_grain_fields: BTreeSet<_> = contract
             .source_grain
             .keys
@@ -1017,21 +1216,33 @@ pub(super) fn apply(
                 errors,
                 "unsupported_expression",
                 format!("{mp}/expression"),
-                "only SUM(field) and COUNT(field|*) are executable",
+                "only SUM/AVG/MIN/MAX(field) and COUNT(field|*) are executable",
             );
             continue;
         };
         if field
             .as_ref()
             .is_some_and(|field| !fields.contains(field.as_str()))
-            || kind == "sum"
+            || matches!(kind, "sum" | "avg")
                 && !field.as_ref().is_some_and(|field| {
                     dataset.fields.iter().any(|candidate| {
-                        candidate.name == *field && candidate.datatype.as_deref() == Some("Integer")
+                        candidate.name == *field
+                            && matches!(
+                                candidate.datatype.as_deref(),
+                                Some("Integer" | "Decimal" | "Float")
+                            )
                     })
                 })
             || contract.empty
-                != if kind == "count" {
+                != if kind == "count"
+                    || matches!(
+                        contract.state.as_ref().map(|state| &state.state),
+                        Some(semantic_catalog::MetricStateKind::WeightedAverage {
+                            zero: semantic_catalog::ZeroWeight::Zero,
+                            ..
+                        })
+                    )
+                {
                     EmptyBehavior::Zero
                 } else {
                     EmptyBehavior::Null
@@ -1069,11 +1280,11 @@ pub(super) fn apply(
             distinct: false,
             source_grain: contract.source_grain,
             compatible_dimensions: contract.dimensions,
-            compatible_lookup_dimensions: vec![],
-            sum_rollup_dimensions: None,
-            state: None,
-            row_filters: vec![],
-            result_type: DataType::Int64,
+            compatible_lookup_dimensions: contract.lookup_dimensions,
+            sum_rollup_dimensions: contract.sum_rollup_dimensions,
+            state: contract.state,
+            row_filters: contract.row_filters,
+            result_type,
             unit: Presence::Value(contract.unit),
             temporal: Presence::Null,
             empty_behavior: contract.empty,

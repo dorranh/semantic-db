@@ -86,6 +86,39 @@ fn concept_placeholders_have_bounded_exact_authored_types() {
     assert_invalid_parameter(relation);
 }
 
+#[test]
+fn civil_date_concept_parameters_remain_exact_and_reject_mixed_field_types() {
+    let mut relation = catalog("open").relation("tickets").unwrap().clone();
+    relation.schema = Arc::new(Schema::new(vec![
+        Field::new("day", DataType::Date32, false),
+        Field::new("id", DataType::Int64, false),
+    ]));
+    concept_parameter(&mut relation).predicate = RowPredicate::CompareParameter {
+        field: "day".into(),
+        operator: Comparison::LtEq,
+        parameter: "as_of_date".into(),
+    };
+    Catalog::from_relations([relation.clone()])
+        .unwrap()
+        .validate(&PublicationLimits::default())
+        .unwrap();
+    concept_parameter(&mut relation).predicate = RowPredicate::All {
+        predicates: vec![
+            RowPredicate::CompareParameter {
+                field: "day".into(),
+                operator: Comparison::LtEq,
+                parameter: "as_of_date".into(),
+            },
+            RowPredicate::CompareParameter {
+                field: "id".into(),
+                operator: Comparison::Eq,
+                parameter: "as_of_date".into(),
+            },
+        ],
+    };
+    assert_invalid_parameter(relation);
+}
+
 fn concept_parameter(relation: &mut Relation) -> &mut ConceptDefinition {
     relation
         .semantics
