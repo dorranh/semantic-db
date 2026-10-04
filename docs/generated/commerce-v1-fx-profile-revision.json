@@ -1,0 +1,56 @@
+{
+  "version": "1.0.5",
+  "artifact_digest": "3e512e3301b2a7739dba833011159bff88e2d492b80f07da185f835f4871876a",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "a93b4a335ee7a0596af352445adc1614fbd1a5914044e3c5dcf49f1fe9ab0535",
+      "after": "72c79ce02016dc79045370a1fb4e8dc4d53217f5a47f2c4059a6c74e464e1585"
+    },
+    "manifest.json": {
+      "before": "9b0a78aa7ba839263f109ab2bdbc2ff007c546731805c08e037ed73bf35b50ef",
+      "after": "1b5c93ebaab79a71aba66a9dbe9856d9c6377e8942fbc811b12e835b8faceccc"
+    },
+    "model.ossie.yaml": {
+      "before": "075852226c6a9d5827dab148f3f733f795fb99659e224c7c747b8f1713cc5cbf",
+      "after": "8a50ef3657b74a50f4de7760d724b4e6b20c451239a59123e91e7a883a82d320"
+    }
+  },
+  "unchanged_file_count": 146,
+  "isolated_regeneration_all_files_identical": 149,
+  "authored_profiles": [
+    {
+      "kind": "exact_decimal_rate",
+      "name": "chf",
+      "dataset": "exchange_rates",
+      "rule": {
+        "version": 1,
+        "id": "commerce/exchange_rates/chf",
+        "rate_relation": "exchange_rates",
+        "source_currency_field": "currency",
+        "date_field": "rate_date",
+        "rate_field": "chf_per_unit",
+        "target_currency": "CHF",
+        "positive_only": true,
+        "null_rate": "unavailable",
+        "source_refs": []
+      }
+    },
+    {
+      "kind": "exact_decimal_rate",
+      "name": "chf",
+      "dataset": "exchange_rates_duplicate",
+      "rule": {
+        "version": 1,
+        "id": "commerce/exchange_rates_duplicate/chf",
+        "rate_relation": "exchange_rates_duplicate",
+        "source_currency_field": "currency",
+        "date_field": "rate_date",
+        "rate_field": "chf_per_unit",
+        "target_currency": "CHF",
+        "positive_only": true,
+        "null_rate": "unavailable",
+        "source_refs": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Commerce v1.0.5 genuine row-wise FX profile author receipt
+
+Published two model-scope exact_decimal_rate wrappers, one on exchange_rates and one on executable exchange_rates_duplicate. Both use relation-local name chf and distinct durable IDs commerce/exchange_rates/chf and commerce/exchange_rates_duplicate/chf. Source fields are the genuine currency Utf8, rate_date Date32 and chf_per_unit Decimal128(18,6); keys are physically nonnull. Target currency CHF, positive_only=true and null_rate=unavailable are domain policies. No amount, rate value, date, case ID or expected result is inserted into the model.
+
+The diagnostic relation retains no primary key or entity identity and no invented uniqueness; its actual conflicting rows remain available for execution. The profiles describe row-wise conversion only; exact one-match duplicate/missing lookup guards and stronger companion metadata are not implemented or claimed by this author patch. Existing negative expectations remain unchanged. Booked aliases were not authored.
+
+Only generator, model and manifest changed, with dataset version 1.0.5. All 146 other artifact files remain byte-identical, including questions, SQL, golds, data, source configuration, schemas, comparison settings, tolerances and question errata. Isolated regeneration reproduces all 149 files identically. Exact objects and pre/post hashes are in commerce-v1-fx-profile-revision.json; baseline hashes in commerce-v1-fx-profile-baseline-hashes.json.
+
+Artifact digest `3e512e3301b2a7739dba833011159bff88e2d492b80f07da185f835f4871876a`. Commerce refrozen for independent actual-delta review and parent offline/runtime validation. BIRD remains unchanged and frozen for its live run. No Cargo or git operation was performed by the analyst. This author receipt is not live FX acceptance proof.

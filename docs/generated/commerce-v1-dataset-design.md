@@ -163,3 +163,8 @@ calendar.missing_month now explicitly ends “ordered by month ascending,” cla
 
 
 Fresh v1.0.3 SQL verification passed 103/103; focused pipeline 38 SQL+Ask passed 13/14, with both month queries passing and concept.zero_active retaining an extra client_id. Exact report paths/hashes, artifact identity and filtered coverage limits are recorded in [the pipeline 38 receipt](commerce-v1-pipeline38-verification.md). No full Ask success is claimed.
+
+
+## Commerce v1.0.5 genuine row-wise FX profiles
+
+The separately reviewed author revision adds exact_decimal_rate profiles over actual production and diagnostic Decimal rate relations, without synthetic source fields or answer constants. Only generator/model/manifest changed; all 146 other artifact files are identical. Detailed objects, hashes and boundaries are recorded in [the FX author receipt](commerce-v1-fx-profile-revision.md). Negative oracle migration and exact one-match execution remain separate. Bundle refrozen for review/parent validation.

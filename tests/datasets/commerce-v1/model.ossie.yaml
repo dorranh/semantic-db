@@ -1446,6 +1446,14 @@
         {
           "vendor_name": "SEMANTIC_DB",
           "data": "{\"kind\":\"concept\",\"dataset\":\"customers\",\"name\":\"french_region\",\"description\":\"Customers whose exact region code FR denotes France\",\"predicate\":{\"kind\":\"compare\",\"field\":\"region\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"FR\"}}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"exact_decimal_rate\",\"name\":\"chf\",\"dataset\":\"exchange_rates\",\"rule\":{\"version\":1,\"id\":\"commerce/exchange_rates/chf\",\"rate_relation\":\"exchange_rates\",\"source_currency_field\":\"currency\",\"date_field\":\"rate_date\",\"rate_field\":\"chf_per_unit\",\"target_currency\":\"CHF\",\"positive_only\":true,\"null_rate\":\"unavailable\",\"source_refs\":[]}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"exact_decimal_rate\",\"name\":\"chf\",\"dataset\":\"exchange_rates_duplicate\",\"rule\":{\"version\":1,\"id\":\"commerce/exchange_rates_duplicate/chf\",\"rate_relation\":\"exchange_rates_duplicate\",\"source_currency_field\":\"currency\",\"date_field\":\"rate_date\",\"rate_field\":\"chf_per_unit\",\"target_currency\":\"CHF\",\"positive_only\":true,\"null_rate\":\"unavailable\",\"source_refs\":[]}}"
         }
       ]
     }
