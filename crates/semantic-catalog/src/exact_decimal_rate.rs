@@ -3,14 +3,7 @@ use crate::{CatalogSnapshot, DataType, ObjectRef, SourceRef, canonical_digest};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-/// Exact quantization modes; legacy rational conversions retain their own enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DecimalRounding {
-    Truncate,
-    HalfEven,
-    HalfAwayFromZero,
-}
+pub use semantic_plan::typed::DecimalRounding;
 /// Missing rate values cannot be silently replaced by parity or zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

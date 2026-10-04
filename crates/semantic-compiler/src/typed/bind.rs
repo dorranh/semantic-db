@@ -82,6 +82,10 @@ pub(super) enum BoundOperation {
         conversion: BoundConversion,
         alias: String,
     },
+    ConvertRate {
+        conversion: BoundRateConversion,
+        alias: String,
+    },
     CurrencyConvert {
         rate: Box<BoundCurrencyRate>,
         alias: String,
@@ -201,6 +205,17 @@ pub(super) struct BoundAsOf {
     pub valid_to: BoundField,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(super) struct BoundRateConversion {
+    pub source: BoundField,
+    pub output: BoundField,
+    pub amount: Literal,
+    pub result_type: DecimalResultType,
+    pub rounding: DecimalRounding,
+    pub target_currency: String,
+    pub profile: ObjectRef,
+    pub source_refs: Vec<SourceRef>,
+}
 #[derive(Debug, Clone, Serialize)]
 pub(super) struct BoundConversion {
     pub source: BoundField,
@@ -1188,6 +1203,103 @@ fn bind_scoped(
                         alias: alias.clone(),
                     }
                 }
+                RowOperation::ConvertRate {
+                    rate,
+                    amount,
+                    result_type,
+                    rounding,
+                    alias,
+                } => {
+                    if aggregate_query {
+                        return Err(diagnostic(
+                            "conversion_grain",
+                            "Exact rate conversion requires a row query",
+                        ));
+                    }
+                    check_alias(alias, &mut aliases)?;
+                    let semantics = relation.definition().semantics.as_ref().ok_or_else(|| {
+                        diagnostic("unknown_conversion", "No exact rate profiles are authored")
+                    })?;
+                    let mut matches = semantics
+                        .exact_decimal_rates
+                        .iter()
+                        .filter(|(name, rule)| name.as_str() == rate || rule.id == *rate);
+                    let (name, rule) = matches.next().ok_or_else(|| {
+                        diagnostic(
+                            "unknown_conversion",
+                            "Exact rate profile is not authored on this relation",
+                        )
+                    })?;
+                    if matches.next().is_some() {
+                        return Err(diagnostic(
+                            "ambiguous_conversion",
+                            "Exact rate profile has competing identities",
+                        ));
+                    }
+                    rule.validate(snapshot, options.allowed_relations.as_ref())
+                        .map_err(|_| {
+                            diagnostic("conversion_contract", "Invalid exact decimal rate contract")
+                        })?;
+                    if rule.rate_relation != query.input.relation
+                        || result_type.precision == 0
+                        || result_type.precision > 38
+                        || result_type.scale > result_type.precision
+                    {
+                        return Err(diagnostic(
+                            "conversion_contract",
+                            "Exact rate relation or result representation is invalid",
+                        ));
+                    }
+                    let RateAmount::Literal { value, .. } = amount;
+                    if !matches!(value, Literal::Decimal128 { .. }) {
+                        return Err(diagnostic(
+                            "conversion_type",
+                            "Exact rate amount requires a decimal literal in major source currency units",
+                        ));
+                    }
+                    super::literal::checked_scalar(value)?;
+                    for field in [&rule.source_currency_field, &rule.date_field] {
+                        binder.field(&FieldRef {
+                            instance: query.input.instance.clone(),
+                            field: field.clone(),
+                        })?;
+                    }
+                    let source = binder.field(&FieldRef {
+                        instance: query.input.instance.clone(),
+                        field: rule.rate_field.clone(),
+                    })?;
+                    let mut output_name = format!("__semantic_rate_{}", requirements.len());
+                    while relation.field(&output_name).is_some() {
+                        output_name.push('_');
+                    }
+                    let output = BoundField {
+                        instance: "$output".into(),
+                        field: Field::new(
+                            output_name,
+                            DataType::Decimal128(result_type.precision, result_type.scale as i8),
+                            true,
+                        ),
+                    };
+                    definitions.push(
+                        relation
+                            .definition_reference("exact_decimal_rate", name)
+                            .expect("published exact rate")
+                            .clone(),
+                    );
+                    BoundOperation::ConvertRate {
+                        conversion: BoundRateConversion {
+                            source,
+                            output,
+                            amount: value.clone(),
+                            result_type: *result_type,
+                            rounding: *rounding,
+                            target_currency: rule.target_currency.clone(),
+                            profile: rule.reference(),
+                            source_refs: rule.source_refs.clone(),
+                        },
+                        alias: alias.clone(),
+                    }
+                }
                 RowOperation::CurrencyConvert { rate, alias } => {
                     if query.requirements.len() != 1 {
                         return Err(diagnostic(
@@ -1627,6 +1739,25 @@ fn bind_scoped(
                 BoundOperation::Lookup { lookup, .. } => snapshot
                     .relation(&lookup.relationship.right.id)
                     .and_then(|right| field_meaning(right, lookup.value.field.name())),
+                BoundOperation::ConvertRate { conversion, .. } => Some(SlotMeaning {
+                    unit: FactResolution::Known {
+                        value: Presence::Value(Unit::Currency {
+                            code: conversion.target_currency.clone(),
+                        }),
+                        contributors: vec![Fact {
+                            id: conversion.profile.id.clone(),
+                            scope: query.input.relation.clone(),
+                            value: Presence::Value(Unit::Currency {
+                                code: conversion.target_currency.clone(),
+                            }),
+                            authority: Authority::Authored,
+                            origins: conversion.source_refs.clone(),
+                            evidence: vec![],
+                        }],
+                    },
+                    source_grain: FactResolution::Unknown,
+                    entity: FactResolution::Unknown,
+                }),
                 _ => None,
             };
             if let Some(meaning) = authored_field {
@@ -1698,6 +1829,15 @@ fn bind_scoped(
         definitions.push(ObjectRef {
             id: "functions/semantic_scale_i64_v1".into(),
             revision: "1".into(),
+        });
+    }
+    if requirements
+        .iter()
+        .any(|r| matches!(r.operation, BoundOperation::ConvertRate { .. }))
+    {
+        definitions.push(ObjectRef {
+            id: "functions/semantic_decimal_rate_v1".into(),
+            revision: "2".into(),
         });
     }
     if requirements

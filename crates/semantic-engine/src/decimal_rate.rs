@@ -134,7 +134,10 @@ impl ScalarUDFImpl for DecimalRate {
         Ok(Arc::new(Field::new(
             self.name(),
             DataType::Decimal128(p, s),
-            args.arg_fields[0].is_nullable(),
+            // SQL planning happens before decimal amount parameters are bound.
+            // Keep the same conservative metadata for literal and parameter forms;
+            // a nonnull result is valid under this nullable contract as well.
+            true,
         )))
     }
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {

@@ -958,6 +958,9 @@ fn record_bound(bound: &BoundQuery, record: &mut CompilationRecord, scope: Requi
                 bind::BoundOperation::BusinessCalendar { .. } => {
                     "business_calendar.same_query_exactly_one.v1"
                 }
+                bind::BoundOperation::ConvertRate { .. } => {
+                    "conversion.authored_exact_decimal_rowwise.v1"
+                }
                 bind::BoundOperation::Convert { .. } => "conversion.authored_exact_rational.v1",
                 bind::BoundOperation::CalendarFilter { .. } => "calendar.half_open_local_period.v1",
                 bind::BoundOperation::CalendarGroup { .. } => "calendar.observed_utc_month.v1",

@@ -66,6 +66,7 @@ enum Operator {
     },
     Convert {
         conversions: Vec<BoundConversion>,
+        rates: Vec<BoundRateConversion>,
     },
     CalendarGroup {
         buckets: Vec<CalendarBucketExpression>,
@@ -188,6 +189,7 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
     );
     let mut windows = Vec::new();
     let mut conversions = Vec::new();
+    let mut rates = Vec::new();
     let mut conversion_ids = Vec::new();
     let mut calendar_buckets = Vec::new();
     let mut calendar_bucket_ids = Vec::new();
@@ -288,6 +290,14 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
                 business_calendar = Some((requirement.id.clone(), calendar.clone()));
                 projections.push(Projection {
                     field: calendar.output.clone(),
+                    alias: alias.clone(),
+                });
+            }
+            BoundOperation::ConvertRate { conversion, alias } => {
+                conversion_ids.push(requirement.id.clone());
+                rates.push(conversion.clone());
+                projections.push(Projection {
+                    field: conversion.output.clone(),
                     alias: alias.clone(),
                 });
             }
@@ -488,8 +498,8 @@ pub(super) fn lower(bound: &BoundQuery) -> Result<RelationalPlan, CompileDiagnos
     if let Some((id, calendar)) = business_calendar {
         plan.push(vec![id], Operator::BusinessCalendar { calendar });
     }
-    if !conversions.is_empty() {
-        plan.push(conversion_ids, Operator::Convert { conversions });
+    if !conversions.is_empty() || !rates.is_empty() {
+        plan.push(conversion_ids, Operator::Convert { conversions, rates });
     }
     if !calendar_buckets.is_empty() {
         plan.push(
@@ -699,7 +709,7 @@ impl RelationalPlan {
                     business_calendar::emit(query, calendar, &mut parameters)
                 }
                 Operator::Lookup { lookup } => lookup::emit_lookup(query, lookup, &mut parameters),
-                Operator::Convert { conversions } => {
+                Operator::Convert { conversions, rates } => {
                     select.projection = vec![ast::SelectItem::Wildcard(Default::default())];
                     select
                         .projection
@@ -709,6 +719,12 @@ impl RelationalPlan {
                                 alias: ident(conversion.output.field.name()),
                             }
                         }));
+                    for rate in rates {
+                        select.projection.push(ast::SelectItem::ExprWithAlias {
+                            expr: sql_rate_conversion(rate, &mut parameters),
+                            alias: ident(rate.output.field.name()),
+                        });
+                    }
                     wrap_query(query);
                 }
                 Operator::CalendarGroup { buckets } => {
@@ -879,7 +895,7 @@ impl RelationalPlan {
                         business_calendar::plan(input, engine, calendar).await
                     }
                     Operator::Lookup { lookup } => lookup::plan_lookup(input, engine, lookup).await,
-                    Operator::Convert { conversions } => {
+                    Operator::Convert { conversions, rates } => {
                         let mut output = input;
                         for conversion in conversions {
                             output = output
@@ -890,6 +906,20 @@ impl RelationalPlan {
                                         lit(conversion.numerator),
                                         lit(conversion.denominator),
                                         lit(conversion.half_even),
+                                    ]),
+                                )
+                                .map_err(backend_error)?;
+                        }
+                        for rate in rates {
+                            output = output
+                                .with_column(
+                                    rate.output.field.name(),
+                                    semantic_engine::semantic_decimal_rate_v1().call(vec![
+                                        lit(super::literal::checked_scalar(&rate.amount)?),
+                                        df_field(&rate.source),
+                                        lit(i64::from(rate.result_type.precision)),
+                                        lit(i64::from(rate.result_type.scale)),
+                                        lit(rate_rounding(rate.rounding)),
                                     ]),
                                 )
                                 .map_err(backend_error)?;
@@ -1092,11 +1122,10 @@ impl RelationalPlan {
                         fields.insert(as_of.fact_time.field.name().as_str());
                     }
                 }
-                Operator::Convert { conversions } => fields.extend(
-                    conversions
-                        .iter()
-                        .map(|conversion| conversion.source.field.name().as_str()),
-                ),
+                Operator::Convert { conversions, rates } => {
+                    fields.extend(conversions.iter().map(|c| c.source.field.name().as_str()));
+                    fields.extend(rates.iter().map(|c| c.source.field.name().as_str()));
+                }
                 Operator::CalendarGroup { buckets } => fields.extend(
                     buckets
                         .iter()
@@ -1923,4 +1952,57 @@ async fn related_frame(
         }
     }
     Ok((frame, scope_alias))
+}
+
+fn rate_rounding(rounding: semantic_plan::typed::DecimalRounding) -> i64 {
+    match rounding {
+        semantic_plan::typed::DecimalRounding::Truncate => 0,
+        semantic_plan::typed::DecimalRounding::HalfEven => 1,
+        semantic_plan::typed::DecimalRounding::HalfAwayFromZero => 2,
+    }
+}
+fn sql_rate_conversion(rate: &BoundRateConversion, parameters: &mut Vec<Literal>) -> ast::Expr {
+    parameters.push(rate.amount.clone());
+    let amount = ast::Expr::Cast {
+        kind: ast::CastKind::Cast,
+        expr: Box::new(ast::Expr::Value(
+            ast::Value::Placeholder(format!("${}", parameters.len())).into(),
+        )),
+        data_type: super::literal::sql_type(&rate.amount),
+        format: None,
+        array: false,
+    };
+    let mut statements = Parser::parse_sql(
+        &GenericDialect {},
+        "SELECT semantic_decimal_rate_v1(0, 0, 0, 0, 0)",
+    )
+    .expect("static exact rate function");
+    let ast::Statement::Query(query) = &mut statements[0] else {
+        unreachable!()
+    };
+    let ast::SetExpr::Select(select) = query.body.as_mut() else {
+        unreachable!()
+    };
+    let ast::SelectItem::UnnamedExpr(expression) = &mut select.projection[0] else {
+        unreachable!()
+    };
+    let ast::Expr::Function(function) = expression else {
+        unreachable!()
+    };
+    let ast::FunctionArguments::List(arguments) = &mut function.args else {
+        unreachable!()
+    };
+    arguments.args = vec![
+        amount,
+        sql_field(&rate.source),
+        ast::Expr::Value(ast::Value::Number(rate.result_type.precision.to_string(), false).into()),
+        ast::Expr::Value(ast::Value::Number(rate.result_type.scale.to_string(), false).into()),
+        ast::Expr::Value(
+            ast::Value::Number(rate_rounding(rate.rounding).to_string(), false).into(),
+        ),
+    ]
+    .into_iter()
+    .map(|expr| ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)))
+    .collect();
+    expression.clone()
 }

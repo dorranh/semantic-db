@@ -480,6 +480,10 @@ pub fn audit_context_manifest(
                 ("concepts", serde_json::to_value(&semantics.concepts)),
                 ("conversions", serde_json::to_value(&semantics.conversions)),
                 (
+                    "exact_decimal_rates",
+                    serde_json::to_value(&semantics.exact_decimal_rates),
+                ),
+                (
                     "business_calendars",
                     serde_json::to_value(&semantics.business_calendars),
                 ),
@@ -515,6 +519,7 @@ pub fn audit_context_manifest(
                                 "relationships" => "relationship",
                                 "concepts" => "concept",
                                 "conversions" => "conversion",
+                                "exact_decimal_rates" => "exact_decimal_rate",
                                 "business_calendars" => "business_calendar",
                                 "allocations" => "allocation",
                                 "currency_rates" => "currency_rate",

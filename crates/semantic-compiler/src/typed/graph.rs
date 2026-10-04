@@ -976,6 +976,7 @@ fn leaf_slots(bound: &BoundQuery) -> (Vec<Slot>, Option<BTreeSet<String>>) {
                 aggregate = true;
                 (output, alias, None)
             }
+            O::ConvertRate { conversion, alias } => (&conversion.output, alias, None),
             O::Window { output, alias, .. } => (output, alias, None),
             O::Lookup {
                 lookup,

@@ -6,7 +6,7 @@
 
 /// Stable identity recorded by compiler artifacts and connector capability
 /// declarations. Change this value whenever an observable semantic below changes.
-pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v13";
+pub const MVP_EXECUTION_PROFILE_REVISION: &str = "semantic-datafusion-typed-v14";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IntegerSumSemantics {

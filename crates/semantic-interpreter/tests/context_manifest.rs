@@ -100,6 +100,7 @@ fn rendered(snapshot: &CatalogSnapshot, names: &[&str], omit_facts: bool) -> Str
                     "business_calendars":semantics.business_calendars,
                     "allocations":semantics.allocations,
                     "currency_rates":semantics.currency_rates,
+                    "exact_decimal_rates":semantics.exact_decimal_rates,
                     "row_policies":semantics.row_policies
                 });
                 if omit_facts {
@@ -112,8 +113,8 @@ fn rendered(snapshot: &CatalogSnapshot, names: &[&str], omit_facts: bool) -> Str
                 "revision":entry.reference().revision,
                 "description":entry.definition().description,
                 "grain":entry.definition().grain,
-                "columns":[{"name":"id","data_type":"Int64","nullable":false,"semantics":null}],
-                "fields_total":1,
+                "columns":entry.definition().schema.fields().iter().map(|field| json!({"name":field.name(),"data_type":field.data_type().to_string(),"nullable":field.is_nullable(),"semantics":entry.definition().semantics.as_ref().and_then(|s|s.fields.get(field.name()))})).collect::<Vec<_>>(),
+                "fields_total":entry.definition().schema.fields().len(),
                 "field_inventory_complete":true,
                 "view_sql":match &entry.definition().kind {
                     RelationKind::View { sql, .. } => Some(sql.as_str()),
@@ -144,7 +145,15 @@ fn manifest(snapshot: &CatalogSnapshot, payload: &str, names: &[&str]) -> Contex
             .iter()
             .map(|name| ContextObject {
                 reference: snapshot.relation(name).unwrap().reference().clone(),
-                fields: vec!["id".into()],
+                fields: snapshot
+                    .relation(name)
+                    .unwrap()
+                    .definition()
+                    .schema
+                    .fields()
+                    .iter()
+                    .map(|field| field.name().clone())
+                    .collect(),
                 field_inventory_complete: true,
                 reasons: BTreeSet::from(["full_catalog".into()]),
             })
@@ -404,4 +413,93 @@ fn retrieved_context_requires_a_pinned_completed_search() {
     });
     let audit = audit_context_manifest(&snapshot, &manifest, &payload);
     assert!(audit.complete, "{:?}", audit.gaps);
+}
+
+#[test]
+fn exact_rate_fact_group_omission_is_incomplete_even_when_empty() {
+    let snapshot = fixture();
+    let mut value: Value =
+        serde_json::from_str(&rendered(&snapshot, &["items", "item_view"], false)).unwrap();
+    value["relations"][0]["semantics"]
+        .as_object_mut()
+        .unwrap()
+        .remove("exact_decimal_rates");
+    let payload = value.to_string();
+    let manifest = manifest(&snapshot, &payload, &["items", "item_view"]);
+    let audit = audit_context_manifest(&snapshot, &manifest, &payload);
+    assert!(!audit.complete);
+    assert!(
+        audit
+            .gaps
+            .iter()
+            .any(|gap| gap.kind == ContextGapKind::MissingFactGroup
+                && gap.detail == "exact_decimal_rates")
+    );
+}
+
+#[test]
+fn published_exact_rate_context_pins_profile_and_rejects_omission_or_tampering() {
+    let mut relation = Relation::base(
+        "rates",
+        Arc::new(Schema::new(vec![
+            Field::new("currency", DataType::Utf8, false),
+            Field::new("date", DataType::Date32, false),
+            Field::new("rate", DataType::Decimal128(18, 6), true),
+        ])),
+        "fixture:rates",
+    );
+    let rule = semantic_catalog::ExactDecimalRateRule {
+        version: 1,
+        id: "rates/chf".into(),
+        rate_relation: "rates".into(),
+        source_currency_field: "currency".into(),
+        date_field: "date".into(),
+        rate_field: "rate".into(),
+        target_currency: "CHF".into(),
+        positive_only: true,
+        null_rate: semantic_catalog::NullRatePolicy::Unavailable,
+        source_refs: vec![],
+    };
+    relation.semantics = Some(RelationSemantics {
+        exact_decimal_rates: [("chf".into(), rule.clone())].into(),
+        ..Default::default()
+    });
+    let catalog = Catalog::from_relations([relation]).unwrap();
+    catalog
+        .validate(&semantic_catalog::PublicationLimits::default())
+        .unwrap();
+    let snapshot = catalog.snapshot();
+    let payload = rendered(&snapshot, &["rates"], false);
+    let mut receipt = manifest(&snapshot, &payload, &["rates"]);
+    receipt.dependencies.clear();
+    let audit = audit_context_manifest(&snapshot, &receipt, &payload);
+    assert!(audit.complete, "{:?}", audit.gaps);
+    assert!(audit.facts.iter().any(|fact| fact.relation == "rates"
+        && fact.kind == "exact_decimal_rates"
+        && fact.id == "chf"
+        && fact.revision.as_deref() == Some(rule.reference().revision.as_str())));
+    for remove in [true, false] {
+        let mut value: Value = serde_json::from_str(&payload).unwrap();
+        if remove {
+            value["relations"][0]["semantics"]
+                .as_object_mut()
+                .unwrap()
+                .remove("exact_decimal_rates");
+        } else {
+            value["relations"][0]["semantics"]["exact_decimal_rates"]["chf"]["target_currency"] =
+                json!("EUR");
+        }
+        let changed = value.to_string();
+        let mut receipt = manifest(&snapshot, &changed, &["rates"]);
+        receipt.dependencies.clear();
+        let audit = audit_context_manifest(&snapshot, &receipt, &changed);
+        assert!(!audit.complete);
+        assert!(
+            audit
+                .gaps
+                .iter()
+                .any(|gap| gap.kind == ContextGapKind::MissingFactGroup
+                    && gap.detail == "exact_decimal_rates")
+        );
+    }
 }

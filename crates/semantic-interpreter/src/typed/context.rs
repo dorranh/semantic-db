@@ -82,7 +82,7 @@ impl ContextCache {
             parameter_digest: semantic_catalog::canonical_digest(&serde_json::json!(
                 options.request_context
             )),
-            renderer_revision: "context-render-v2".into(),
+            renderer_revision: "context-render-v3".into(),
             function_revision: "context-functions-v1".into(),
             acceptance_revision: "strict-v1".into(),
         };
@@ -747,6 +747,20 @@ impl ContextState {
                         .values()
                         .map(|conversion| conversion.field.clone()),
                 );
+                for rate in semantics.exact_decimal_rates.values() {
+                    options.check()?;
+                    if fields.len().saturating_add(3) > options.max_context_edges {
+                        return Err(diagnostic(
+                            "context_limit",
+                            "Exact decimal rate dependency closure exceeds the work budget",
+                        ));
+                    }
+                    fields.extend([
+                        rate.source_currency_field.clone(),
+                        rate.date_field.clone(),
+                        rate.rate_field.clone(),
+                    ]);
+                }
                 for policy in &semantics.row_policies {
                     options.check()?;
                     if policy.filters.len() + fields.len() > options.max_context_edges {
@@ -913,6 +927,7 @@ impl ContextState {
             facts: &'a BTreeMap<String, semantic_catalog::FactResolution<serde_json::Value>>,
             concepts: &'a BTreeMap<String, semantic_catalog::ConceptDefinition>,
             conversions: &'a BTreeMap<String, semantic_catalog::UnitConversion>,
+            exact_decimal_rates: &'a BTreeMap<String, semantic_catalog::ExactDecimalRateRule>,
             business_calendars: &'a BTreeMap<String, semantic_catalog::BusinessCalendarRule>,
             allocations: &'a BTreeMap<String, semantic_catalog::AllocationContract>,
             currency_rates: &'a BTreeMap<String, semantic_catalog::CurrencyRateRule>,
@@ -989,6 +1004,7 @@ impl ContextState {
                     facts: &s.facts,
                     concepts: &s.concepts,
                     conversions: &s.conversions,
+                    exact_decimal_rates: &s.exact_decimal_rates,
                     business_calendars: &s.business_calendars,
                     allocations: &s.allocations,
                     currency_rates: &s.currency_rates,

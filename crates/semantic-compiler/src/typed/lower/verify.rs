@@ -4,7 +4,7 @@
 use super::*;
 
 pub(super) const PASS_ID: &str = "semantic.row_lower";
-pub(super) const PASS_VERSION: u32 = 8;
+pub(super) const PASS_VERSION: u32 = 9;
 pub(super) const COMPARISON_PROFILE: &str = "datafusion-55/sql-null-logic/utf8-binary";
 
 /// The row lowerer is one fixed pass. Its input is a bound, ordered unary
@@ -240,7 +240,7 @@ pub(super) fn verify(
                     && !sort
                     && !project
                     && !fetch => {}
-            Operator::Convert { conversions }
+            Operator::Convert { conversions, rates }
                 if scan
                     && !allocate
                     && !currency_rate
@@ -252,7 +252,7 @@ pub(super) fn verify(
                     && !sort
                     && !project
                     && !fetch
-                    && !conversions.is_empty() =>
+                    && (!conversions.is_empty() || !rates.is_empty()) =>
             {
                 convert = true;
             }
@@ -567,7 +567,7 @@ impl AbstractSchema {
             }
             Operator::Filter { predicate } => self.predicate(predicate)?,
             Operator::OutputFilter { predicate, .. } => self.output_predicate(predicate)?,
-            Operator::Convert { conversions } => {
+            Operator::Convert { conversions, rates } => {
                 for conversion in conversions {
                     self.read(&conversion.source)?;
                     if conversion.source.field.data_type() != &semantic_catalog::DataType::Int64
@@ -577,6 +577,28 @@ impl AbstractSchema {
                         return Err(invalid_schema());
                     }
                     self.write(&conversion.output)?;
+                }
+                for rate in rates {
+                    self.read(&rate.source)?;
+                    if !matches!(rate.source.field.data_type(), semantic_catalog::DataType::Decimal128(p,s) if *p > 0 && *p <= 38 && *s >= 0 && *s <= *p as i8)
+                        || rate.result_type.precision == 0
+                        || rate.result_type.precision > 38
+                        || rate.result_type.scale > rate.result_type.precision
+                        || rate.output.field.data_type()
+                            != &semantic_catalog::DataType::Decimal128(
+                                rate.result_type.precision,
+                                rate.result_type.scale as i8,
+                            )
+                        || !rate.output.field.is_nullable()
+                        || !matches!(
+                            rate.amount,
+                            semantic_plan::typed::Literal::Decimal128 { .. }
+                        )
+                    {
+                        return Err(invalid_schema());
+                    }
+                    super::super::literal::checked_scalar(&rate.amount)?;
+                    self.write(&rate.output)?;
                 }
             }
             Operator::CalendarGroup { buckets } => {

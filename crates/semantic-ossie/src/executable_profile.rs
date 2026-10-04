@@ -276,6 +276,88 @@ pub(super) struct PreparedView {
     pub path: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExactDecimalRateContract {
+    kind: String,
+    name: String,
+    dataset: String,
+    rule: semantic_catalog::ExactDecimalRateRule,
+}
+fn apply_exact_decimal_rate(
+    document: &OssieDocument,
+    definitions: &mut [(Dataset, String, RelationSemantics)],
+    value: Value,
+    path: &str,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Ok(mut contract) = serde_json::from_value::<ExactDecimalRateContract>(value) else {
+        issue(
+            errors,
+            "invalid_extension",
+            path,
+            "expected complete SEMANTIC_DB exact_decimal_rate contract",
+        );
+        return;
+    };
+    if contract.kind != "exact_decimal_rate"
+        || !identifier(&contract.name)
+        || contract.name.len() > 128
+        || contract.rule.validate_contract().is_err()
+        || contract.dataset != contract.rule.rate_relation
+    {
+        issue(
+            errors,
+            "invalid_conversion_contract",
+            path,
+            "invalid exact decimal rate identity or policy",
+        );
+        return;
+    }
+    let Some((dataset, _, semantics)) = definitions
+        .iter_mut()
+        .find(|(dataset, _, _)| dataset.name == contract.dataset)
+    else {
+        issue(
+            errors,
+            "invalid_conversion_contract",
+            path,
+            "exact decimal rate dataset is missing",
+        );
+        return;
+    };
+    if semantics.exact_decimal_rates.contains_key(&contract.name)
+        || [
+            (&contract.rule.source_currency_field, "String"),
+            (&contract.rule.date_field, "Date"),
+            (&contract.rule.rate_field, "Decimal"),
+        ]
+        .iter()
+        .any(|(name, datatype)| {
+            !dataset
+                .fields
+                .iter()
+                .any(|f| &f.name == *name && f.datatype.as_deref() == Some(*datatype))
+        })
+    {
+        issue(
+            errors,
+            "invalid_conversion_contract",
+            path,
+            "exact decimal rate requires a unique name and String/Date/Decimal fields",
+        );
+        return;
+    }
+    contract.rule.source_refs = document
+        .normalized
+        .pointer(path)
+        .map(|node| node.origins.clone())
+        .unwrap_or_default();
+    semantics
+        .exact_decimal_rates
+        .insert(contract.name, contract.rule);
+}
+
 fn apply_conversion(
     document: &OssieDocument,
     definitions: &mut [(Dataset, String, RelationSemantics)],
@@ -863,6 +945,10 @@ pub(super) fn apply(
         }
         if data.get("kind").and_then(Value::as_str) == Some("entity_identity") {
             apply_entity_identity(document, definitions, data, &ep, errors);
+            continue;
+        }
+        if data.get("kind").and_then(Value::as_str) == Some("exact_decimal_rate") {
+            apply_exact_decimal_rate(document, definitions, data, &ep, errors);
             continue;
         }
         if data.get("kind").and_then(Value::as_str) == Some("conversion") {

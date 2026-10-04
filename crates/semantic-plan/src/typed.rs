@@ -2,6 +2,44 @@
 //! deserialized from retained artifacts. Only the compiler can bind them.
 use serde::{Deserialize, Serialize};
 
+/// Exact decimal quantization; no floating point intermediates are permitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecimalRounding {
+    Truncate,
+    HalfEven,
+    HalfAwayFromZero,
+}
+/// Requested exact decimal output representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DecimalResultType {
+    pub precision: u8,
+    pub scale: u8,
+}
+/// Currency comes from each authored rate row, rather than a guessed constant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RateAmountUnit {
+    RateSourceCurrency,
+}
+/// The first exact rate profile accepts major currency units only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateAmountBasis {
+    Major,
+}
+/// A request amount, repeated over genuine authored rate rows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RateAmount {
+    Literal {
+        value: Literal,
+        unit: RateAmountUnit,
+        basis: RateAmountBasis,
+    },
+}
+
 pub const ROW_QUERY_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +122,15 @@ pub enum RowOperation {
     /// source field. The result is Decimal128(38,18).
     Convert {
         conversion: String,
+        alias: String,
+    },
+    /// Quantize a decimal literal against every surviving authored rate row.
+    /// The result uses the requested exact precision and scale in target major units.
+    ConvertRate {
+        rate: String,
+        amount: RateAmount,
+        result_type: DecimalResultType,
+        rounding: DecimalRounding,
         alias: String,
     },
     /// Convert through one authored, dated rate relation under the same read.
