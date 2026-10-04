@@ -608,7 +608,7 @@
       "relationships",
       "cross_source"
     ],
-    "question": "List order ID, payer name, then recipient name for orders 101 and 102, by ID.",
+    "question": "For orders 101 and 102 with matching customer records for both payer and recipient, list order ID, payer name, then recipient name, by ID.",
     "sql": "SELECT o.order_id,b.name,s.name FROM orders o JOIN customers b ON o.billing_customer_id=b.customer_id JOIN customers s ON o.shipping_customer_id=s.customer_id WHERE o.order_id IN (101,102) ORDER BY o.order_id",
     "expected": "expected/roles.both.json",
     "comparison": {
@@ -1449,7 +1449,7 @@
       "multiple_facts",
       "cross_source"
     ],
-    "question": "Return product name then completed item sales minus line refunds in cents, by product ID.",
+    "question": "For items with matching catalog product records, return product name then completed item sales minus line refunds in cents, by product ID.",
     "sql": "WITH r AS (SELECT order_id,line_no,SUM(refund_minor) AS cents FROM refunds GROUP BY order_id,line_no) SELECT p.name,SUM(i.line_minor-COALESCE(r.cents,0)) AS net_minor FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON i.order_id=o.order_id LEFT JOIN r ON i.order_id=r.order_id AND i.line_no=r.line_no WHERE o.status='completed' GROUP BY p.product_id,p.name ORDER BY p.product_id",
     "expected": "expected/fanout.product_net.json",
     "comparison": {
@@ -1472,7 +1472,7 @@
       "multiple_facts",
       "cross_source"
     ],
-    "question": "Return product name then weighted completed unit price in cents, using signed quantity and null when zero, rounded half away from zero to six decimals, by product ID.",
+    "question": "For items with matching catalog product records, return product name then weighted completed unit price in cents, using signed quantity and null when zero, rounded half away from zero to six decimals, by product ID.",
     "sql": "SELECT p.name,CAST(ROUND(CAST(SUM(i.line_minor) AS DECIMAL(18,6))/NULLIF(CAST(SUM(i.quantity) AS DECIMAL(18,6)),0),6) AS DECIMAL(18,6)) AS weighted_price FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON i.order_id=o.order_id WHERE o.status='completed' GROUP BY p.product_id,p.name ORDER BY p.product_id",
     "expected": "expected/fanout.weighted_price.json",
     "comparison": {
@@ -1563,7 +1563,7 @@
       "temporal",
       "cross_source"
     ],
-    "question": "List order ID then billed customer name for orders on leap day 2024, by ID.",
+    "question": "List order ID then billed customer name for orders on leap day 2024 with matching billed customer records, by ID.",
     "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.order_date=DATE '2024-02-29' ORDER BY o.order_id",
     "expected": "expected/calendar.leap.json",
     "comparison": {
@@ -1586,7 +1586,7 @@
       "temporal",
       "cross_source"
     ],
-    "question": "Using the fixed April 1 2024 request clock, list completed March order IDs and payer names, by ID.",
+    "question": "Using the fixed April 1 2024 request clock, list completed March order IDs and payer names, excluding orders without a matching billed customer record, by ID.",
     "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' AND o.order_date>=DATE '2024-03-01' AND o.order_date<DATE '2024-04-01' ORDER BY o.order_id",
     "expected": "expected/calendar.previous_month.json",
     "comparison": {
@@ -1811,7 +1811,7 @@
       "historical",
       "cross_source"
     ],
-    "question": "For orders 101 and 102 return ID, current payer region, then payer region at order date, by ID.",
+    "question": "For orders 101 and 102 with matching current billed customer records, return ID, current payer region, then payer region at order date, retaining missing historical matches as null, by ID.",
     "sql": "SELECT o.order_id,c.region,h.region FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.order_id IN (101,102) ORDER BY o.order_id",
     "expected": "expected/history.current_vs_then.json",
     "comparison": {
@@ -1991,7 +1991,7 @@
       "windows",
       "cross_source"
     ],
-    "question": "Return current billed region, order ID, then running sales cents within region by date and ID, ordered by region then date and ID.",
+    "question": "For completed orders with matching billed customer records, return current billed region, order ID, then running sales cents within region by date and ID, ordered by region then date and ID.",
     "sql": "SELECT c.region,o.order_id,SUM(o.total_minor) OVER (PARTITION BY c.region ORDER BY o.order_date,o.order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_minor FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' ORDER BY c.region,o.order_date,o.order_id",
     "expected": "expected/window.region_running.json",
     "comparison": {
