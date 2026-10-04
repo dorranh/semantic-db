@@ -117,7 +117,7 @@ pub(super) fn bind_slot_comparison(
         unique_output(&comparison.id, &comparison.alias, &mut ids, &mut aliases)?;
         let left = slot(source, &comparison.left)?;
         let right = slot(source, &comparison.right)?;
-        let expression = CheckedSlotComparison::int64(
+        let expression = CheckedSlotComparison::integer(
             &source.id,
             CheckedSlot::new(&source.id, &left.id, &left.field),
             CheckedSlot::new(&source.id, &right.id, &right.field),

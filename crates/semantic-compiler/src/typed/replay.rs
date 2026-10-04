@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 mod decision;
 pub use decision::{DecisionTrace, RuleDecision, StageArtifact, StageReplayOutcome};
 
-pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-34/datafusion-55";
+pub const PIPELINE_REVISION: &str = "semantic-compiler/typed-v1/pipeline-35/datafusion-55";
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReplayBundle {

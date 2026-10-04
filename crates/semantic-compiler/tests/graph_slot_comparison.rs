@@ -363,3 +363,216 @@ async fn each_comparison_output_requires_graph_intent_evidence() {
         TypedOutcome::Rejected { diagnostic } if diagnostic.code == "request_coverage"
     ));
 }
+
+fn integer_fixture(left: DataType, right: DataType) -> Engine {
+    use datafusion::arrow::array::*;
+    fn values(kind: &DataType, reversed: bool) -> ArrayRef {
+        macro_rules! signed {
+            ($array:ty, $native:ty) => {{
+                let mut values = vec![
+                    Some(<$native>::MIN),
+                    Some(<$native>::MAX),
+                    None,
+                    Some(0),
+                    Some(0),
+                ];
+                if reversed {
+                    values.swap(0, 1);
+                    values[2] = Some(0);
+                    values[4] = None;
+                }
+                Arc::new(<$array>::from(values)) as ArrayRef
+            }};
+        }
+        macro_rules! unsigned {
+            ($array:ty, $native:ty) => {{
+                let mut values = vec![Some(0), Some(<$native>::MAX), None, Some(0), Some(0)];
+                if reversed {
+                    values.swap(0, 1);
+                    values[2] = Some(0);
+                    values[4] = None;
+                }
+                Arc::new(<$array>::from(values)) as ArrayRef
+            }};
+        }
+        match kind {
+            DataType::Int8 => signed!(Int8Array, i8),
+            DataType::Int16 => signed!(Int16Array, i16),
+            DataType::Int32 => signed!(Int32Array, i32),
+            DataType::Int64 => signed!(Int64Array, i64),
+            DataType::UInt8 => unsigned!(UInt8Array, u8),
+            DataType::UInt16 => unsigned!(UInt16Array, u16),
+            DataType::UInt32 => unsigned!(UInt32Array, u32),
+            DataType::UInt64 => unsigned!(UInt64Array, u64),
+            _ => unreachable!(),
+        }
+    }
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Int64, false),
+        Field::new("left_amount", left.clone(), true),
+        Field::new("right_amount", right.clone(), true),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+            values(&left, false),
+            values(&right, true),
+        ],
+    )
+    .unwrap();
+    let mut engine = Engine::new();
+    engine
+        .register_table(
+            Relation::base("amounts", schema.clone(), "memory"),
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+    engine
+}
+
+fn integer_query() -> GraphQuery {
+    let mut query = query();
+    let GraphOperation::Rows { query: rows } = &mut query.nodes[0].operation else {
+        unreachable!()
+    };
+    rows.requirements
+        .retain(|r| matches!(r.id.as_str(), "id" | "left_amount" | "right_amount"));
+    let GraphOperation::CompareSlots { comparisons, .. } = &mut query.nodes[1].operation else {
+        unreachable!()
+    };
+    *comparisons = [
+        Comparison::Eq,
+        Comparison::NotEq,
+        Comparison::Lt,
+        Comparison::LtEq,
+        Comparison::Gt,
+        Comparison::GtEq,
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(i, operator)| GraphSlotComparison {
+        id: format!("comparison_{i}"),
+        left: "left_amount".into(),
+        right: "right_amount".into(),
+        operator,
+        alias: format!("comparison_{i}"),
+    })
+    .collect();
+    query
+}
+
+fn boolean_rows(batches: &[RecordBatch]) -> Vec<Vec<Option<bool>>> {
+    batches
+        .iter()
+        .flat_map(|batch| {
+            (0..batch.num_rows())
+                .map(|row| {
+                    batch
+                        .columns()
+                        .iter()
+                        .skip(1)
+                        .map(|column| {
+                            let values = column.as_any().downcast_ref::<BooleanArray>().unwrap();
+                            (!values.is_null(row)).then(|| values.value(row))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn every_exact_integer_width_compares_extrema_and_nulls_in_direct_and_sql() {
+    for kind in [
+        DataType::Int8,
+        DataType::Int16,
+        DataType::Int32,
+        DataType::Int64,
+        DataType::UInt8,
+        DataType::UInt16,
+        DataType::UInt32,
+        DataType::UInt64,
+    ] {
+        let engine = integer_fixture(kind.clone(), kind.clone());
+        let result = compile_graph(&engine, integer_query(), CompileOptions::default()).await;
+        let TypedOutcome::CompiledGraph { query } = result.outcome else {
+            panic!("{kind:?} failed: {:?}", result.outcome);
+        };
+        let direct = query
+            .plan_direct(&engine)
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let sql = query
+            .execute(&engine, QueryOptions::default())
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let expected = vec![
+            vec![
+                Some(false),
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(false),
+                Some(false),
+            ],
+            vec![
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(true),
+            ],
+            vec![None; 6],
+            vec![
+                Some(true),
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(true),
+            ],
+            vec![None; 6],
+        ];
+        assert_eq!(boolean_rows(&direct), expected, "direct {kind:?}");
+        assert_eq!(boolean_rows(&sql), expected, "SQL {kind:?}");
+        assert_eq!(direct[0].schema(), sql[0].schema(), "schema {kind:?}");
+        assert!(
+            direct[0]
+                .schema()
+                .fields()
+                .iter()
+                .skip(1)
+                .all(|f| f.data_type() == &DataType::Boolean && f.is_nullable())
+        );
+    }
+}
+
+#[tokio::test]
+async fn integer_slot_comparisons_reject_width_and_signedness_coercion() {
+    for (left, right) in [
+        (DataType::Int16, DataType::Int32),
+        (DataType::UInt32, DataType::UInt64),
+        (DataType::Int64, DataType::UInt64),
+        (DataType::UInt8, DataType::Int8),
+    ] {
+        let result = compile_graph(
+            &integer_fixture(left.clone(), right.clone()),
+            integer_query(),
+            CompileOptions::default(),
+        )
+        .await;
+        assert!(
+            matches!(result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "graph_comparison_type"),
+            "{left:?}/{right:?}"
+        );
+    }
+}

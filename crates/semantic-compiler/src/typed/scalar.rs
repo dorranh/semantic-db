@@ -531,7 +531,7 @@ pub(super) struct CheckedSlotComparison {
 }
 
 impl CheckedSlotComparison {
-    pub(super) fn int64(
+    pub(super) fn integer(
         scope: &str,
         left: CheckedSlot,
         right: CheckedSlot,
@@ -543,11 +543,22 @@ impl CheckedSlotComparison {
                 "Graph slot comparison operands must belong to one input node",
             ));
         }
-        if left.field.data_type() != &DataType::Int64 || right.field.data_type() != &DataType::Int64
+        if left.field.data_type() != right.field.data_type()
+            || !matches!(
+                left.field.data_type(),
+                DataType::Int8
+                    | DataType::Int16
+                    | DataType::Int32
+                    | DataType::Int64
+                    | DataType::UInt8
+                    | DataType::UInt16
+                    | DataType::UInt32
+                    | DataType::UInt64
+            )
         {
             return Err(diagnostic(
                 "graph_comparison_type",
-                "Graph slot comparison requires two exact Int64 operands",
+                "Graph slot comparison requires two operands of the same exact integer type",
             ));
         }
         Ok(Self {
