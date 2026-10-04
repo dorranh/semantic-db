@@ -598,6 +598,21 @@ impl SqlArtifact {
         statement: String,
         parameters: Vec<Literal>,
     ) -> Self {
+        // Bind civil dates to the established physical parameter contract before
+        // exposing the artifact to external transports.
+        let parameters = parameters
+            .into_iter()
+            .map(|value| {
+                if matches!(value, Literal::GregorianDate(_)) {
+                    let ScalarValue::Date32(Some(days)) = scalar(&value) else {
+                        unreachable!("bound civil date has Date32 type")
+                    };
+                    Literal::Date32(days)
+                } else {
+                    value
+                }
+            })
+            .collect::<Vec<_>>();
         let parameter_types = parameters
             .iter()
             .map(|value| scalar(value).data_type().to_string())

@@ -793,6 +793,14 @@ async fn exact_decimal_date_and_timestamp_parameters_match_both_backends() {
         ),
         (Literal::Date32(20000), ScalarValue::Date32(Some(20000))),
         (
+            Literal::GregorianDate("2024-02-29".into()),
+            ScalarValue::Date32(Some(19782)),
+        ),
+        (
+            Literal::GregorianDate("1969-12-31".into()),
+            ScalarValue::Date32(Some(-1)),
+        ),
+        (
             Literal::Timestamp {
                 ticks: 1720000000123456,
                 unit: TimestampUnit::Microsecond,
@@ -834,12 +842,21 @@ async fn exact_decimal_date_and_timestamp_parameters_match_both_backends() {
             )
             .unwrap();
         let mut q = query();
+        let civil_date = matches!(&literal, Literal::GregorianDate(_));
         q.requirements.push(requirement(
             "exact filter",
             RowOperation::Filter {
                 predicate: compare("value", Comparison::Eq, literal),
             },
         ));
+        if civil_date {
+            let artifact =
+                compiled(compile_rows(&engine, q.clone(), CompileOptions::default()).await);
+            let ScalarValue::Date32(Some(days)) = scalar else {
+                panic!("civil date must bind to Date32")
+            };
+            assert_eq!(artifact.sql().parameters(), &[Literal::Date32(days)]);
+        }
         both_paths(&engine, q, vec![vec!["1"]]).await;
     }
 }
@@ -2541,10 +2558,54 @@ fn traced_intent() -> IntentQuery {
     }
 }
 #[tokio::test]
+async fn span_repair_diagnostics_do_not_echo_request_text_or_requirement_ids() {
+    let secret = "private-customer-token";
+    let mut intent = traced_intent();
+    intent.evidence.original_request = secret.into();
+    intent.evidence.requirement_spans = [(
+        "private-requirement-token".into(),
+        vec![RequestSpan {
+            start: 0,
+            end: secret.len(),
+        }],
+    )]
+    .into();
+    intent.query.requirements[0].id = "private-requirement-token".into();
+    intent.query.requirements[0].source_text = "mismatch".into();
+    let result =
+        semantic_compiler::typed::compile_intent(&fixture(), intent, CompileOptions::default())
+            .await;
+    let TypedOutcome::Rejected { diagnostic } = result.outcome else {
+        panic!("invalid evidence must be rejected")
+    };
+    for output in [
+        serde_json::to_string(&diagnostic).unwrap(),
+        diagnostic.to_string(),
+        format!("{diagnostic:?}"),
+    ] {
+        assert!(!output.contains(secret));
+        assert!(!output.contains("private-requirement-token"));
+    }
+    assert!(diagnostic.message.contains("index 0"));
+    assert!(diagnostic.message.contains("end: 22"));
+}
+
+#[tokio::test]
 async fn intent_retains_exact_request_and_validates_utf8_spans_without_claiming_completeness() {
     use semantic_compiler::typed::compile_intent;
     let engine = fixture();
     let intent = traced_intent();
+    let mut mismatched = intent.clone();
+    mismatched.query.requirements[0].source_text = "identifiers".into();
+    let mismatch = compile_intent(&engine, mismatched, CompileOptions::default()).await;
+    assert!(
+        matches!(mismatch.outcome, TypedOutcome::Rejected { diagnostic }
+        if diagnostic.code == "request_span"
+        && diagnostic.message.contains("index 0")
+        && diagnostic.message.contains("start: 9")
+        && !diagnostic.message.contains("IDs")
+        && !diagnostic.message.contains("identifiers"))
+    );
     let result = compile_intent(&engine, intent.clone(), CompileOptions::default()).await;
     assert!(result.record.request_spans_validated);
     assert!(result.record.request_digest.is_some());

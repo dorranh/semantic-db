@@ -20,6 +20,30 @@ pub(super) fn checked_scalar(value: &Literal) -> Result<ScalarValue, CompileDiag
         Literal::UInt64(v) => ScalarValue::UInt64(Some(*v)),
         Literal::Utf8(v) => ScalarValue::Utf8(Some(v.clone())),
         Literal::Date32(v) => ScalarValue::Date32(Some(*v)),
+        Literal::GregorianDate(value) => {
+            let invalid = || {
+                diagnostic(
+                    "date_literal",
+                    "Gregorian dates require a valid YYYY-MM-DD date",
+                )
+            };
+            if value.len() != 10
+                || value.as_bytes()[4] != b'-'
+                || value.as_bytes()[7] != b'-'
+                || !value
+                    .bytes()
+                    .enumerate()
+                    .all(|(i, b)| matches!(i, 4 | 7) || b.is_ascii_digit())
+            {
+                return Err(invalid());
+            }
+            let date =
+                chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| invalid())?;
+            let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).expect("valid epoch");
+            let days = i32::try_from(date.signed_duration_since(epoch).num_days())
+                .map_err(|_| invalid())?;
+            ScalarValue::Date32(Some(days))
+        }
         Literal::Decimal128 {
             coefficient,
             precision,
@@ -79,7 +103,7 @@ pub(super) fn sql_type(value: &Literal) -> ast::DataType {
         Literal::Float64(_) => ast::DataType::Double(ast::ExactNumberInfo::None),
         Literal::UInt64(_) => ast::DataType::BigIntUnsigned(None),
         Literal::Utf8(_) => ast::DataType::Text,
-        Literal::Date32(_) => ast::DataType::Date,
+        Literal::Date32(_) | Literal::GregorianDate(_) => ast::DataType::Date,
         Literal::Decimal128 {
             precision, scale, ..
         } => ast::DataType::Decimal(ast::ExactNumberInfo::PrecisionAndScale(
@@ -99,5 +123,37 @@ pub(super) fn sql_type(value: &Literal) -> ast::DataType {
                 ast::TimezoneInfo::None
             },
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn civil_dates_are_validated_without_timezone_or_epoch_guessing() {
+        for (date, days) in [("1970-01-01", 0), ("1969-12-31", -1), ("2024-02-29", 19782)] {
+            assert_eq!(
+                checked_scalar(&Literal::GregorianDate(date.into())).unwrap(),
+                ScalarValue::Date32(Some(days))
+            );
+        }
+        for date in [
+            "2023-02-29",
+            "2024-04-31",
+            "2024-2-29",
+            "2024-02-29Z",
+            "2024-02-29T00:00:00",
+            "today",
+            "2024-00-01",
+        ] {
+            let error = checked_scalar(&Literal::GregorianDate(date.into())).unwrap_err();
+            assert_eq!(error.code, "date_literal");
+            assert_eq!(error.details.stage, super::super::DiagnosticStage::Input);
+            assert_eq!(
+                error.details.kind,
+                super::super::DiagnosticKind::InvalidProposal
+            );
+        }
     }
 }

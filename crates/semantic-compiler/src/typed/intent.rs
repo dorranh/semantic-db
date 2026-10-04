@@ -31,7 +31,7 @@ pub(super) fn validate(
         ));
     }
     let mut total = 0usize;
-    for requirement in &query.requirements {
+    for (position, requirement) in query.requirements.iter().enumerate() {
         options.check()?;
         let spans = evidence
             .requirement_spans
@@ -46,10 +46,13 @@ pub(super) fn validate(
         if total > options.max_nodes {
             return Err(diagnostic("work_limit", "Request span budget exhausted"));
         }
-        if span_text(&evidence.original_request, spans)? != requirement.source_text {
+        let exact_text = span_text(&evidence.original_request, spans)?;
+        if exact_text != requirement.source_text {
             return Err(diagnostic(
                 "request_span",
-                "Requirement source text must exactly equal its source spans joined by a space",
+                &format!(
+                    "Requirement at index {position} source_text must equal the request substrings at UTF-8 byte ranges {spans:?}, joined by a space. Repair source_text or the spans without changing the requirement"
+                ),
             ));
         }
     }

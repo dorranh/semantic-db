@@ -203,7 +203,7 @@ pub(super) fn validate(
         ));
     }
     let mut spans = 0usize;
-    for item in &evidence.requirements {
+    for (position, item) in evidence.requirements.iter().enumerate() {
         options.check()?;
         let source = required.remove(&item.target).ok_or_else(|| {
             diagnostic(
@@ -222,7 +222,10 @@ pub(super) fn validate(
         if source.is_some_and(|source| text != source) {
             return Err(diagnostic(
                 "request_span",
-                "Graph source text must exactly match its joined request spans",
+                &format!(
+                    "Graph evidence at index {position} source_text must equal the request substrings at UTF-8 byte ranges {:?}, joined by a space. Repair source_text or the spans without changing the requirement",
+                    item.source_spans
+                ),
             ));
         }
     }

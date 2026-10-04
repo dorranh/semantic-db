@@ -332,6 +332,9 @@ pub enum Literal {
     },
     /// Days since 1970-01-01 in the proleptic Gregorian calendar.
     Date32(i32),
+    /// An explicit proleptic Gregorian civil date, encoded as YYYY-MM-DD.
+    /// Binding validates the date and converts it to Date32 without a timezone.
+    GregorianDate(String),
     Timestamp {
         ticks: i64,
         unit: TimestampUnit,

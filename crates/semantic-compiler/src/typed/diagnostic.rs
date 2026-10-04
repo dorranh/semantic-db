@@ -233,6 +233,7 @@ pub fn diagnostic_details(code: &str) -> DiagnosticDetails {
         | "invalid_output"
         | "empty_boolean"
         | "decimal_literal"
+        | "date_literal"
         | "timestamp_timezone"
         | "parameter_contract"
         | "unbound_parameter" => DiagnosticDetails::new(
