@@ -1078,10 +1078,10 @@ impl RelationalPlan {
                             .filter(|(left, _)| left.instance != "$output")
                             .map(|(left, _)| left.field.name().as_str()),
                     );
-                    if let Some(as_of) = &lookup.as_of {
-                        if as_of.fact_time.instance != "$output" {
-                            fields.insert(as_of.fact_time.field.name().as_str());
-                        }
+                    if let Some(as_of) = &lookup.as_of
+                        && as_of.fact_time.instance != "$output"
+                    {
+                        fields.insert(as_of.fact_time.field.name().as_str());
                     }
                 }
                 Operator::Convert { conversions } => fields.extend(
@@ -1486,15 +1486,14 @@ fn sql_aggregate(aggregate: &Aggregation, parameters: &mut Vec<Literal>) -> ast:
         "semantic_exact_count_i64_v1"
     } else if aggregate.weighted.is_some() {
         "semantic_weighted_mean_i64_v1"
-    } else if aggregate.mean_state {
-        "semantic_mean_i64_v1"
-    } else if aggregate.function == AggregateFunction::Avg
-        && aggregate.field.as_ref().is_some_and(|field| {
-            matches!(
-                field.field.data_type(),
-                DataType::Int16 | DataType::Int32 | DataType::Int64
-            )
-        })
+    } else if aggregate.mean_state
+        || aggregate.function == AggregateFunction::Avg
+            && aggregate.field.as_ref().is_some_and(|field| {
+                matches!(
+                    field.field.data_type(),
+                    DataType::Int16 | DataType::Int32 | DataType::Int64
+                )
+            })
     {
         "semantic_mean_i64_v1"
     } else {
@@ -1577,15 +1576,14 @@ fn df_aggregate(aggregate: &Aggregation) -> Expr {
         semantic_engine::semantic_exact_count_i64_v1()
     } else if aggregate.weighted.is_some() {
         semantic_engine::semantic_weighted_mean_i64_v1()
-    } else if aggregate.mean_state {
-        semantic_engine::semantic_mean_i64_v1()
-    } else if aggregate.function == AggregateFunction::Avg
-        && aggregate.field.as_ref().is_some_and(|field| {
-            matches!(
-                field.field.data_type(),
-                DataType::Int16 | DataType::Int32 | DataType::Int64
-            )
-        })
+    } else if aggregate.mean_state
+        || aggregate.function == AggregateFunction::Avg
+            && aggregate.field.as_ref().is_some_and(|field| {
+                matches!(
+                    field.field.data_type(),
+                    DataType::Int16 | DataType::Int32 | DataType::Int64
+                )
+            })
     {
         semantic_engine::semantic_mean_i64_v1()
     } else {

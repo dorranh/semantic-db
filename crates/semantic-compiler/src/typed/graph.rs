@@ -837,72 +837,6 @@ fn unique_output<'a>(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod output_contract_tests {
-    use super::*;
-    use datafusion::arrow::datatypes::{Field as ArrowField, Schema};
-
-    #[test]
-    fn root_contract_rejects_unsafe_nonnull_promise() {
-        let mut slot = Slot {
-            id: "value".into(),
-            field: Field::new("value", DataType::Int64, true),
-            origin: None,
-            meaning: SlotMeaning::default(),
-        };
-        let nullable = Schema::new(vec![ArrowField::new("value", DataType::Int64, true)]);
-        verify_root_output_contract(&[slot.clone()], &nullable).unwrap();
-
-        slot.field = Field::new("value", DataType::Int64, false);
-        assert_eq!(
-            verify_root_output_contract(&[slot.clone()], &nullable)
-                .unwrap_err()
-                .code,
-            "output_contract"
-        );
-
-        let nonnull = Schema::new(vec![ArrowField::new("value", DataType::Int64, false)]);
-        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
-        slot.field = Field::new("value", DataType::Int64, true);
-        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
-
-        slot.field = Field::new("value", DataType::Utf8, true);
-        assert_eq!(
-            verify_root_output_contract(&[slot], &nonnull)
-                .unwrap_err()
-                .code,
-            "output_contract"
-        );
-    }
-
-    #[test]
-    fn intermediate_mismatch_fails_even_if_final_root_contract_is_valid() {
-        let intermediate_schema =
-            Schema::new(vec![ArrowField::new("middle", DataType::Utf8, true)]);
-        let root_schema = Schema::new(vec![ArrowField::new("result", DataType::Int64, false)]);
-        let root = Slot {
-            id: "root".into(),
-            field: Field::new("result", DataType::Int64, false),
-            origin: None,
-            meaning: SlotMeaning::default(),
-        };
-        verify_root_output_contract(&[root], &root_schema).unwrap();
-
-        let intermediate = Slot {
-            id: "middle".into(),
-            field: Field::new("middle", DataType::Utf8, false),
-            origin: None,
-            meaning: SlotMeaning::default(),
-        };
-        assert_eq!(
-            verify_root_output_contract(&[intermediate], &intermediate_schema)
-                .unwrap_err()
-                .code,
-            "output_contract"
-        );
-    }
-}
 fn exact_type(ty: &DataType) -> bool {
     matches!(
         ty,
@@ -1338,4 +1272,70 @@ fn emit(
         query.to_string(),
         parameters,
     ))
+}
+
+#[cfg(test)]
+mod output_contract_tests {
+    use super::*;
+    use datafusion::arrow::datatypes::{Field as ArrowField, Schema};
+
+    #[test]
+    fn root_contract_rejects_unsafe_nonnull_promise() {
+        let mut slot = Slot {
+            id: "value".into(),
+            field: Field::new("value", DataType::Int64, true),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        let nullable = Schema::new(vec![ArrowField::new("value", DataType::Int64, true)]);
+        verify_root_output_contract(&[slot.clone()], &nullable).unwrap();
+
+        slot.field = Field::new("value", DataType::Int64, false);
+        assert_eq!(
+            verify_root_output_contract(&[slot.clone()], &nullable)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+
+        let nonnull = Schema::new(vec![ArrowField::new("value", DataType::Int64, false)]);
+        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
+        slot.field = Field::new("value", DataType::Int64, true);
+        verify_root_output_contract(&[slot.clone()], &nonnull).unwrap();
+
+        slot.field = Field::new("value", DataType::Utf8, true);
+        assert_eq!(
+            verify_root_output_contract(&[slot], &nonnull)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+    }
+
+    #[test]
+    fn intermediate_mismatch_fails_even_if_final_root_contract_is_valid() {
+        let intermediate_schema =
+            Schema::new(vec![ArrowField::new("middle", DataType::Utf8, true)]);
+        let root_schema = Schema::new(vec![ArrowField::new("result", DataType::Int64, false)]);
+        let root = Slot {
+            id: "root".into(),
+            field: Field::new("result", DataType::Int64, false),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        verify_root_output_contract(&[root], &root_schema).unwrap();
+
+        let intermediate = Slot {
+            id: "middle".into(),
+            field: Field::new("middle", DataType::Utf8, false),
+            origin: None,
+            meaning: SlotMeaning::default(),
+        };
+        assert_eq!(
+            verify_root_output_contract(&[intermediate], &intermediate_schema)
+                .unwrap_err()
+                .code,
+            "output_contract"
+        );
+    }
 }

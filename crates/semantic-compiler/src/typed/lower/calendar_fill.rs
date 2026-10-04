@@ -65,13 +65,13 @@ pub(super) fn emit(
     let ast::TableFactor::Derived { subquery, .. } = &mut join.relation else {
         unreachable!()
     };
-    *subquery = Box::new(previous);
+    **subquery = previous;
     join.join_operator = ast::JoinOperator::LeftOuter(ast::JoinConstraint::On(binary(
         qualified("spine", "m"),
         ast::BinaryOperator::Eq,
         qualified("agg", month.field.name()),
     )));
-    query.body = Box::new(ast::SetExpr::Select(select));
+    *query.body = ast::SetExpr::Select(select);
     wrap_query(query);
 }
 

@@ -66,7 +66,7 @@ async fn weighted_mean_merge_is_partition_invariant() {
         )
         .unwrap()
     };
-    let chunks = vec![
+    let chunks = [
         batch(vec![Some(10), None], vec![Some(1), Some(9)]),
         batch(vec![Some(20), Some(20)], vec![Some(2), Some(1)]),
     ];

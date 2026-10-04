@@ -65,6 +65,8 @@ impl Database {
             .await
             .unwrap_or_else(|error| panic!("fixture statement failed: {sql}\n{error}"));
     }
+    // Some integration crates use only the fixture's endpoint and admin client.
+    #[allow(dead_code)]
     pub fn connection(&self, federation: bool) -> ClickHouse {
         let mut config = ClickHouseConfig::new(&self.endpoint, "drilling", "fixture", PASSWORD);
         config.federation = federation;

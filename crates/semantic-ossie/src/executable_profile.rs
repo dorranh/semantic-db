@@ -687,7 +687,7 @@ pub(super) fn apply(
     document: &OssieDocument,
     model: &Model,
     path: &str,
-    definitions: &mut Vec<(Dataset, String, RelationSemantics)>,
+    definitions: &mut [(Dataset, String, RelationSemantics)],
     errors: &mut Vec<Diagnostic>,
 ) -> Vec<PreparedView> {
     let mut views = Vec::new();

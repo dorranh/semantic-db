@@ -367,7 +367,7 @@ fn validate_definitions<'a>(
                     contributors,
                 } if !contributors.is_empty()
                     && contributors.iter().all(|fact| {
-                        fact.id.trim().len() > 0
+                        !fact.id.trim().is_empty()
                             && fact.scope == relation.name
                             && fact.value == crate::KeyEvidence::AuthoredDeclaration
                             && fact.authority == crate::Authority::Authored

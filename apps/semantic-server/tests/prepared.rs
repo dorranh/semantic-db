@@ -74,7 +74,7 @@ async fn public_prepared_route_binds_exact_value_without_a_model() {
     let (status, response) = post(&app, "/v1/compile/prepared-row", prepared_request()).await;
     assert_eq!(status, StatusCode::OK, "{response}");
     assert_eq!(response["outcome"]["status"], "compiled", "{response}");
-    assert_eq!(response["record"]["work"]["model_calls"], 0);
+    assert!(response["record"]["work"].get("model_calls").is_none());
     let sql = response["outcome"]["query"]["sql"]["statement"]
         .as_str()
         .unwrap();

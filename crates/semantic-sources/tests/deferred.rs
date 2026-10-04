@@ -12,7 +12,7 @@ use semantic_sources::{
 };
 use serde_json::{Value, json};
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -127,12 +127,7 @@ fn project() -> Project {
             "nested_view":{"sql_file":"nested_view.sql"}
         }
     });
-    Project::new(
-        serde_json::from_value(config).unwrap(),
-        document,
-        PathBuf::from(base_dir),
-    )
-    .unwrap()
+    Project::new(serde_json::from_value(config).unwrap(), document, base_dir).unwrap()
 }
 
 fn registry(drift: bool) -> (Arc<Registry>, Arc<AtomicUsize>, Arc<AtomicUsize>) {

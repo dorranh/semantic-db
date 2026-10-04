@@ -17,7 +17,7 @@ use semantic_engine::{Engine, QueryOptions, RelationBackend, TableProvider};
 use semantic_interpreter::{
     Interpreter,
     provider::{Message, ModelProvider, ProviderError},
-    typed::{InterpretOptions, SelectionMode},
+    typed::InterpretOptions,
 };
 use semantic_plan::typed::{
     Direction, FieldRef, NullOrder, RelationInput, Requirement, RowOperation, RowQuery,
@@ -156,12 +156,13 @@ async fn nested_authored_views_retain_local_definition_and_exact_rows() {
     let TypedOutcome::Compiled { query } = result.outcome else {
         panic!("nested authored view failed: {:?}", result.outcome)
     };
-    let seen = contexts.lock().unwrap();
-    assert_eq!(seen.len(), 1);
-    assert!(seen[0].contains("active_deep_wells"));
-    assert!(seen[0].contains("deep_wells"));
-    assert!(seen[0].contains("2500"));
-    drop(seen);
+    {
+        let seen = contexts.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].contains("active_deep_wells"));
+        assert!(seen[0].contains("deep_wells"));
+        assert!(seen[0].contains("2500"));
+    }
     let direct = query
         .plan_direct(&engine)
         .await

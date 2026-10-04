@@ -567,15 +567,14 @@ impl Engine {
         // they are part of a cache key, never retain plans containing a `$`.
         // This also conservatively bypasses strings/identifiers containing `$`.
         let cacheable = !sql.contains('$') && sql.len() <= GENERATED_PLAN_CACHE_MAX_SQL_BYTES;
-        if cacheable {
-            if let Some(frame) = self
+        if cacheable
+            && let Some(frame) = self
                 .generated_plan_cache
                 .lock()
                 .unwrap_or_else(|poison| poison.into_inner())
                 .get(self.binding_generation, sql)
-            {
-                return Ok(frame);
-            }
+        {
+            return Ok(frame);
         }
         let frame = self.plan_sql(sql).await?;
         if cacheable {

@@ -143,21 +143,23 @@ async fn unhydrated_proposals_expand_and_reconsider_before_binding() {
     assert_eq!(result.interpretation.work.context_expansions, 1);
     assert_eq!(result.interpretation.work.model_calls, 2);
     assert_eq!(result.interpretation.contexts.len(), 2);
-    let calls = calls.lock().unwrap();
-    assert!(!calls[0][1].content.contains("f900"));
-    assert!(calls[1][1].content.contains("f900"));
-    assert!(calls[1].last().unwrap().content.contains("Reconsider"));
+    let first_call_bytes = {
+        let calls = calls.lock().unwrap();
+        assert!(!calls[0][1].content.contains("f900"));
+        assert!(calls[1][1].content.contains("f900"));
+        assert!(calls[1].last().unwrap().content.contains("Reconsider"));
 
-    let first_call_bytes = calls[0]
-        .iter()
-        .map(|message| message.content.len())
-        .sum::<usize>();
-    let second_call_bytes = calls[1]
-        .iter()
-        .map(|message| message.content.len())
-        .sum::<usize>();
-    assert!(second_call_bytes > first_call_bytes);
-    drop(calls);
+        let first_call_bytes = calls[0]
+            .iter()
+            .map(|message| message.content.len())
+            .sum::<usize>();
+        let second_call_bytes = calls[1]
+            .iter()
+            .map(|message| message.content.len())
+            .sum::<usize>();
+        assert!(second_call_bytes > first_call_bytes);
+        first_call_bytes
+    };
     let (compiler, limited_calls) =
         make_compiler(vec![proposal("wide", "f900"), proposal("wide", "f900")]);
     let mut options = retrieved();
@@ -318,18 +320,20 @@ async fn repair_conversation_rechecks_the_complete_model_call_envelope() {
         .compile_typed(&engine, "rare_signal", retrieved())
         .await;
     assert!(matches!(result.outcome, TypedOutcome::Compiled { .. }));
-    let calls = calls.lock().unwrap();
-    assert_eq!(calls.len(), 2);
-    let first_call_bytes = calls[0]
-        .iter()
-        .map(|message| message.content.len())
-        .sum::<usize>();
-    let second_call_bytes = calls[1]
-        .iter()
-        .map(|message| message.content.len())
-        .sum::<usize>();
-    assert!(second_call_bytes > first_call_bytes);
-    drop(calls);
+    let first_call_bytes = {
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+        let first_call_bytes = calls[0]
+            .iter()
+            .map(|message| message.content.len())
+            .sum::<usize>();
+        let second_call_bytes = calls[1]
+            .iter()
+            .map(|message| message.content.len())
+            .sum::<usize>();
+        assert!(second_call_bytes > first_call_bytes);
+        first_call_bytes
+    };
 
     let (compiler, limited_calls) = make_compiler(replies);
     let mut options = retrieved();

@@ -10,6 +10,45 @@ use semantic_postgres::Postgres;
 mod fixture;
 #[tokio::test]
 #[ignore = "requires Docker"]
+async fn connector_integration_postgres_small_text_batches() {
+    let db = fixture::Database::start().await;
+    db.client.batch_execute(r#"
+        CREATE TABLE small_batches (id TEXT, label TEXT, notes TEXT, metadata JSONB, payload BYTEA, priority INTEGER);
+        INSERT INTO small_batches VALUES
+          ('one', NULL, '', '{"n":1}', decode('00ff', 'hex'), 2),
+          ('two', 'maintenance', 'a note', NULL, decode('', 'hex'), NULL);
+    "#).await.unwrap();
+    let pg = Postgres::new(&db.url, 1, 1).unwrap();
+    let table = pg.table("public", "small_batches").await.unwrap();
+    let mut engine = Engine::new();
+    engine
+        .register_table(Relation::base("items", table.schema(), "postgres"), table)
+        .unwrap();
+    let rows = engine
+        .query("SELECT * FROM items ORDER BY id")
+        .await
+        .unwrap();
+    let combined = datafusion::arrow::compute::concat_batches(&rows[0].schema(), &rows).unwrap();
+    assert_eq!(combined.num_rows(), 2);
+    assert_eq!(
+        ScalarValue::try_from_array(combined.column(0), 0).unwrap(),
+        ScalarValue::Utf8(Some("one".into()))
+    );
+    assert!(combined.column(1).is_null(0));
+    assert_eq!(
+        ScalarValue::try_from_array(combined.column(4), 0).unwrap(),
+        ScalarValue::Binary(Some(vec![0, 255]))
+    );
+    assert_eq!(
+        ScalarValue::try_from_array(combined.column(4), 1).unwrap(),
+        ScalarValue::Binary(Some(vec![]))
+    );
+    assert!(combined.column(3).is_null(1));
+    assert!(combined.column(5).is_null(1));
+}
+
+#[tokio::test]
+#[ignore = "requires Docker"]
 async fn connector_integration_postgres() {
     let db = fixture::Database::start().await;
     db.client.batch_execute(r#"

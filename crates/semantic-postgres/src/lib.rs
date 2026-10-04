@@ -330,9 +330,9 @@ fn batch(schema: &SchemaRef, rows: &[Row]) -> Result<RecordBatch> {
                                 .transpose()
                         })
                         .collect::<Result<Vec<_>>>()?;
-                    Arc::new(StringArray::from(values))
+                    Arc::new(codec::string_array(values))
                 }
-                DataType::Utf8 => Arc::new(StringArray::from(values!(String))),
+                DataType::Utf8 => Arc::new(codec::string_array(values!(String))),
                 DataType::Boolean => Arc::new(BooleanArray::from(values!(bool))),
                 DataType::Int16 => Arc::new(Int16Array::from(values!(i16))),
                 DataType::Int32 => Arc::new(Int32Array::from(values!(i32))),

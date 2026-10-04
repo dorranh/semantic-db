@@ -104,7 +104,7 @@ pub(super) fn plan(
         .fields()
         .iter()
         .enumerate()
-        .map(|(index, field)| col(&format!("column{}", index + 1)).alias(field.name()))
+        .map(|(index, field)| col(format!("column{}", index + 1)).alias(field.name()))
         .collect::<Vec<_>>();
     let relation = LogicalPlanBuilder::values(rows)?
         .project(projections)?

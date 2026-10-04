@@ -17,7 +17,7 @@ use semantic_engine::{Engine, QueryOptions};
 use semantic_interpreter::{
     Interpreter,
     provider::{Message, ModelProvider, ProviderError},
-    typed::{InterpretOptions, SelectionMode},
+    typed::InterpretOptions,
 };
 use semantic_plan::typed::*;
 use serde_json::json;

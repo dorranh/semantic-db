@@ -66,13 +66,15 @@ struct ComparisonOutput {
     alias: String,
 }
 
+type BoundOutputs<T> = (T, Vec<Slot>, Option<BTreeSet<String>>);
+
 pub(super) fn bind_slot_comparison(
     input: usize,
     source: &CheckedNode,
     passthrough: &[GraphProjection],
     comparisons: &[GraphSlotComparison],
     options: &CompileOptions,
-) -> Result<(SlotComparison, Vec<Slot>, Option<BTreeSet<String>>), CompileDiagnostic> {
+) -> Result<BoundOutputs<SlotComparison>, CompileDiagnostic> {
     if comparisons.is_empty()
         || passthrough.len().saturating_add(comparisons.len()) > options.max_nodes
     {
@@ -181,7 +183,7 @@ pub(super) fn bind_null_test(
     passthrough: &[GraphProjection],
     tests: &[GraphNullTest],
     options: &CompileOptions,
-) -> Result<(NullTest, Vec<Slot>, Option<BTreeSet<String>>), CompileDiagnostic> {
+) -> Result<BoundOutputs<NullTest>, CompileDiagnostic> {
     if tests.is_empty() || passthrough.len().saturating_add(tests.len()) > options.max_nodes {
         return Err(diagnostic(
             "graph_null_test",
@@ -262,7 +264,7 @@ pub(super) fn bind_cast(
     passthrough: &[GraphProjection],
     casts: &[GraphCast],
     options: &CompileOptions,
-) -> Result<(Cast, Vec<Slot>, Option<BTreeSet<String>>), CompileDiagnostic> {
+) -> Result<BoundOutputs<Cast>, CompileDiagnostic> {
     if casts.is_empty() || passthrough.len().saturating_add(casts.len()) > options.max_nodes {
         return Err(diagnostic(
             "graph_cast",
@@ -344,7 +346,7 @@ pub(super) fn bind_conditional(
     passthrough: &[GraphProjection],
     outputs: &[GraphConditional],
     options: &CompileOptions,
-) -> Result<(Conditional, Vec<Slot>, Option<BTreeSet<String>>), CompileDiagnostic> {
+) -> Result<BoundOutputs<Conditional>, CompileDiagnostic> {
     if outputs.is_empty() || passthrough.len().saturating_add(outputs.len()) > options.max_nodes {
         return Err(diagnostic(
             "graph_conditional",
@@ -426,7 +428,7 @@ pub(super) fn bind_calculation(
     passthrough: &[GraphProjection],
     ratios: &[GraphRatio],
     options: &CompileOptions,
-) -> Result<(Calculation, Vec<Slot>, Option<BTreeSet<String>>), CompileDiagnostic> {
+) -> Result<BoundOutputs<Calculation>, CompileDiagnostic> {
     if passthrough.len().saturating_add(ratios.len()) > options.max_nodes || ratios.is_empty() {
         return Err(diagnostic(
             "graph_calculation",

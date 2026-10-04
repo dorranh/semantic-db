@@ -73,7 +73,7 @@ if (mode === "setup" || mode === "reset") {
       if (e.code !== "ESRCH") throw e;
     }
   }
-  run("cargo", ["build", "-p", "semantic-cli", "--features", "github", "--locked"], root);
+  run("cargo", ["build", "-p", "example-github", "--bin", "sdb-github", "--locked"], root);
   process.title = processTitle;
   writeFileSync(".run/pid", String(process.pid));
   const children = [];
@@ -106,7 +106,7 @@ if (mode === "setup" || mode === "reset") {
       launch(process.execPath, ["fixtures/github.mjs"]);
       await wait("http://127.0.0.1:4010/health");
     }
-    launch(path.join(root, "target/debug/sdb"), [
+    launch(path.join(root, "target/debug/sdb-github"), [
       "server",
       "--project-config",
       process.env.SEMANTIC_LIVE ? "semantic-db.live.yaml" : "semantic-db.yaml",

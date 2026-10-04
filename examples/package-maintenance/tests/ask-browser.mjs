@@ -1,5 +1,5 @@
 // Standalone Ask check: scripted model, real Semantic DB and application, local CSVs.
-// Requires a built sdb, npm dependencies and agent-browser; port 3001 must be free.
+// Requires a built sdb-github, npm dependencies and agent-browser; port 3001 must be free.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -13,7 +13,7 @@ import { createServer as createViteServer } from "vite";
 import react from "@vitejs/plugin-react";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const binary = process.env.SEMANTIC_SERVER_BIN ?? resolve(root, "../../target/debug/sdb");
+const binary = process.env.SEMANTIC_SERVER_BIN ?? resolve(root, "../../target/debug/sdb-github");
 const session = `maintenance-ask-${process.pid}`;
 const browser = async (...args) => (await promisify(execFile)("agent-browser", ["--session", session, ...args], { timeout: 35000 })).stdout;
 const directory = await mkdtemp(join(tmpdir(), "maintenance-ask-"));

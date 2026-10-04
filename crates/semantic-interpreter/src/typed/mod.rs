@@ -1,4 +1,7 @@
 //! Model proposal, context selection, bounded repair, and interpretation history.
+// Match the compiler API, which returns its structured diagnostic by value.
+#![allow(clippy::result_large_err)]
+
 mod capture;
 mod context;
 mod context_manifest;

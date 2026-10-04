@@ -336,14 +336,14 @@ impl<V> AnalysisCache<V> {
             // identities have saturated the active-build admission limit.
             state.clock += 1;
             let used = state.clock;
-            if let Some(entry) = state.entries.get_mut(&identity) {
-                if entry.dependencies.matches(snapshot) {
-                    entry.used = used;
-                    let value = entry.value.clone();
-                    state.stats.hits += 1;
-                    state.stats.active_keys = state.active.len();
-                    return Ok(value);
-                }
+            if let Some(entry) = state.entries.get_mut(&identity)
+                && entry.dependencies.matches(snapshot)
+            {
+                entry.used = used;
+                let value = entry.value.clone();
+                state.stats.hits += 1;
+                state.stats.active_keys = state.active.len();
+                return Ok(value);
             }
             match state.active.get(&identity).and_then(Weak::upgrade) {
                 Some(lock) => lock,

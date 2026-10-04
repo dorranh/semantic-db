@@ -41,6 +41,14 @@ pub(crate) fn admitted_size(rows: &[Row]) -> Result<usize> {
     }
     Ok(size)
 }
+pub(crate) fn string_array(values: Vec<Option<String>>) -> StringArray {
+    // Arrow's FromIterator reserves 1024 data bytes even for one short value.
+    // Reserve the actual payload so small batches stay within decode admission.
+    let bytes = values.iter().flatten().map(String::len).sum();
+    let mut builder = StringBuilder::with_capacity(values.len(), bytes);
+    builder.extend(values);
+    builder.finish()
+}
 pub(crate) fn decimal_type(modifier: i32) -> Result<DataType> {
     if modifier < 0 {
         return Ok(DataType::Decimal128(38, 10));
@@ -170,12 +178,17 @@ pub(crate) fn extra_array(field: &Field, rows: &[Row], i: usize) -> Result<Array
             )
             .with_precision_and_scale(*p, *s)?,
         ),
-        DataType::Binary => Arc::new(BinaryArray::from_iter(
-            rows.iter()
+        DataType::Binary => {
+            let values = rows
+                .iter()
                 .map(|r| r.try_get::<_, Option<&[u8]>>(i))
                 .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(|_| bad())?,
-        )),
+                .map_err(|_| bad())?;
+            let bytes = values.iter().flatten().map(|value| value.len()).sum();
+            let mut builder = BinaryBuilder::with_capacity(values.len(), bytes);
+            builder.extend(values);
+            Arc::new(builder.finish())
+        }
         DataType::FixedSizeBinary(16) => {
             let mut builder = FixedSizeBinaryBuilder::with_capacity(rows.len(), 16);
             for r in rows {

@@ -1,5 +1,9 @@
 //! Opt-in typed row compiler. SQL compatibility compilation stays separate.
 //! Records are compiler-owned and available without a tracing subscriber/exporter.
+// Keep the structured diagnostic in the public Result type; boxing it would
+// change the compiler API solely to accommodate this size heuristic.
+#![allow(clippy::result_large_err)]
+
 mod bind;
 mod cache;
 pub use cache::{CompilationCacheOptions, CompilationCacheStats, CompilationSession};

@@ -129,10 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &PublicationLimits::default(),
     )?;
     let update_ms = millis(update_start);
-    let coherent_readers = tasks
-        .into_iter()
-        .map(|task| task.join().unwrap_or(false))
-        .all(|consistent| consistent);
+    let coherent_readers = tasks.into_iter().all(|task| task.join().unwrap_or(false));
     if !coherent_readers {
         return Err("a pinned catalog reader observed mixed generations".into());
     }

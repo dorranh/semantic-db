@@ -56,6 +56,9 @@ pub(super) struct BoundField {
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+// Operations retain their checked semantic state inline and are bounded by the
+// compilation node budget. Keep the representation consistent across variants.
+#[allow(clippy::large_enum_variant)]
 pub(super) enum BoundOperation {
     FilterOutput {
         stage: OutputFilterStage,
@@ -2479,9 +2482,7 @@ impl Binder<'_> {
                 DataType::Decimal128(38, 18),
                 weighted.zero != semantic_catalog::ZeroWeight::Zero,
             )
-        } else if exact_distinct {
-            (DataType::Int64, true)
-        } else if snapshot.is_some() {
+        } else if exact_distinct || snapshot.is_some() {
             (DataType::Int64, true)
         } else {
             aggregate_type(metric.function, field.as_ref(), metric.distinct)?
@@ -3376,17 +3377,15 @@ fn validate_utc_month_group(
         .as_ref()
         .and_then(|semantics| semantics.fields.get(field.field.name()))
         .and_then(|field| field.calendar_reference.as_ref())
-    {
-        if !matches!(
+        && (!matches!(
             &reference.system,
             semantic_catalog::CalendarSystem::Gregorian
-        ) || reference.timezone != "UTC"
-        {
-            return Err(diagnostic(
-                "calendar_reference",
-                "The authored calendar and timezone do not permit UTC Gregorian month grouping",
-            ));
-        }
+        ) || reference.timezone != "UTC")
+    {
+        return Err(diagnostic(
+            "calendar_reference",
+            "The authored calendar and timezone do not permit UTC Gregorian month grouping",
+        ));
     }
     if grain != CalendarUnit::Month || timezone != "UTC" {
         return Err(diagnostic(
