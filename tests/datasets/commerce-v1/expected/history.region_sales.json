@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "region",
+      "type": "utf8"
+    },
+    {
+      "name": "SUM(o.total_minor)",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "AT",
+      "-100"
+    ],
+    [
+      "CH",
+      "4000"
+    ],
+    [
+      "DE",
+      "4500"
+    ]
+  ]
+}

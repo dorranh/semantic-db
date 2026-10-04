@@ -457,3 +457,214 @@ async fn modeled_files_keep_observed_reads_without_transaction_capabilities() {
         );
     }
 }
+
+#[tokio::test]
+async fn csv_explicit_nonnullable_constraints_are_enforced_by_reader() {
+    let files = Files::new();
+    let path = files.config_connector(
+        "csv",
+        json!({"path":"items.csv","non_nullable_columns":["CODE"],"null_regex":r"^\\N$"}),
+    );
+    let project = Project::from_path(path).unwrap();
+    let loaded = project
+        .load(&Registry::standard(), &|_| None)
+        .await
+        .unwrap();
+    assert!(
+        !loaded
+            .engine
+            .catalog()
+            .relation("products")
+            .unwrap()
+            .schema
+            .field_with_name("code")
+            .unwrap()
+            .is_nullable()
+    );
+    assert_eq!(
+        loaded
+            .engine
+            .query("SELECT code FROM products")
+            .await
+            .unwrap()
+            .iter()
+            .map(|b| b.num_rows())
+            .sum::<usize>(),
+        2
+    );
+    // Source remains lazy: a later corrupt record must fail rather than merely advertising nonnull metadata.
+    files.write("items.csv", "CODE,qty\n\\N,2\n00456,3\n");
+    let error = loaded
+        .engine
+        .query("SELECT code FROM products")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("non-nullable") || error.contains("null"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn csv_nonnullable_names_are_validated_without_fabricating_columns() {
+    let files = Files::new();
+    for source in [
+        json!({"path":"items.csv","non_nullable_columns":["CODE","CODE"]}),
+        json!({"path":"items.parquet","non_nullable_columns":["CODE"]}),
+    ] {
+        let project = Project::from_path(files.config(source)).unwrap();
+        assert!(project.inspect(&Registry::standard()).is_err());
+    }
+    let project = Project::from_path(
+        files.config(json!({"path":"items.csv","non_nullable_columns":["missing"]})),
+    )
+    .unwrap();
+    assert!(
+        project
+            .load(&Registry::standard(), &|_| None)
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn csv_nonnullable_preflight_rejects_null_beyond_inference_before_count_optimization() {
+    let files = Files::new();
+    let mut valid = String::from("CODE,qty\n");
+    for index in 0..2048 {
+        valid.push_str(&format!("{index:05},2\n"));
+    }
+    for corrupt in ["\\N,3\n", "00456,\\N\n"] {
+        files.write("items.csv", &format!("{valid}{corrupt}"));
+        let project=Project::from_path(files.config_connector("csv",json!({"path":"items.csv","schema_infer_max_records":1,"non_nullable_columns":["CODE","qty"],"null_regex":r"^\\N$"}))).unwrap();
+        // No Engine is published: COUNT optimizations cannot hide either composite key component.
+        let error = project
+            .load(&Registry::standard(), &|_| None)
+            .await
+            .err()
+            .expect("nonnull preflight must reject corrupt source")
+            .to_string();
+        assert!(
+            error.contains("non-nullable") || error.contains("null"),
+            "{error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn csv_custom_null_token_keeps_empty_text_and_handles_compression_directories() {
+    use datafusion::arrow::array::{Array, StringArray};
+    use std::io::Write;
+    let files = Files::new();
+    files.write("items.csv", "CODE,qty\n\"\",2\n\\N,3\n\"\\N\",4\n");
+    let mut gzip = flate2::write::GzEncoder::new(
+        std::fs::File::create(files.0.join("custom.csv.gz")).unwrap(),
+        flate2::Compression::default(),
+    );
+    gzip.write_all(&std::fs::read(files.0.join("items.csv")).unwrap())
+        .unwrap();
+    gzip.finish().unwrap();
+    std::fs::create_dir(files.0.join("custom-directory")).unwrap();
+    std::fs::copy(
+        files.0.join("custom.csv.gz"),
+        files.0.join("custom-directory/part.csv.gz"),
+    )
+    .unwrap();
+    for path in ["items.csv", "custom.csv.gz", "custom-directory/"] {
+        let source = if path.ends_with('/') {
+            json!({"path":path,"format":"csv","compression":"gzip","extension":".csv.gz","null_regex":r"^\\N$"})
+        } else {
+            json!({"path":path,"null_regex":r"^\\N$"})
+        };
+        let project = Project::from_path(files.config(source)).unwrap();
+        let loaded = project
+            .load(&Registry::standard(), &|_| None)
+            .await
+            .unwrap();
+        let batches = loaded
+            .engine
+            .query("SELECT code FROM products ORDER BY qty")
+            .await
+            .unwrap();
+        let values = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(values.value(0), "", "{path}");
+        assert!(!values.is_null(0));
+        assert!(values.is_null(1), "{path}");
+        assert!(
+            values.is_null(2),
+            "quoted token follows Arrow null semantics: {path}"
+        );
+    }
+    files.write("inferred.csv", "CODE,qty\nvalue,1\n\"\",2\n\\N,3\n");
+    files.write("inferred-project.json",&json!({"connections":{"local":{"connector":"csv"}},"app_tables":{"raw":{"connection":"local","path":"inferred.csv","null_regex":r"^\\N$"}}}).to_string());
+    let project = Project::from_path(files.0.join("inferred-project.json")).unwrap();
+    let loaded = project
+        .load(&Registry::standard(), &|_| None)
+        .await
+        .unwrap();
+    let result = loaded
+        .engine
+        .query("SELECT \"CODE\" FROM raw ORDER BY qty")
+        .await
+        .unwrap();
+    let array = result[0]
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!(array.value(1), "");
+    assert!(!array.is_null(1));
+    assert!(array.is_null(2));
+    let invalid =
+        Project::from_path(files.config(json!({"path":"items.csv","null_regex":"["}))).unwrap();
+    assert!(invalid.inspect(&Registry::standard()).is_err());
+}
+
+#[tokio::test]
+async fn csv_null_adapter_honors_delimiter_quote_escape_and_header_options() {
+    use datafusion::arrow::array::{Array, StringArray};
+    let files = Files::new();
+    files.write("custom.csv", "CODE;qty\n'left\\'right';2\nNULL;3\n");
+    let project=Project::from_path(files.config(json!({"path":"custom.csv","delimiter":";","quote":"'","escape":"\\","null_regex":"^NULL$"}))).unwrap();
+    let loaded = project
+        .load(&Registry::standard(), &|_| None)
+        .await
+        .unwrap();
+    let batches = loaded
+        .engine
+        .query("SELECT code FROM products ORDER BY qty")
+        .await
+        .unwrap();
+    let array = batches[0]
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!(array.value(0), "left'right");
+    assert!(array.is_null(1));
+    // Header-less inference has generated physical names; direct app table loading checks that path.
+    files.write("headerless.csv", "alpha;2\nNULL;3\n");
+    files.write("headerless-project.json",&json!({"connections":{"local":{"connector":"csv"}},"app_tables":{"raw":{"connection":"local","path":"headerless.csv","has_header":false,"delimiter":";","null_regex":"^NULL$","physical_types":{"column_1":"Utf8","column_2":"Int64"}}}}).to_string());
+    let project = Project::from_path(files.0.join("headerless-project.json")).unwrap();
+    let loaded = project
+        .load(&Registry::standard(), &|_| None)
+        .await
+        .unwrap();
+    let result = loaded
+        .engine
+        .query("SELECT column_1 FROM raw ORDER BY column_2")
+        .await
+        .unwrap();
+    let array = result[0]
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!(array.value(0), "alpha");
+    assert!(array.is_null(1));
+}

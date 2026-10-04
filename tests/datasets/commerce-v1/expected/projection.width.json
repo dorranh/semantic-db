@@ -1,0 +1,24 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "customer_id",
+      "type": "int32"
+    },
+    {
+      "name": "tier",
+      "type": "int16"
+    },
+    {
+      "name": "vip",
+      "type": "boolean"
+    }
+  ],
+  "rows": [
+    [
+      "6",
+      "-1",
+      false
+    ]
+  ]
+}

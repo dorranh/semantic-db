@@ -1,0 +1,23 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "customer_id",
+      "type": "int32"
+    }
+  ],
+  "rows": [
+    [
+      "1"
+    ],
+    [
+      "3"
+    ],
+    [
+      "4"
+    ],
+    [
+      "5"
+    ]
+  ]
+}

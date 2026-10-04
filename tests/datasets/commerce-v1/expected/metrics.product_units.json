@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "units",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Tea",
+      "3"
+    ],
+    [
+      "Mug",
+      "4"
+    ],
+    [
+      "Book",
+      "1"
+    ]
+  ]
+}

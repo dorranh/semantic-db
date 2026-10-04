@@ -1,0 +1,35 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "subscription_id",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "Ada O'Brien"
+    ],
+    [
+      "2",
+      "Ada O'Brien"
+    ],
+    [
+      "3",
+      "Béatrice"
+    ],
+    [
+      "4",
+      "Chen"
+    ],
+    [
+      "5",
+      "Éva"
+    ]
+  ]
+}

@@ -14,6 +14,7 @@ use serde::Deserialize;
 mod config;
 mod init;
 mod repl;
+mod result_json;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -87,6 +88,10 @@ struct ReplArgs {
 #[derive(ClapArgs)]
 #[command(group(ArgGroup::new("input").args(["sql", "file"]).required(true)))]
 struct SqlArgs {
+    /// Emit lossless typed schema and rows as JSON.
+    #[arg(long, conflicts_with_all = ["plan", "explain", "read_report", "read_consistency", "read_cache"])]
+    output_json: bool,
+
     #[command(flatten)]
     project: ProjectOptions,
     #[command(flatten)]
@@ -127,6 +132,16 @@ enum TypedPresentation {
 
 #[derive(ClapArgs)]
 struct AskArgs {
+    /// Emit lossless typed schema and rows as JSON (typed modes only).
+    #[arg(long, conflicts_with_all = ["compile_only", "read_report", "read_consistency", "read_cache"])]
+    output_json: bool,
+    /// Fix the host request instant using RFC3339; requires --timezone.
+    #[arg(long, requires = "timezone")]
+    reference_time: Option<String>,
+    /// IANA timezone used with --reference-time.
+    #[arg(long, requires = "reference_time")]
+    timezone: Option<String>,
+
     /// Choose SQL compatibility or the deterministic typed compiler/context mode.
     #[arg(long, value_enum, default_value_t = CompilerMode::SqlCompatibility)]
     compiler_mode: CompilerMode,
@@ -486,6 +501,13 @@ async fn run_sql_command(args: SqlArgs, registry: Registry) -> Result<()> {
     }
     let mut engine = load_engine(path, registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
+    if args.output_json {
+        if write {
+            return Err("--output-json accepts read SQL only".into());
+        }
+        return print_json_execution(engine.execute(&sql, engine.query_options().clone()).await?)
+            .await;
+    }
     if write {
         run_write(
             &engine,
@@ -511,6 +533,37 @@ async fn run_ask_command(args: AskArgs, registry: Registry) -> Result<()> {
     let mut engine = load_engine(Some(path), registry).await?;
     set_timeout(&mut engine, args.query_timeout_seconds)?;
     let compiler = Interpreter::new(config::provider()?);
+    let request_context = match (&args.reference_time, &args.timezone) {
+        (Some(time), Some(timezone)) => {
+            let context = semantic_compiler::typed::RequestContext {
+                reference_unix_millis: chrono::DateTime::parse_from_rfc3339(time)?
+                    .timestamp_millis(),
+                timezone: timezone.clone(),
+                calendar: semantic_compiler::typed::Calendar::Gregorian,
+                origin: semantic_compiler::typed::ContextOrigin::Caller,
+            };
+            context.validate()?;
+            Some(context)
+        }
+        _ => None,
+    };
+    if args.output_json || request_context.is_some() {
+        if args.compiler_mode == CompilerMode::SqlCompatibility {
+            return Err(
+                "--output-json and host request context require a typed compiler mode".into(),
+            );
+        }
+        return run_typed_machine(
+            &engine,
+            &compiler,
+            &args.request,
+            args.compiler_mode,
+            request_context,
+            args.output_json,
+            args.compile_only,
+        )
+        .await;
+    }
     if args.compiler_mode != CompilerMode::SqlCompatibility {
         return run_typed_ask(
             &engine,
@@ -975,4 +1028,84 @@ async fn run_typed_ask(
         }
     }
     Ok(())
+}
+
+async fn print_json_execution(execution: semantic_engine::QueryExecution) -> Result<()> {
+    print_json_execution_with_record(execution, None).await
+}
+async fn print_json_execution_with_record(
+    execution: semantic_engine::QueryExecution,
+    compilation: Option<serde_json::Value>,
+) -> Result<()> {
+    let schema = execution.stream.schema();
+    let batches = execution.collect().await?;
+    let result =
+        result_json::result_from_batches(schema.as_ref(), &batches).map_err(|e| e.to_string())?;
+    let mut value = serde_json::to_value(result)?;
+    if let Some(record) = compilation {
+        value
+            .as_object_mut()
+            .ok_or("result JSON must be an object")?
+            .insert("compilation".into(), record);
+    }
+    println!("{}", serde_json::to_string(&value)?);
+    Ok(())
+}
+
+async fn run_typed_machine(
+    engine: &Engine,
+    compiler: &Interpreter<OpenAiProvider>,
+    request: &str,
+    mode: CompilerMode,
+    context: Option<semantic_compiler::typed::RequestContext>,
+    json: bool,
+    compile_only: bool,
+) -> Result<()> {
+    use semantic_compiler::typed::TypedOutcome;
+    use semantic_interpreter::typed::{InterpretOptions, SelectionMode};
+    let mut options = InterpretOptions::default();
+    options.request_context = context;
+    options.selection_mode = match mode {
+        CompilerMode::TypedAuto => SelectionMode::Auto,
+        CompilerMode::TypedFull => SelectionMode::Full,
+        CompilerMode::TypedRetrieved => SelectionMode::Retrieved,
+        CompilerMode::SqlCompatibility => unreachable!(),
+    };
+    let compilation = compiler.compile_typed(engine, request, options).await;
+    if compile_only {
+        println!("{}", serde_json::to_string_pretty(&compilation)?);
+        return Ok(());
+    }
+    let evidence = if json {
+        Some(serde_json::to_value(&compilation)?)
+    } else {
+        None
+    };
+    let execution = match compilation.outcome {
+        TypedOutcome::Compiled { query } => {
+            query
+                .execute(engine, engine.query_options().clone())
+                .await?
+        }
+        TypedOutcome::CompiledGraph { query } => {
+            query
+                .execute(engine, engine.query_options().clone())
+                .await?
+        }
+        other => {
+            println!("{}", serde_json::to_string(&other)?);
+            return Err("typed Ask did not produce an executable result".into());
+        }
+    };
+    if json {
+        print_json_execution_with_record(execution, evidence).await
+    } else {
+        let batches = execution.collect().await?;
+        println!("{}", pretty_format_batches(&batches)?);
+        println!(
+            "{} row(s)",
+            batches.iter().map(|b| b.num_rows()).sum::<usize>()
+        );
+        Ok(())
+    }
 }

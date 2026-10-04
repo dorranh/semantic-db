@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "net_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Tea",
+      "2800"
+    ],
+    [
+      "Mug",
+      "5000"
+    ],
+    [
+      "Book",
+      "2000"
+    ]
+  ]
+}

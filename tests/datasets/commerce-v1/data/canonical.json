@@ -1,0 +1,529 @@
+{
+  "customers": [
+    {
+      "customer_id": 1,
+      "name": "Ada O'Brien",
+      "region": "CH",
+      "vip": true,
+      "note": "",
+      "tier": 2
+    },
+    {
+      "customer_id": 2,
+      "name": "Béatrice",
+      "region": "FR",
+      "vip": false,
+      "note": null,
+      "tier": 1
+    },
+    {
+      "customer_id": 3,
+      "name": "Chen",
+      "region": "CH",
+      "vip": true,
+      "note": "loyal",
+      "tier": 2
+    },
+    {
+      "customer_id": 4,
+      "name": "Dario",
+      "region": "DE",
+      "vip": false,
+      "note": "",
+      "tier": 0
+    },
+    {
+      "customer_id": 5,
+      "name": "Éva",
+      "region": "AT",
+      "vip": false,
+      "note": null,
+      "tier": 1
+    },
+    {
+      "customer_id": 6,
+      "name": "No orders",
+      "region": "CH",
+      "vip": false,
+      "note": "prospect",
+      "tier": -1
+    }
+  ],
+  "products": [
+    {
+      "product_id": 10,
+      "name": "Tea",
+      "category": "grocery",
+      "weight_kg": 0.25,
+      "rating": 4.5,
+      "list_price": "10.00"
+    },
+    {
+      "product_id": 20,
+      "name": "Mug",
+      "category": "home",
+      "weight_kg": 0.5,
+      "rating": 4.5,
+      "list_price": "15.00"
+    },
+    {
+      "product_id": 30,
+      "name": "Book",
+      "category": "books",
+      "weight_kg": 0.75,
+      "rating": 4.75,
+      "list_price": "20.00"
+    },
+    {
+      "product_id": 40,
+      "name": "Unused",
+      "category": "home",
+      "weight_kg": 0.0,
+      "rating": 3.0,
+      "list_price": "0.00"
+    }
+  ],
+  "exchange_rates": [
+    {
+      "currency": "EUR",
+      "rate_date": "2024-02-29",
+      "chf_per_unit": "0.950050"
+    },
+    {
+      "currency": "USD",
+      "rate_date": "2024-02-29",
+      "chf_per_unit": "0.900000"
+    },
+    {
+      "currency": "CHF",
+      "rate_date": "2024-02-29",
+      "chf_per_unit": "1.000000"
+    }
+  ],
+  "business_calendar": [
+    {
+      "calendar_date": "2023-12-31",
+      "month_key": "2023-12",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 3,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-01-01",
+      "month_key": "2024-01",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-02-28",
+      "month_key": "2024-02",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-02-29",
+      "month_key": "2024-02",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": false
+    },
+    {
+      "calendar_date": "2024-03-01",
+      "month_key": "2024-03",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-03-30",
+      "month_key": "2024-03",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-03-31",
+      "month_key": "2024-03",
+      "fiscal_year": 2023,
+      "fiscal_quarter": 4,
+      "business_day": false
+    },
+    {
+      "calendar_date": "2024-04-01",
+      "month_key": "2024-04",
+      "fiscal_year": 2024,
+      "fiscal_quarter": 1,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-05-01",
+      "month_key": "2024-05",
+      "fiscal_year": 2024,
+      "fiscal_quarter": 1,
+      "business_day": true
+    },
+    {
+      "calendar_date": "2024-10-27",
+      "month_key": "2024-10",
+      "fiscal_year": 2024,
+      "fiscal_quarter": 3,
+      "business_day": true
+    }
+  ],
+  "orders": [
+    {
+      "order_id": 101,
+      "billing_customer_id": 1,
+      "shipping_customer_id": 2,
+      "status": "completed",
+      "order_date": "2023-12-31",
+      "placed_at": "2023-12-31T22:59:59.123456Z",
+      "local_placed_at": "2023-12-31T23:59:59.123456",
+      "pickup_time": "09:30:00.123456",
+      "total_minor": 2500,
+      "tax_amount": "1.25",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 102,
+      "billing_customer_id": 1,
+      "shipping_customer_id": 1,
+      "status": "completed",
+      "order_date": "2024-01-01",
+      "placed_at": "2023-12-31T23:00:00.000000Z",
+      "local_placed_at": "2024-01-01T00:00:00.000000",
+      "pickup_time": "10:00:00.000000",
+      "total_minor": 2000,
+      "tax_amount": "1.00",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 103,
+      "billing_customer_id": 2,
+      "shipping_customer_id": 3,
+      "status": "cancelled",
+      "order_date": "2024-02-28",
+      "placed_at": "2024-02-28T12:00:00.000000Z",
+      "local_placed_at": "2024-02-28T13:00:00.000000",
+      "pickup_time": "11:00:00.000000",
+      "total_minor": 900,
+      "tax_amount": "0.45",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 104,
+      "billing_customer_id": 3,
+      "shipping_customer_id": 1,
+      "status": "completed",
+      "order_date": "2024-02-29",
+      "placed_at": "2024-02-29T12:00:00.000001Z",
+      "local_placed_at": "2024-02-29T13:00:00.000001",
+      "pickup_time": "12:00:00.000000",
+      "total_minor": 3000,
+      "tax_amount": "1.50",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 105,
+      "billing_customer_id": 2,
+      "shipping_customer_id": null,
+      "status": "pending",
+      "order_date": "2024-03-01",
+      "placed_at": "2024-03-01T12:00:00.000000Z",
+      "local_placed_at": "2024-03-01T13:00:00.000000",
+      "pickup_time": "13:00:00.000000",
+      "total_minor": 0,
+      "tax_amount": "0.00",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 106,
+      "billing_customer_id": 4,
+      "shipping_customer_id": 2,
+      "status": "completed",
+      "order_date": "2024-03-31",
+      "placed_at": "2024-03-31T00:30:00.000000Z",
+      "local_placed_at": "2024-03-31T01:30:00.000000",
+      "pickup_time": "01:30:00.000000",
+      "total_minor": 2000,
+      "tax_amount": "1.00",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 107,
+      "billing_customer_id": 1,
+      "shipping_customer_id": 4,
+      "status": "completed",
+      "order_date": "2024-03-31",
+      "placed_at": "2024-03-31T01:30:00.000000Z",
+      "local_placed_at": "2024-03-31T03:30:00.000000",
+      "pickup_time": "03:30:00.000000",
+      "total_minor": 1500,
+      "tax_amount": "0.75",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 108,
+      "billing_customer_id": 5,
+      "shipping_customer_id": 5,
+      "status": "completed",
+      "order_date": "2024-04-01",
+      "placed_at": "2024-03-31T22:00:00.000000Z",
+      "local_placed_at": "2024-04-01T00:00:00.000000",
+      "pickup_time": "00:00:00.000000",
+      "total_minor": -100,
+      "tax_amount": "-0.05",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 109,
+      "billing_customer_id": 99,
+      "shipping_customer_id": 1,
+      "status": "completed",
+      "order_date": "2024-10-27",
+      "placed_at": "2024-10-27T00:30:00.000000Z",
+      "local_placed_at": "2024-10-27T02:30:00.000000",
+      "pickup_time": "02:30:00.000000",
+      "total_minor": 500,
+      "tax_amount": "0.25",
+      "currency": "CHF"
+    },
+    {
+      "order_id": 110,
+      "billing_customer_id": 3,
+      "shipping_customer_id": 3,
+      "status": "completed",
+      "order_date": "2024-10-27",
+      "placed_at": "2024-10-27T01:30:00.000000Z",
+      "local_placed_at": "2024-10-27T02:30:00.000000",
+      "pickup_time": "02:30:00.000000",
+      "total_minor": 500,
+      "tax_amount": "0.25",
+      "currency": "CHF"
+    }
+  ],
+  "order_items": [
+    {
+      "order_id": 101,
+      "line_no": 1,
+      "product_id": 10,
+      "quantity": 1,
+      "line_minor": 1000
+    },
+    {
+      "order_id": 101,
+      "line_no": 2,
+      "product_id": 20,
+      "quantity": 1,
+      "line_minor": 1500
+    },
+    {
+      "order_id": 102,
+      "line_no": 1,
+      "product_id": 10,
+      "quantity": 2,
+      "line_minor": 2000
+    },
+    {
+      "order_id": 103,
+      "line_no": 1,
+      "product_id": 10,
+      "quantity": 1,
+      "line_minor": 900
+    },
+    {
+      "order_id": 104,
+      "line_no": 1,
+      "product_id": 20,
+      "quantity": 2,
+      "line_minor": 3000
+    },
+    {
+      "order_id": 105,
+      "line_no": 1,
+      "product_id": 30,
+      "quantity": 0,
+      "line_minor": 0
+    },
+    {
+      "order_id": 106,
+      "line_no": 1,
+      "product_id": 30,
+      "quantity": 1,
+      "line_minor": 2000
+    },
+    {
+      "order_id": 107,
+      "line_no": 1,
+      "product_id": 20,
+      "quantity": 1,
+      "line_minor": 1500
+    },
+    {
+      "order_id": 108,
+      "line_no": 1,
+      "product_id": 10,
+      "quantity": -1,
+      "line_minor": -100
+    },
+    {
+      "order_id": 109,
+      "line_no": 1,
+      "product_id": 999,
+      "quantity": 1,
+      "line_minor": 500
+    },
+    {
+      "order_id": 110,
+      "line_no": 1,
+      "product_id": 10,
+      "quantity": 1,
+      "line_minor": 500
+    }
+  ],
+  "refunds": [
+    {
+      "refund_id": 1,
+      "order_id": 101,
+      "line_no": 1,
+      "refund_minor": 200,
+      "refund_date": "2024-01-01"
+    },
+    {
+      "refund_id": 2,
+      "order_id": 101,
+      "line_no": 1,
+      "refund_minor": 300,
+      "refund_date": "2024-02-29"
+    },
+    {
+      "refund_id": 3,
+      "order_id": 104,
+      "line_no": 1,
+      "refund_minor": 1000,
+      "refund_date": "2024-03-01"
+    },
+    {
+      "refund_id": 4,
+      "order_id": 106,
+      "line_no": 1,
+      "refund_minor": 0,
+      "refund_date": "2024-03-31"
+    },
+    {
+      "refund_id": 5,
+      "order_id": 110,
+      "line_no": 1,
+      "refund_minor": 100,
+      "refund_date": "2024-10-27"
+    }
+  ],
+  "subscriptions": [
+    {
+      "subscription_id": 1,
+      "customer_id": 1,
+      "start_date": "2024-01-01",
+      "end_date": null,
+      "monthly_minor": 1200,
+      "status": "active"
+    },
+    {
+      "subscription_id": 2,
+      "customer_id": 1,
+      "start_date": "2024-02-01",
+      "end_date": "2024-04-01",
+      "monthly_minor": 800,
+      "status": "active"
+    },
+    {
+      "subscription_id": 3,
+      "customer_id": 2,
+      "start_date": "2024-01-01",
+      "end_date": null,
+      "monthly_minor": 1000,
+      "status": "paused"
+    },
+    {
+      "subscription_id": 4,
+      "customer_id": 3,
+      "start_date": "2024-03-01",
+      "end_date": null,
+      "monthly_minor": 0,
+      "status": "active"
+    },
+    {
+      "subscription_id": 5,
+      "customer_id": 5,
+      "start_date": "2024-04-01",
+      "end_date": null,
+      "monthly_minor": 1500,
+      "status": "active"
+    }
+  ],
+  "customer_region_history": [
+    {
+      "customer_id": 1,
+      "valid_from": "2020-01-01",
+      "valid_to": "2024-01-01",
+      "region": "DE"
+    },
+    {
+      "customer_id": 1,
+      "valid_from": "2024-01-01",
+      "valid_to": null,
+      "region": "CH"
+    },
+    {
+      "customer_id": 2,
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "region": "FR"
+    },
+    {
+      "customer_id": 3,
+      "valid_from": "2024-03-01",
+      "valid_to": null,
+      "region": "CH"
+    },
+    {
+      "customer_id": 4,
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "region": "DE"
+    },
+    {
+      "customer_id": 5,
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "region": "AT"
+    }
+  ],
+  "exchange_rates_duplicate": [
+    {
+      "currency": "EUR",
+      "rate_date": "2024-02-29",
+      "chf_per_unit": "0.950000"
+    },
+    {
+      "currency": "EUR",
+      "rate_date": "2024-02-29",
+      "chf_per_unit": "0.960000"
+    }
+  ],
+  "customer_region_history_overlap": [
+    {
+      "customer_id": 1,
+      "valid_from": "2020-01-01",
+      "valid_to": "2024-02-01",
+      "region": "DE"
+    },
+    {
+      "customer_id": 1,
+      "valid_from": "2024-01-01",
+      "valid_to": null,
+      "region": "CH"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 //! Local DataFusion readers. Model guidance changes parsing, never casts parsed data.
+mod csv;
 mod json;
 use super::*;
 use datafusion::common::GetExt;
@@ -10,6 +11,7 @@ use datafusion::{
         AvroReadOptions, CsvReadOptions, JsonReadOptions, ParquetReadOptions, SessionContext,
     },
 };
+use futures::StreamExt;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -63,6 +65,9 @@ struct FileOptions {
     /// Arrow serde types, only needed for physical details absent from Ossie (e.g. decimal scale).
     #[serde(default)]
     physical_types: BTreeMap<String, DataType>,
+    /// Explicit CSV constraints, enforced by the decoder when building Arrow batches.
+    #[serde(default)]
+    non_nullable_columns: Vec<String>,
 }
 
 fn err(message: impl Into<String>) -> SourceError {
@@ -129,6 +134,27 @@ impl FileOptions {
         let format = fixed.or(self.format).or(inferred_format).ok_or_else(|| {
             err("cannot infer file format; set format for directories or extensionless files")
         })?;
+        if !self.non_nullable_columns.is_empty() {
+            if format != FileFormat::Csv {
+                return Err(err("non_nullable_columns applies only to CSV"));
+            }
+            let unique: BTreeSet<_> = self.non_nullable_columns.iter().collect();
+            if unique.len() != self.non_nullable_columns.len()
+                || unique.iter().any(|name| name.trim().is_empty())
+            {
+                return Err(err(
+                    "non_nullable_columns must contain unique nonempty physical names",
+                ));
+            }
+        }
+        if let Some(pattern) = &self.null_regex {
+            let _ = datafusion::arrow::csv::ReaderBuilder::new(Arc::new(Schema::empty()))
+                .with_null_regex(
+                    pattern
+                        .parse()
+                        .map_err(|_| err("CSV null_regex must be a valid regular expression"))?,
+                );
+        }
         let compression = self
             .compression
             .as_deref()
@@ -418,11 +444,19 @@ impl SourceConnection for FileConnection {
                     .await?
                 }
             };
-            if options.physical_types.is_empty() && format != FileFormat::Json {
+            if options.physical_types.is_empty()
+                && options.non_nullable_columns.is_empty()
+                && options.null_regex.is_none()
+                && format != FileFormat::Json
+            {
                 return Ok(inferred.into_view());
             }
             let schema = inferred.schema().as_arrow();
-            for name in options.physical_types.keys() {
+            for name in options
+                .physical_types
+                .keys()
+                .chain(options.non_nullable_columns.iter())
+            {
                 if schema.field_with_name(name).is_err() {
                     return Err(err(format!(
                         "declared physical column {name:?} is missing from the file schema"
@@ -432,15 +466,52 @@ impl SourceConnection for FileConnection {
             let fields = schema
                 .fields()
                 .iter()
-                .map(|field| match options.physical_types.get(field.name()) {
-                    Some(datatype) => {
-                        Field::new(field.name(), datatype.clone(), field.is_nullable())
-                            .with_metadata(field.metadata().clone())
-                    }
-                    None => field.as_ref().clone(),
+                .map(|field| {
+                    let datatype = options
+                        .physical_types
+                        .get(field.name())
+                        .unwrap_or(field.data_type())
+                        .clone();
+                    let nullable =
+                        field.is_nullable() && !options.non_nullable_columns.contains(field.name());
+                    Field::new(field.name(), datatype, nullable)
+                        .with_metadata(field.metadata().clone())
                 })
                 .collect::<Vec<_>>();
             let schema = Schema::new_with_metadata(fields, schema.metadata().clone());
+            if format == FileFormat::Csv
+                && (options.null_regex.is_some() || !options.non_nullable_columns.is_empty())
+            {
+                let provider = csv::table(
+                    Path::new(path),
+                    &extension,
+                    Arc::new(schema),
+                    compression,
+                    csv::Options {
+                        header: csv.has_header,
+                        delimiter: csv.delimiter,
+                        quote: csv.quote,
+                        escape: csv.escape,
+                        null_regex: options.null_regex.clone(),
+                    },
+                )?;
+                if !options.non_nullable_columns.is_empty() {
+                    let constrained = options
+                        .non_nullable_columns
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>();
+                    let mut batches = ctx
+                        .read_table(provider.clone())?
+                        .select_columns(&constrained)?
+                        .execute_stream()
+                        .await?;
+                    while let Some(batch) = batches.next().await {
+                        batch?;
+                    }
+                }
+                return Ok(provider);
+            }
             // Reopen with the guided schema: no values are taken from the inferred frame.
             let frame = match format {
                 FileFormat::Csv => ctx.read_csv(path, csv.schema(&schema)).await?,
@@ -454,6 +525,23 @@ impl SourceConnection for FileConnection {
                 }
                 _ => unreachable!("physical overrides rejected for embedded schemas"),
             };
+            if !options.non_nullable_columns.is_empty() {
+                // Opt-in invariant validation must finish before the importer trusts metadata.
+                // Stream only constrained columns; COUNT optimizations cannot elide this scan.
+                let constrained = options
+                    .non_nullable_columns
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                let mut batches = frame
+                    .clone()
+                    .select_columns(&constrained)?
+                    .execute_stream()
+                    .await?;
+                while let Some(batch) = batches.next().await {
+                    batch?;
+                }
+            }
             Ok(frame.into_view())
         })
     }

@@ -1,0 +1,35 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "sent_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Ada O'Brien",
+      "5500"
+    ],
+    [
+      "Béatrice",
+      "4500"
+    ],
+    [
+      "Chen",
+      "500"
+    ],
+    [
+      "Dario",
+      "1500"
+    ],
+    [
+      "Éva",
+      "-100"
+    ]
+  ]
+}

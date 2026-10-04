@@ -1,0 +1,2 @@
+# Preserve authored fixture bytes and recognize CSV CRLF line endings.
+tests/datasets/commerce-v1/data/*.csv -text whitespace=cr-at-eol

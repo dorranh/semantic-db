@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "cents",
+      "type": "int64"
+    },
+    {
+      "name": "positive_count",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "1600",
+      "4"
+    ]
+  ]
+}

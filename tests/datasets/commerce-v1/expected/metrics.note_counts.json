@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "customers",
+      "type": "int64"
+    },
+    {
+      "name": "known_notes",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "6",
+      "4"
+    ]
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "customer_id",
+      "type": "int32"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "Ada O'Brien"
+    ],
+    [
+      "3",
+      "Chen"
+    ]
+  ]
+}

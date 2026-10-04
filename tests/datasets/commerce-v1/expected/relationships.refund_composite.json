@@ -1,0 +1,35 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "refund_id",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "Tea"
+    ],
+    [
+      "2",
+      "Tea"
+    ],
+    [
+      "3",
+      "Mug"
+    ],
+    [
+      "4",
+      "Book"
+    ],
+    [
+      "5",
+      "Tea"
+    ]
+  ]
+}

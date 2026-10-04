@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "kilograms",
+      "type": "float64"
+    }
+  ],
+  "rows": [
+    [
+      3.75
+    ]
+  ]
+}

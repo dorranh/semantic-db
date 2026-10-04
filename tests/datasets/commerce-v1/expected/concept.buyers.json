@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "buyer_id",
+      "type": "int32"
+    },
+    {
+      "name": "buyer_name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "Ada O'Brien"
+    ],
+    [
+      "3",
+      "Chen"
+    ],
+    [
+      "6",
+      "No orders"
+    ]
+  ]
+}

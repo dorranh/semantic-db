@@ -1,0 +1,23 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "line_no",
+      "type": "int16"
+    },
+    {
+      "name": "allocated_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "800"
+    ],
+    [
+      "2",
+      "1200"
+    ]
+  ]
+}

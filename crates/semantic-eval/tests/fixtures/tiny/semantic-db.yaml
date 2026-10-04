@@ -1,0 +1,9 @@
+app_tables:
+  samples:
+    connection: local
+    path: samples.csv
+    physical_types:
+      id: Int64
+connections:
+  local:
+    connector: csv

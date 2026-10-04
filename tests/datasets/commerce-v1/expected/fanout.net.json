@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "net_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "10300"
+    ]
+  ]
+}

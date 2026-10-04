@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "int32"
+    }
+  ],
+  "rows": [
+    [
+      "40"
+    ]
+  ]
+}

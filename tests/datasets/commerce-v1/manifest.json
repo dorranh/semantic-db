@@ -1,0 +1,84 @@
+{
+  "format_version": 1,
+  "id": "commerce-v1",
+  "version": "1.0.0",
+  "project": "semantic-db.yaml",
+  "cases": "cases.json",
+  "required_paired_cases": 100,
+  "required_companion_cases": 15,
+  "public_cases": [
+    "projection.empty",
+    "roles.billing",
+    "calendar.previous_month"
+  ],
+  "context": {
+    "reference_time": "2024-04-01T00:00:00Z",
+    "timezone": "Europe/Zurich"
+  },
+  "environment": {
+    "compose_files": [
+      "compose.yaml"
+    ],
+    "services": [
+      "postgres"
+    ],
+    "bootstrap_service": "bootstrap",
+    "startup_timeout_seconds": 120,
+    "bootstrap_timeout_seconds": 120,
+    "bindings": {
+      "EVAL_DATABASE_URL": {
+        "service": "postgres",
+        "port": 5432,
+        "template": "postgres://commerce:commerce@{host}:{port}/commerce?sslmode=disable"
+      }
+    }
+  },
+  "schemas": "schemas.json",
+  "canonical_data": "data/canonical.json",
+  "fixtures": [
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM customers",
+      "expected": "expected/fixture-customers.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM products",
+      "expected": "expected/fixture-products.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM exchange_rates",
+      "expected": "expected/fixture-exchange_rates.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM business_calendar",
+      "expected": "expected/fixture-business_calendar.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM orders",
+      "expected": "expected/fixture-orders.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM order_items",
+      "expected": "expected/fixture-order_items.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM refunds",
+      "expected": "expected/fixture-refunds.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM subscriptions",
+      "expected": "expected/fixture-subscriptions.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM customer_region_history",
+      "expected": "expected/fixture-customer_region_history.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM exchange_rates_duplicate",
+      "expected": "expected/fixture-exchange_rates_duplicate.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM customer_region_history_overlap",
+      "expected": "expected/fixture-customer_region_history_overlap.json"
+    }
+  ]
+}

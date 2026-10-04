@@ -19,6 +19,7 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
+semantic-eval = { path = "crates/semantic-eval" }
 semantic-db = { path = "crates/semantic-db", default-features = false }
 semantic-cli = { path = "apps/semantic-cli" }
 semantic-materialization = { path = "crates/semantic-materialization" }

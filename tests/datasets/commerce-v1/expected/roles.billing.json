@@ -1,0 +1,43 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "101",
+      "Ada O'Brien"
+    ],
+    [
+      "102",
+      "Ada O'Brien"
+    ],
+    [
+      "104",
+      "Chen"
+    ],
+    [
+      "106",
+      "Dario"
+    ],
+    [
+      "107",
+      "Ada O'Brien"
+    ],
+    [
+      "108",
+      "Éva"
+    ],
+    [
+      "110",
+      "Chen"
+    ]
+  ]
+}

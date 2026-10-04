@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "line_no",
+      "type": "int16"
+    },
+    {
+      "name": "line_minor",
+      "type": "int64"
+    },
+    {
+      "name": "refunded",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "1000",
+      "500"
+    ],
+    [
+      "2",
+      "1500",
+      "0"
+    ]
+  ]
+}

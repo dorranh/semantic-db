@@ -1,0 +1,1 @@
+[{"id":"duplicates","question":"List all sample IDs in ascending order, retaining duplicates.","sql":"SELECT id FROM samples ORDER BY id","expected":"expected/duplicates.json","comparison":{"ordered":true}}]

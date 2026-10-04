@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "weighted_price",
+      "type": "decimal128(18,6)"
+    }
+  ],
+  "rows": [
+    [
+      "Tea",
+      "1133.333333"
+    ],
+    [
+      "Mug",
+      "1500.000000"
+    ],
+    [
+      "Book",
+      "2000.000000"
+    ]
+  ]
+}

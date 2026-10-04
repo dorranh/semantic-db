@@ -202,3 +202,41 @@ fn sql_dispatch_rejects_mutations_without_a_write_binding_and_multiple_statement
     assert_eq!(std::fs::read(dir.join("data/items.csv")).unwrap(), before);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn sql_json_preserves_empty_schema_and_lossless_integer() {
+    let output = run(&[
+        "sql",
+        "--no-project",
+        "--output-json",
+        "SELECT CAST(9007199254740993 AS BIGINT) AS precise",
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["columns"][0]["type"], "int64");
+    assert_eq!(value["rows"][0][0], "9007199254740993");
+    let empty = run(&[
+        "sql",
+        "--no-project",
+        "--output-json",
+        "SELECT CAST(1 AS BIGINT) AS precise WHERE false",
+    ]);
+    assert!(empty.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&empty.stdout).unwrap();
+    assert_eq!(value["columns"][0]["type"], "int64");
+    assert_eq!(value["rows"], serde_json::json!([]));
+}
+
+#[test]
+fn sql_json_preserves_unsigned_window_output() {
+    let output = run(&[
+        "sql",
+        "--no-project",
+        "--output-json",
+        "SELECT ROW_NUMBER() OVER (ORDER BY id) AS rank FROM (VALUES (1),(2)) AS t(id)",
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["columns"][0]["type"], "uint64");
+    assert_eq!(value["rows"], serde_json::json!([["1"], ["2"]]));
+}

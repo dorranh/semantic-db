@@ -1,0 +1,2596 @@
+[
+  {
+    "id": "projection.vip",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "List VIP customer IDs then names, ascending customer ID.",
+    "sql": "SELECT customer_id,name FROM customers WHERE vip = true ORDER BY customer_id",
+    "expected": "expected/projection.vip.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Customers 1 and 3 are VIP; customer 2 is not."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Customers 1 and 3 are VIP; customer 2 is not.",
+    "distinguishing_rows": [
+      "Customers 1 and 3 are VIP; customer 2 is not."
+    ]
+  },
+  {
+    "id": "projection.empty",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Which customers have an explicitly empty note? Return IDs ascending.",
+    "sql": "SELECT customer_id FROM customers WHERE note = '' ORDER BY customer_id",
+    "expected": "expected/projection.empty.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Customers 1 and 4 empty; 2 and 5 null."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Customers 1 and 4 empty; 2 and 5 null.",
+    "distinguishing_rows": [
+      "Customers 1 and 4 empty; 2 and 5 null."
+    ]
+  },
+  {
+    "id": "projection.null",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Which customers have unknown notes? Return IDs ascending.",
+    "sql": "SELECT customer_id FROM customers WHERE note IS NULL ORDER BY customer_id",
+    "expected": "expected/projection.null.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Customers 2 and 5 null, distinct from empty."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Customers 2 and 5 null, distinct from empty.",
+    "distinguishing_rows": [
+      "Customers 2 and 5 null, distinct from empty."
+    ]
+  },
+  {
+    "id": "roles.billing",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "For completed orders, list order ID then billed buyer name; omit unmatched buyers and sort by order ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' ORDER BY o.order_id",
+    "expected": "expected/roles.billing.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 bills Ada but ships Béatrice; 109 has unmatched billing ID 99."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 bills Ada but ships Béatrice; 109 has unmatched billing ID 99.",
+    "distinguishing_rows": [
+      "101 bills Ada but ships Béatrice; 109 has unmatched billing ID 99."
+    ]
+  },
+  {
+    "id": "roles.shipping",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List every order ID then recipient name, retaining unknown recipients, by order ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o LEFT JOIN customers c ON o.shipping_customer_id=c.customer_id ORDER BY o.order_id",
+    "expected": "expected/roles.shipping.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 ships Béatrice not Ada;105 unknown recipient;109 recipient Ada despite unmatched payer."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 ships Béatrice not Ada;105 unknown recipient;109 recipient Ada despite unmatched payer.",
+    "distinguishing_rows": [
+      "101 ships Béatrice not Ada;105 unknown recipient;109 recipient Ada despite unmatched payer."
+    ]
+  },
+  {
+    "id": "metrics.gross",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "What is gross completed sales in exact CHF cents?",
+    "sql": "SELECT SUM(total_minor) AS gross_minor FROM orders WHERE status='completed'",
+    "expected": "expected/metrics.gross.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 2500,102 2000,104 3000,106 2000,107 1500,108 -100,109 500,110 500; sum 11900."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 2500,102 2000,104 3000,106 2000,107 1500,108 -100,109 500,110 500; sum 11900.",
+    "distinguishing_rows": [
+      "101 2500,102 2000,104 3000,106 2000,107 1500,108 -100,109 500,110 500; sum 11900."
+    ]
+  },
+  {
+    "id": "relationships.products",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List order ID, line number, then product name for every line; keep unknown products and sort by order then line.",
+    "sql": "SELECT i.order_id,i.line_no,p.name FROM order_items i LEFT JOIN products p ON i.product_id=p.product_id ORDER BY i.order_id,i.line_no",
+    "expected": "expected/relationships.products.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "109 product 999 unmatched;101 has two different product lines."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 109 product 999 unmatched;101 has two different product lines.",
+    "distinguishing_rows": [
+      "109 product 999 unmatched;101 has two different product lines."
+    ]
+  },
+  {
+    "id": "absence.buyers",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "Which customer IDs and names have no billed orders of any status? Sort by ID.",
+    "sql": "SELECT c.customer_id,c.name FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.billing_customer_id=c.customer_id) ORDER BY c.customer_id",
+    "expected": "expected/absence.buyers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Customer 6 never ordered;2 only cancelled/pending but still has orders."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Customer 6 never ordered;2 only cancelled/pending but still has orders.",
+    "distinguishing_rows": [
+      "Customer 6 never ordered;2 only cancelled/pending but still has orders."
+    ]
+  },
+  {
+    "id": "fanout.net",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts"
+    ],
+    "question": "What are completed gross sales minus all refunds linked to completed orders, in CHF cents?",
+    "sql": "SELECT (SELECT SUM(total_minor) FROM orders WHERE status='completed')-(SELECT SUM(r.refund_minor) FROM refunds r JOIN orders o ON r.order_id=o.order_id WHERE o.status='completed') AS net_minor",
+    "expected": "expected/fanout.net.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Gross 11900 minus 1600 =10300;101 has two items and two refunds, so raw three-way joins multiply totals."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Gross 11900 minus 1600 =10300;101 has two items and two refunds, so raw three-way joins multiply totals.",
+    "distinguishing_rows": [
+      "Gross 11900 minus 1600 =10300;101 has two items and two refunds, so raw three-way joins multiply totals."
+    ]
+  },
+  {
+    "id": "history.boundary",
+    "primary_group": "historical",
+    "tags": [
+      "historical"
+    ],
+    "question": "For Ada’s billed orders, list order ID then historical region at the order date; keep missing history and sort by order ID.",
+    "sql": "SELECT o.order_id,h.region FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) WHERE o.billing_customer_id=1 ORDER BY o.order_id",
+    "expected": "expected/history.boundary.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 before Jan 1 regionDE;102 exactly boundary regionCH;107 CH. Half-open history."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 before Jan 1 regionDE;102 exactly boundary regionCH;107 CH. Half-open history.",
+    "distinguishing_rows": [
+      "101 before Jan 1 regionDE;102 exactly boundary regionCH;107 CH. Half-open history."
+    ]
+  },
+  {
+    "id": "projection.unicode",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Return names of French-region customers, ordered by customer ID.",
+    "sql": "SELECT name FROM customers WHERE region='FR' ORDER BY customer_id",
+    "expected": "expected/projection.unicode.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Béatrice includes accented Unicode."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Béatrice includes accented Unicode.",
+    "distinguishing_rows": [
+      "Béatrice includes accented Unicode."
+    ]
+  },
+  {
+    "id": "projection.apostrophe",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Return the customer ID for the exact name Ada O'Brien.",
+    "sql": "SELECT customer_id FROM customers WHERE name='Ada O''Brien'",
+    "expected": "expected/projection.apostrophe.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Apostrophe requires SQL escaping; customer 1."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Apostrophe requires SQL escaping; customer 1.",
+    "distinguishing_rows": [
+      "Apostrophe requires SQL escaping; customer 1."
+    ]
+  },
+  {
+    "id": "projection.negation",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "List non-VIP customers outside CH, ID then region, sorted by ID.",
+    "sql": "SELECT customer_id,region FROM customers WHERE NOT vip AND region <> 'CH' ORDER BY customer_id",
+    "expected": "expected/projection.negation.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "2 FR,4 DE,5 AT;6 nonVIP CH excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 2 FR,4 DE,5 AT;6 nonVIP CH excluded.",
+    "distinguishing_rows": [
+      "2 FR,4 DE,5 AT;6 nonVIP CH excluded."
+    ]
+  },
+  {
+    "id": "projection.boolean_scope",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "List customers who are VIP or have an empty note and tier zero, IDs ascending.",
+    "sql": "SELECT customer_id FROM customers WHERE vip OR (note='' AND tier=0) ORDER BY customer_id",
+    "expected": "expected/projection.boolean_scope.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,3 VIP plus 4 zero-tier empty; parentheses matter."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,3 VIP plus 4 zero-tier empty; parentheses matter.",
+    "distinguishing_rows": [
+      "1,3 VIP plus 4 zero-tier empty; parentheses matter."
+    ]
+  },
+  {
+    "id": "projection.top",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Return the three largest completed orders, ID then cents, descending cents with ID ascending as tie breaker.",
+    "sql": "SELECT order_id,total_minor FROM orders WHERE status='completed' ORDER BY total_minor DESC,order_id ASC LIMIT 3",
+    "expected": "expected/projection.top.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1043000,1012500,1022000 wins tie 1062000."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1043000,1012500,1022000 wins tie 1062000.",
+    "distinguishing_rows": [
+      "1043000,1012500,1022000 wins tie 1062000."
+    ]
+  },
+  {
+    "id": "projection.negative",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "List negative completed order IDs and cents, ordered by ID.",
+    "sql": "SELECT order_id,total_minor FROM orders WHERE status='completed' AND total_minor<0 ORDER BY order_id",
+    "expected": "expected/projection.negative.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "108 credit -100; zero 105 excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 108 credit -100; zero 105 excluded.",
+    "distinguishing_rows": [
+      "108 credit -100; zero 105 excluded."
+    ]
+  },
+  {
+    "id": "projection.empty_result",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Return order IDs with a total over one million cents, ascending.",
+    "sql": "SELECT order_id FROM orders WHERE total_minor>1000000 ORDER BY order_id",
+    "expected": "expected/projection.empty_result.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Empty relation still has int 64 schema."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Empty relation still has int 64 schema.",
+    "distinguishing_rows": [
+      "Empty relation still has int 64 schema."
+    ]
+  },
+  {
+    "id": "projection.float",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "Return product ID, weight in kilograms, then rating for products rated above 4.5, by product ID.",
+    "sql": "SELECT product_id,weight_kg,rating FROM products WHERE rating>4.5 ORDER BY product_id",
+    "expected": "expected/projection.float.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": true
+    },
+    "requirements": [
+      "Book 30 weight 0.75 rating 4.75; Tea andMug tie 4.5 excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Book 30 weight 0.75 rating 4.75; Tea andMug tie 4.5 excluded.",
+    "distinguishing_rows": [
+      "Book 30 weight 0.75 rating 4.75; Tea andMug tie 4.5 excluded."
+    ]
+  },
+  {
+    "id": "projection.width",
+    "primary_group": "projection",
+    "tags": [
+      "projection"
+    ],
+    "question": "List negative customer tiers as customer ID, tier, then VIP flag, ascending ID.",
+    "sql": "SELECT customer_id,tier,vip FROM customers WHERE tier<0 ORDER BY customer_id",
+    "expected": "expected/projection.width.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": true
+    },
+    "requirements": [
+      "Customer 6 tier-1 exercises signed 16."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Customer 6 tier-1 exercises signed 16.",
+    "distinguishing_rows": [
+      "Customer 6 tier-1 exercises signed 16."
+    ]
+  },
+  {
+    "id": "concept.completed",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts"
+    ],
+    "question": "List booked purchase IDs, ascending, using the completed-order definition.",
+    "sql": "SELECT order_id FROM orders WHERE status='completed' ORDER BY order_id",
+    "expected": "expected/concept.completed.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Booked means completed, including credit 108; no pending 105/cancelled 103."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Booked means completed, including credit 108; no pending 105/cancelled 103.",
+    "distinguishing_rows": [
+      "Booked means completed, including credit 108; no pending 105/cancelled 103."
+    ]
+  },
+  {
+    "id": "concept.active",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts",
+      "cross_source"
+    ],
+    "question": "At April 1 2024, list active membership IDs then customer names, ordered by membership ID.",
+    "sql": "SELECT s.subscription_id,c.name FROM subscriptions s JOIN customers c ON s.customer_id=c.customer_id WHERE s.status='active' AND s.start_date<='2024-04-01' AND (s.end_date IS NULL OR '2024-04-01'<s.end_date) ORDER BY s.subscription_id",
+    "expected": "expected/concept.active.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,4,5 active;2 ends boundary;3 paused."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,4,5 active;2 ends boundary;3 paused.",
+    "distinguishing_rows": [
+      "1,4,5 active;2 ends boundary;3 paused."
+    ]
+  },
+  {
+    "id": "concept.active_before",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts"
+    ],
+    "question": "At March 31 2024, list active membership IDs ascending.",
+    "sql": "SELECT subscription_id FROM subscriptions WHERE status='active' AND start_date<='2024-03-31' AND (end_date IS NULL OR '2024-03-31'<end_date) ORDER BY subscription_id",
+    "expected": "expected/concept.active_before.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,2,4;5 future;2 not yet ended."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,2,4;5 future;2 not yet ended.",
+    "distinguishing_rows": [
+      "1,2,4;5 future;2 not yet ended."
+    ]
+  },
+  {
+    "id": "concept.buyers",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts"
+    ],
+    "question": "From the buyers directory, return buyer IDs then names for CH buyers, by ID.",
+    "sql": "SELECT buyer_id,buyer_name FROM buyers WHERE region='CH' ORDER BY buyer_id",
+    "expected": "expected/concept.buyers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "View field renaming retains 1,3,6."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. View field renaming retains 1,3,6.",
+    "distinguishing_rows": [
+      "View field renaming retains 1,3,6."
+    ]
+  },
+  {
+    "id": "concept.nested",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts"
+    ],
+    "question": "From the nested buyer directory, return ID then name for ID 2.",
+    "sql": "SELECT id,name FROM buyer_directory WHERE id=2",
+    "expected": "expected/concept.nested.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Nested lineage buyer_id to id; accented name."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Nested lineage buyer_id to id; accented name.",
+    "distinguishing_rows": [
+      "Nested lineage buyer_id to id; accented name."
+    ]
+  },
+  {
+    "id": "concept.purchases",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts",
+      "cross_source"
+    ],
+    "question": "For each billed client with booked purchases, return client name then booked purchase count, by client ID.",
+    "sql": "SELECT c.name,COUNT(*) AS purchases FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/concept.purchases.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 3,Chen 2,Dario 1,Éva 1; unmatched 99 omitted."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 3,Chen 2,Dario 1,Éva 1; unmatched 99 omitted.",
+    "distinguishing_rows": [
+      "Ada 3,Chen 2,Dario 1,Éva 1; unmatched 99 omitted."
+    ]
+  },
+  {
+    "id": "concept.gross_by_region",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts",
+      "cross_source"
+    ],
+    "question": "Return current billed-client region then gross booked sales cents, ordered by region.",
+    "sql": "SELECT c.region,SUM(o.total_minor) AS gross_minor FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' GROUP BY c.region ORDER BY c.region",
+    "expected": "expected/concept.gross_by_region.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Current CH 9500 DE 2000 AT-100; noFR completed."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Current CH 9500 DE 2000 AT-100; noFR completed.",
+    "distinguishing_rows": [
+      "Current CH 9500 DE 2000 AT-100; noFR completed."
+    ]
+  },
+  {
+    "id": "concept.zero_active",
+    "primary_group": "concepts",
+    "tags": [
+      "concepts",
+      "cross_source"
+    ],
+    "question": "List names of clients with a zero-priced active membership on April 1 2024, by client ID.",
+    "sql": "SELECT c.name FROM customers c JOIN subscriptions s ON c.customer_id=s.customer_id WHERE s.monthly_minor=0 AND s.status='active' AND s.start_date<='2024-04-01' AND (s.end_date IS NULL OR '2024-04-01'<s.end_date) ORDER BY c.customer_id",
+    "expected": "expected/concept.zero_active.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Chen active free membership 4 is active despite zero price."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Chen active free membership 4 is active despite zero price.",
+    "distinguishing_rows": [
+      "Chen active free membership 4 is active despite zero price."
+    ]
+  },
+  {
+    "id": "roles.both",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List order ID, payer name, then recipient name for orders 101 and 102, by ID.",
+    "sql": "SELECT o.order_id,b.name,s.name FROM orders o JOIN customers b ON o.billing_customer_id=b.customer_id JOIN customers s ON o.shipping_customer_id=s.customer_id WHERE o.order_id IN (101,102) ORDER BY o.order_id",
+    "expected": "expected/roles.both.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 payerAda recipientBéatrice;102 bothAda."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 payerAda recipientBéatrice;102 bothAda.",
+    "distinguishing_rows": [
+      "101 payerAda recipientBéatrice;102 bothAda."
+    ]
+  },
+  {
+    "id": "roles.different",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List IDs of orders whose known payer and recipient differ, ascending.",
+    "sql": "SELECT o.order_id FROM orders o JOIN customers b ON o.billing_customer_id=b.customer_id JOIN customers s ON o.shipping_customer_id=s.customer_id WHERE b.customer_id<>s.customer_id ORDER BY o.order_id",
+    "expected": "expected/roles.different.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101,103,104,106,107;109 payer unknown;105 null."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101,103,104,106,107;109 payer unknown;105 null.",
+    "distinguishing_rows": [
+      "101,103,104,106,107;109 payer unknown;105 null."
+    ]
+  },
+  {
+    "id": "roles.same",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List IDs then names for orders billed and shipped to the same known customer, by ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id AND o.shipping_customer_id=c.customer_id ORDER BY o.order_id",
+    "expected": "expected/roles.same.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "102,108,110 both roles equal; multiple join predicates."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 102,108,110 both roles equal; multiple join predicates.",
+    "distinguishing_rows": [
+      "102,108,110 both roles equal; multiple join predicates."
+    ]
+  },
+  {
+    "id": "roles.unmatched_billing",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List order ID then payer name for all orders, retaining missing payer records, by order ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o LEFT JOIN customers c ON o.billing_customer_id=c.customer_id ORDER BY o.order_id",
+    "expected": "expected/roles.unmatched_billing.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "109 payer 99 yields null, not row dropped."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 109 payer 99 yields null, not row dropped.",
+    "distinguishing_rows": [
+      "109 payer 99 yields null, not row dropped."
+    ]
+  },
+  {
+    "id": "roles.shipping_fr",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List IDs of orders sent to a recipient currently in FR, ascending.",
+    "sql": "SELECT o.order_id FROM orders o JOIN customers c ON o.shipping_customer_id=c.customer_id WHERE c.region='FR' ORDER BY o.order_id",
+    "expected": "expected/roles.shipping_fr.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 and 106 shipFR;103 billsFR but shipsCH."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 and 106 shipFR;103 billsFR but shipsCH.",
+    "distinguishing_rows": [
+      "101 and 106 shipFR;103 billsFR but shipsCH."
+    ]
+  },
+  {
+    "id": "relationships.product_filter",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List order ID then product name for completed home-category lines, by order ID then line number.",
+    "sql": "SELECT i.order_id,p.name FROM order_items i JOIN orders o ON i.order_id=o.order_id JOIN products p ON i.product_id=p.product_id WHERE o.status='completed' AND p.category='home' ORDER BY i.order_id,i.line_no",
+    "expected": "expected/relationships.product_filter.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101,104,107 Mug;Unused 40 has no lines."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101,104,107 Mug;Unused 40 has no lines.",
+    "distinguishing_rows": [
+      "101,104,107 Mug;Unused 40 has no lines."
+    ]
+  },
+  {
+    "id": "relationships.refund_composite",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "For each refund, return refund ID then item product name, preserving unknown products, by refund ID.",
+    "sql": "SELECT r.refund_id,p.name FROM refunds r JOIN order_items i ON r.order_id=i.order_id AND r.line_no=i.line_no LEFT JOIN products p ON i.product_id=p.product_id ORDER BY r.refund_id",
+    "expected": "expected/relationships.refund_composite.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Refunds 1/2 attach 101 line 1 Tea; order-only join falsely attachesMug."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Refunds 1/2 attach 101 line 1 Tea; order-only join falsely attachesMug.",
+    "distinguishing_rows": [
+      "Refunds 1/2 attach 101 line 1 Tea; order-only join falsely attachesMug."
+    ]
+  },
+  {
+    "id": "relationships.subscribers",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List subscription ID then subscriber name, by subscription ID.",
+    "sql": "SELECT s.subscription_id,c.name FROM subscriptions s JOIN customers c ON s.customer_id=c.customer_id ORDER BY s.subscription_id",
+    "expected": "expected/relationships.subscribers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada has two memberships; retain multiplicity."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada has two memberships; retain multiplicity.",
+    "distinguishing_rows": [
+      "Ada has two memberships; retain multiplicity."
+    ]
+  },
+  {
+    "id": "relationships.calendar",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "List completed order ID then fiscal year from authored calendar, by order ID.",
+    "sql": "SELECT o.order_id,c.fiscal_year FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' ORDER BY o.order_id",
+    "expected": "expected/relationships.calendar.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "108/109/110 FY 2024; earlier FY 2023."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 108/109/110 FY 2024; earlier FY 2023.",
+    "distinguishing_rows": [
+      "108/109/110 FY 2024; earlier FY 2023."
+    ]
+  },
+  {
+    "id": "relationships.all_customers",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "Return every customer ID then each billed order ID, retaining customers without orders, ordered by customer then order ID.",
+    "sql": "SELECT c.customer_id,o.order_id FROM customers c LEFT JOIN orders o ON c.customer_id=o.billing_customer_id ORDER BY c.customer_id,o.order_id",
+    "expected": "expected/relationships.all_customers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "6 preserved null;Ada 3 orders;99 no customer dimension."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 6 preserved null;Ada 3 orders;99 no customer dimension.",
+    "distinguishing_rows": [
+      "6 preserved null;Ada 3 orders;99 no customer dimension."
+    ]
+  },
+  {
+    "id": "relationships.left_scope",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "Return every customer ID then completed billed order IDs, keeping customers without completed orders, ordered by customer then order ID.",
+    "sql": "SELECT c.customer_id,o.order_id FROM customers c LEFT JOIN orders o ON c.customer_id=o.billing_customer_id AND o.status='completed' ORDER BY c.customer_id,o.order_id",
+    "expected": "expected/relationships.left_scope.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "2 has orders but no completed, still null;6 null. Predicate inON."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 2 has orders but no completed, still null;6 null. Predicate inON.",
+    "distinguishing_rows": [
+      "2 has orders but no completed, still null;6 null. Predicate inON."
+    ]
+  },
+  {
+    "id": "relationships.shipping_totals",
+    "primary_group": "relationships",
+    "tags": [
+      "relationships",
+      "cross_source"
+    ],
+    "question": "Return recipient name then completed sales cents sent to that recipient, by recipient ID.",
+    "sql": "SELECT c.name,SUM(o.total_minor) AS sent_minor FROM customers c JOIN orders o ON c.customer_id=o.shipping_customer_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/relationships.shipping_totals.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 8000,Béatrice 4500,Chen 500,Dario 1500,Éva-100; differs billing."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 8000,Béatrice 4500,Chen 500,Dario 1500,Éva-100; differs billing.",
+    "distinguishing_rows": [
+      "Ada 8000,Béatrice 4500,Chen 500,Dario 1500,Éva-100; differs billing."
+    ]
+  },
+  {
+    "id": "existence.completed_buyers",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "Return IDs of customers with at least one completed billed order, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.billing_customer_id=c.customer_id AND o.status='completed') ORDER BY c.customer_id",
+    "expected": "expected/existence.completed_buyers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,3,4,5;2 only noncompleted."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,3,4,5;2 only noncompleted.",
+    "distinguishing_rows": [
+      "1,3,4,5;2 only noncompleted."
+    ]
+  },
+  {
+    "id": "absence.completed_buyers",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "Return IDs of customers with no completed billed orders, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.billing_customer_id=c.customer_id AND o.status='completed') ORDER BY c.customer_id",
+    "expected": "expected/absence.completed_buyers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "2 and 6; NOT IN null hazards avoided."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 2 and 6; NOT IN null hazards avoided.",
+    "distinguishing_rows": [
+      "2 and 6; NOT IN null hazards avoided."
+    ]
+  },
+  {
+    "id": "existence.sold_products",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "List product ID then name of products with a positive-quantity completed sale, by ID.",
+    "sql": "SELECT p.product_id,p.name FROM products p WHERE EXISTS (SELECT 1 FROM order_items i JOIN orders o ON i.order_id=o.order_id WHERE i.product_id=p.product_id AND o.status='completed' AND i.quantity>0) ORDER BY p.product_id",
+    "expected": "expected/existence.sold_products.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "10,20,30 sold;40 absent."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 10,20,30 sold;40 absent.",
+    "distinguishing_rows": [
+      "10,20,30 sold;40 absent."
+    ]
+  },
+  {
+    "id": "absence.unsold_products",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "List IDs of products with no positive-quantity completed sale, ascending.",
+    "sql": "SELECT p.product_id FROM products p WHERE NOT EXISTS (SELECT 1 FROM order_items i JOIN orders o ON i.order_id=o.order_id WHERE i.product_id=p.product_id AND o.status='completed' AND i.quantity>0) ORDER BY p.product_id",
+    "expected": "expected/absence.unsold_products.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "40 unsold;30 pending zero line alone would not qualify but 106 does."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 40 unsold;30 pending zero line alone would not qualify but 106 does.",
+    "distinguishing_rows": [
+      "40 unsold;30 pending zero line alone would not qualify but 106 does."
+    ]
+  },
+  {
+    "id": "existence.refunded_clients",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "List IDs of billed customers with a positive refund on a completed order, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c WHERE EXISTS (SELECT 1 FROM orders o JOIN refunds r ON o.order_id=r.order_id WHERE o.billing_customer_id=c.customer_id AND o.status='completed' AND r.refund_minor>0) ORDER BY c.customer_id",
+    "expected": "expected/existence.refunded_clients.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,3;4 only zero refund excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,3;4 only zero refund excluded.",
+    "distinguishing_rows": [
+      "1,3;4 only zero refund excluded."
+    ]
+  },
+  {
+    "id": "absence.no_subscriptions",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "List customer IDs with no subscriptions of any status, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id=c.customer_id) ORDER BY c.customer_id",
+    "expected": "expected/absence.no_subscriptions.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "4,6;2 paused is still a subscription."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 4,6;2 paused is still a subscription.",
+    "distinguishing_rows": [
+      "4,6;2 paused is still a subscription."
+    ]
+  },
+  {
+    "id": "existence.only_ch_shipping",
+    "primary_group": "existence",
+    "tags": [
+      "existence",
+      "cross_source"
+    ],
+    "question": "List billed customer IDs having an order but no order shipped to a known non-CH recipient, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.billing_customer_id=c.customer_id) AND NOT EXISTS (SELECT 1 FROM orders o JOIN customers s ON o.shipping_customer_id=s.customer_id WHERE o.billing_customer_id=c.customer_id AND s.region<>'CH') ORDER BY c.customer_id",
+    "expected": "expected/existence.only_ch_shipping.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "2 and 3;2 pending unknown is not nonCH;6 fails existence."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 2 and 3;2 pending unknown is not nonCH;6 fails existence.",
+    "distinguishing_rows": [
+      "2 and 3;2 pending unknown is not nonCH;6 fails existence."
+    ]
+  },
+  {
+    "id": "metrics.order_count",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Count completed orders, including credit adjustments.",
+    "sql": "SELECT COUNT(*) AS completed_count FROM orders WHERE status='completed'",
+    "expected": "expected/metrics.order_count.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "8 completed including 108."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 8 completed including 108.",
+    "distinguishing_rows": [
+      "8 completed including 108."
+    ]
+  },
+  {
+    "id": "metrics.distinct_buyers",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "Count distinct known billed buyers with completed orders.",
+    "sql": "SELECT COUNT(DISTINCT c.customer_id) AS buyer_count FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed'",
+    "expected": "expected/metrics.distinct_buyers.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Four known 1,3,4,5; unmatched 99 excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Four known 1,3,4,5; unmatched 99 excluded.",
+    "distinguishing_rows": [
+      "Four known 1,3,4,5; unmatched 99 excluded."
+    ]
+  },
+  {
+    "id": "metrics.customer_totals",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "Return billed customer name then completed gross sales cents, by customer ID.",
+    "sql": "SELECT c.name,SUM(o.total_minor) AS gross_minor FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/metrics.customer_totals.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 6000,Chen 3500,Dario 2000,Éva-100."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 6000,Chen 3500,Dario 2000,Éva-100.",
+    "distinguishing_rows": [
+      "Ada 6000,Chen 3500,Dario 2000,Éva-100."
+    ]
+  },
+  {
+    "id": "metrics.customer_count_zero",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "Return every customer ID then count of completed billed orders, including zero, by ID.",
+    "sql": "SELECT c.customer_id,COUNT(o.order_id) AS completed_count FROM customers c LEFT JOIN orders o ON c.customer_id=o.billing_customer_id AND o.status='completed' GROUP BY c.customer_id ORDER BY c.customer_id",
+    "expected": "expected/metrics.customer_count_zero.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Counts 3,0,2,1,1,0; COUNT(*) wrong for null matches."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Counts 3,0,2,1,1,0; COUNT(*) wrong for null matches.",
+    "distinguishing_rows": [
+      "Counts 3,0,2,1,1,0; COUNT(*) wrong for null matches."
+    ]
+  },
+  {
+    "id": "metrics.minmax",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return smallest then largest completed order total in CHF cents.",
+    "sql": "SELECT MIN(total_minor) AS smallest,MAX(total_minor) AS largest FROM orders WHERE status='completed'",
+    "expected": "expected/metrics.minmax.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "-100 and 3000; negatives retained."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. -100 and 3000; negatives retained.",
+    "distinguishing_rows": [
+      "-100 and 3000; negatives retained."
+    ]
+  },
+  {
+    "id": "metrics.average",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return the exact arithmetic average completed order total in CHF cents to two decimal places.",
+    "sql": "SELECT CAST(AVG(CAST(total_minor AS DECIMAL(18,2))) AS DECIMAL(18,2)) AS average_minor FROM orders WHERE status='completed'",
+    "expected": "expected/metrics.average.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "11900/8=1487.50 exact decimal monetary average."
+    ],
+    "oracle_reasoning": "Independent Python Decimal/reference arithmetic over canonical records. 11900/8=1487.50 exact decimal monetary average.",
+    "distinguishing_rows": [
+      "11900/8=1487.50 exact decimal monetary average."
+    ]
+  },
+  {
+    "id": "metrics.empty_sum",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return sum of totals for nonexistent order status lost; unknown empty sum must remain null.",
+    "sql": "SELECT SUM(total_minor) AS lost_minor FROM orders WHERE status='lost'",
+    "expected": "expected/metrics.empty_sum.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "One row null, not zero."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. One row null, not zero.",
+    "distinguishing_rows": [
+      "One row null, not zero."
+    ]
+  },
+  {
+    "id": "metrics.empty_count",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Count orders with nonexistent status lost.",
+    "sql": "SELECT COUNT(*) AS lost_count FROM orders WHERE status='lost'",
+    "expected": "expected/metrics.empty_count.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "One row zero, unlike emptySUM."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. One row zero, unlike emptySUM.",
+    "distinguishing_rows": [
+      "One row zero, unlike emptySUM."
+    ]
+  },
+  {
+    "id": "metrics.note_counts",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return total customer count then count of known notes.",
+    "sql": "SELECT COUNT(*) AS customers,COUNT(note) AS known_notes FROM customers",
+    "expected": "expected/metrics.note_counts.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "6 total,4 known; empty strings count."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 6 total,4 known; empty strings count.",
+    "distinguishing_rows": [
+      "6 total,4 known; empty strings count."
+    ]
+  },
+  {
+    "id": "metrics.status",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return status, order count, then sales cents per status, ordered by status.",
+    "sql": "SELECT status,COUNT(*) AS orders,SUM(total_minor) AS cents FROM orders GROUP BY status ORDER BY status",
+    "expected": "expected/metrics.status.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "cancelled 900 completed 11900 pending 0."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. cancelled 900 completed 11900 pending 0.",
+    "distinguishing_rows": [
+      "cancelled 900 completed 11900 pending 0."
+    ]
+  },
+  {
+    "id": "metrics.having",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "List known billed buyer names then completed sales cents where sales exceed 2500, by customer ID.",
+    "sql": "SELECT c.name,SUM(o.total_minor) AS gross_minor FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' GROUP BY c.customer_id,c.name HAVING SUM(o.total_minor)>2500 ORDER BY c.customer_id",
+    "expected": "expected/metrics.having.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 6000,Chen 3500; postaggregate filter."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 6000,Chen 3500; postaggregate filter.",
+    "distinguishing_rows": [
+      "Ada 6000,Chen 3500; postaggregate filter."
+    ]
+  },
+  {
+    "id": "metrics.refund_sum",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations"
+    ],
+    "question": "Return total refund cents then count of positive refunds.",
+    "sql": "SELECT SUM(refund_minor) AS cents,SUM(CASE WHEN refund_minor>0 THEN 1 ELSE 0 END) AS positive_count FROM refunds",
+    "expected": "expected/metrics.refund_sum.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1600 total;4 positive and 1 zero."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1600 total;4 positive and 1 zero.",
+    "distinguishing_rows": [
+      "1600 total;4 positive and 1 zero."
+    ]
+  },
+  {
+    "id": "metrics.product_units",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "Return product name then signed completed-sale units, ordered by product ID.",
+    "sql": "SELECT p.name,SUM(i.quantity) AS units FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON o.order_id=i.order_id WHERE o.status='completed' GROUP BY p.product_id,p.name ORDER BY p.product_id",
+    "expected": "expected/metrics.product_units.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Tea 3 (1+2-1+1),Mug 4,Book 1; unknown product omitted."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Tea 3 (1+2-1+1),Mug 4,Book 1; unknown product omitted.",
+    "distinguishing_rows": [
+      "Tea 3 (1+2-1+1),Mug 4,Book 1; unknown product omitted."
+    ]
+  },
+  {
+    "id": "metrics.weight_sum",
+    "primary_group": "aggregations",
+    "tags": [
+      "aggregations",
+      "cross_source"
+    ],
+    "question": "Return total shipped weight kilograms across positive completed item quantities with known products.",
+    "sql": "SELECT SUM(CAST(p.weight_kg AS DOUBLE)*i.quantity) AS kilograms FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON o.order_id=i.order_id WHERE o.status='completed' AND i.quantity>0",
+    "expected": "expected/metrics.weight_sum.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Tea 4 units 1 kg +Mug 4 units 2 kg +Book 0.75=3.75."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Tea 4 units 1 kg +Mug 4 units 2 kg +Book 0.75=3.75.",
+    "distinguishing_rows": [
+      "Tea 4 units 1 kg +Mug 4 units 2 kg +Book 0.75=3.75."
+    ]
+  },
+  {
+    "id": "fanout.order_item",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts"
+    ],
+    "question": "For completed orders, return total order cents then total item cents using independent aggregation.",
+    "sql": "SELECT (SELECT SUM(total_minor) FROM orders WHERE status='completed') AS orders_minor,(SELECT SUM(i.line_minor) FROM order_items i JOIN orders o ON i.order_id=o.order_id WHERE o.status='completed') AS items_minor",
+    "expected": "expected/fanout.order_item.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Both 11900; order 101 must count once despite 2 lines."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Both 11900; order 101 must count once despite 2 lines.",
+    "distinguishing_rows": [
+      "Both 11900; order 101 must count once despite 2 lines."
+    ]
+  },
+  {
+    "id": "fanout.per_buyer_net",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "Return each known billed buyer name then completed sales minus linked refunds in cents, by customer ID.",
+    "sql": "WITH r AS (SELECT order_id,SUM(refund_minor) AS refunded FROM refunds GROUP BY order_id) SELECT c.name,SUM(o.total_minor-COALESCE(r.refunded,0)) AS net_minor FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id LEFT JOIN r ON o.order_id=r.order_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/fanout.per_buyer_net.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 5500,Chen 2400,Dario 2000,Éva-100; refund 101 summed 500 once."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 5500,Chen 2400,Dario 2000,Éva-100; refund 101 summed 500 once.",
+    "distinguishing_rows": [
+      "Ada 5500,Chen 2400,Dario 2000,Éva-100; refund 101 summed 500 once."
+    ]
+  },
+  {
+    "id": "fanout.line_refunds",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts"
+    ],
+    "question": "For order 101 return line number, line cents, then total refund cents, by line number.",
+    "sql": "WITH r AS (SELECT order_id,line_no,SUM(refund_minor) AS cents FROM refunds GROUP BY order_id,line_no) SELECT i.line_no,i.line_minor,COALESCE(r.cents,0) AS refunded FROM order_items i LEFT JOIN r ON i.order_id=r.order_id AND i.line_no=r.line_no WHERE i.order_id=101 ORDER BY i.line_no",
+    "expected": "expected/fanout.line_refunds.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Line 1 1000 refunded 500;line 2 1500 refunded 0. Composite grouped join."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Line 1 1000 refunded 500;line 2 1500 refunded 0. Composite grouped join.",
+    "distinguishing_rows": [
+      "Line 1 1000 refunded 500;line 2 1500 refunded 0. Composite grouped join."
+    ]
+  },
+  {
+    "id": "fanout.orders_subscriptions",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "For every customer return name, completed billed sales cents (zero if none), then active monthly cents on April 1, by ID.",
+    "sql": "WITH o AS (SELECT billing_customer_id,SUM(total_minor) AS cents FROM orders WHERE status='completed' GROUP BY billing_customer_id),s AS (SELECT customer_id,SUM(monthly_minor) AS cents FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date) GROUP BY customer_id) SELECT c.name,COALESCE(o.cents,0),COALESCE(s.cents,0) FROM customers c LEFT JOIN o ON c.customer_id=o.billing_customer_id LEFT JOIN s ON c.customer_id=s.customer_id ORDER BY c.customer_id",
+    "expected": "expected/fanout.orders_subscriptions.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 3 orders and 2 subscriptions would multiply; active 1 only atApr 1."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 3 orders and 2 subscriptions would multiply; active 1 only atApr 1.",
+    "distinguishing_rows": [
+      "Ada 3 orders and 2 subscriptions would multiply; active 1 only atApr 1."
+    ]
+  },
+  {
+    "id": "fanout.product_net",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "Return product name then completed item sales minus line refunds in cents, by product ID.",
+    "sql": "WITH r AS (SELECT order_id,line_no,SUM(refund_minor) AS cents FROM refunds GROUP BY order_id,line_no) SELECT p.name,SUM(i.line_minor-COALESCE(r.cents,0)) AS net_minor FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON i.order_id=o.order_id LEFT JOIN r ON i.order_id=r.order_id AND i.line_no=r.line_no WHERE o.status='completed' GROUP BY p.product_id,p.name ORDER BY p.product_id",
+    "expected": "expected/fanout.product_net.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Tea 3400 minus 600=2800;Mug 6000 minus 1000=5000;Book 2000."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Tea 3400 minus 600=2800;Mug 6000 minus 1000=5000;Book 2000.",
+    "distinguishing_rows": [
+      "Tea 3400 minus 600=2800;Mug 6000 minus 1000=5000;Book 2000."
+    ]
+  },
+  {
+    "id": "fanout.weighted_price",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "Return product name then weighted completed unit price in cents, using signed quantity and null when zero, rounded half away from zero to six decimals, by product ID.",
+    "sql": "SELECT p.name,CAST(ROUND(CAST(SUM(i.line_minor) AS DECIMAL(18,6))/NULLIF(CAST(SUM(i.quantity) AS DECIMAL(18,6)),0),6) AS DECIMAL(18,6)) AS weighted_price FROM products p JOIN order_items i ON p.product_id=i.product_id JOIN orders o ON i.order_id=o.order_id WHERE o.status='completed' GROUP BY p.product_id,p.name ORDER BY p.product_id",
+    "expected": "expected/fanout.weighted_price.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Tea 3400/3 rounds 1133.333333, not mean of line prices;Mug 1500;Book 2000."
+    ],
+    "oracle_reasoning": "Independent Python Decimal/reference arithmetic over canonical records. Tea 3400/3 rounds 1133.333333, not mean of line prices;Mug 1500;Book 2000.",
+    "distinguishing_rows": [
+      "Tea 3400/3 rounds 1133.333333, not mean of line prices;Mug 1500;Book 2000."
+    ]
+  },
+  {
+    "id": "fanout.order_refund_count",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "Return each known buyer name, completed order count, then linked refund event count, by buyer ID.",
+    "sql": "WITH r AS (SELECT order_id,COUNT(*) AS events FROM refunds GROUP BY order_id) SELECT c.name,COUNT(o.order_id),SUM(COALESCE(r.events,0)) FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id LEFT JOIN r ON o.order_id=r.order_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/fanout.order_refund_count.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 3 orders 2 refund events;Chen 2 orders 2 events;Dario 1/1 zero event."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 3 orders 2 refund events;Chen 2 orders 2 events;Dario 1/1 zero event.",
+    "distinguishing_rows": [
+      "Ada 3 orders 2 refund events;Chen 2 orders 2 events;Dario 1/1 zero event."
+    ]
+  },
+  {
+    "id": "fanout.refund_fraction",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts",
+      "cross_source"
+    ],
+    "question": "Return billed buyer name then refunded cents divided by completed gross cents as float, by buyer ID.",
+    "sql": "WITH r AS (SELECT order_id,SUM(refund_minor) AS cents FROM refunds GROUP BY order_id) SELECT c.name,SUM(COALESCE(r.cents,0))*1.0/NULLIF(SUM(o.total_minor),0) AS refund_fraction FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id LEFT JOIN r ON o.order_id=r.order_id WHERE o.status='completed' GROUP BY c.customer_id,c.name ORDER BY c.customer_id",
+    "expected": "expected/fanout.refund_fraction.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ratio of sums: Ada 500/6000,Chen 1100/3500,Dario 0/2000,Éva 0/-100."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ratio of sums: Ada 500/6000,Chen 1100/3500,Dario 0/2000,Éva 0/-100.",
+    "distinguishing_rows": [
+      "Ratio of sums: Ada 500/6000,Chen 1100/3500,Dario 0/2000,Éva 0/-100."
+    ]
+  },
+  {
+    "id": "fanout.line_count",
+    "primary_group": "multiple_facts",
+    "tags": [
+      "multiple_facts"
+    ],
+    "question": "Return completed order ID, item count, then refund event count with absent events zero, ordered by order ID.",
+    "sql": "WITH i AS (SELECT order_id,COUNT(*) AS lines FROM order_items GROUP BY order_id),r AS (SELECT order_id,COUNT(*) AS events FROM refunds GROUP BY order_id) SELECT o.order_id,COALESCE(i.lines,0),COALESCE(r.events,0) FROM orders o LEFT JOIN i ON o.order_id=i.order_id LEFT JOIN r ON o.order_id=r.order_id WHERE o.status='completed' ORDER BY o.order_id",
+    "expected": "expected/fanout.line_count.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1012 lines 2 events not 4 each;1021 line 0 events."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1012 lines 2 events not 4 each;1021 line 0 events.",
+    "distinguishing_rows": [
+      "1012 lines 2 events not 4 each;1021 line 0 events."
+    ]
+  },
+  {
+    "id": "calendar.leap",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "List order ID then billed customer name for orders on leap day 2024, by ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.order_date=DATE '2024-02-29' ORDER BY o.order_id",
+    "expected": "expected/calendar.leap.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "104 Chen leap day only."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 104 Chen leap day only.",
+    "distinguishing_rows": [
+      "104 Chen leap day only."
+    ]
+  },
+  {
+    "id": "calendar.previous_month",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "Using the fixed April 1 2024 request clock, list completed March order IDs and payer names, by ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' AND o.order_date>=DATE '2024-03-01' AND o.order_date<DATE '2024-04-01' ORDER BY o.order_id",
+    "expected": "expected/calendar.previous_month.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "106,107 March;105 pending;108 Apr boundary."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 106,107 March;105 pending;108 Apr boundary.",
+    "distinguishing_rows": [
+      "106,107 March;105 pending;108 Apr boundary."
+    ]
+  },
+  {
+    "id": "calendar.fiscal",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "Return fiscal year then completed gross sales cents using the calendar, ordered by fiscal year.",
+    "sql": "SELECT c.fiscal_year,SUM(o.total_minor) FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' GROUP BY c.fiscal_year ORDER BY c.fiscal_year",
+    "expected": "expected/calendar.fiscal.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "FY 2023 11000;FY 2024 900."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. FY 2023 11000;FY 2024 900.",
+    "distinguishing_rows": [
+      "FY 2023 11000;FY 2024 900."
+    ]
+  },
+  {
+    "id": "calendar.business_day",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "List completed order IDs that fall on authored business days, ascending.",
+    "sql": "SELECT o.order_id FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' AND c.business_day=true ORDER BY o.order_id",
+    "expected": "expected/calendar.business_day.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Leap 104 andSunday 106107 excluded by authored flag."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Leap 104 andSunday 106107 excluded by authored flag.",
+    "distinguishing_rows": [
+      "Leap 104 andSunday 106107 excluded by authored flag."
+    ]
+  },
+  {
+    "id": "calendar.monthly",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "Return calendar month key then completed sales cents for months with sales, sorted by month.",
+    "sql": "SELECT c.month_key,SUM(o.total_minor) FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' GROUP BY c.month_key ORDER BY c.month_key",
+    "expected": "expected/calendar.monthly.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "December 2500 January 2000 February 3000 March 3500 April-100 October 1000."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. December 2500 January 2000 February 3000 March 3500 April-100 October 1000.",
+    "distinguishing_rows": [
+      "December 2500 January 2000 February 3000 March 3500 April-100 October 1000."
+    ]
+  },
+  {
+    "id": "calendar.missing_month",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal",
+      "cross_source"
+    ],
+    "question": "Return each distinct authored calendar month then completed sales cents, zero for no completed sales, by month.",
+    "sql": "WITH m AS (SELECT DISTINCT month_key FROM business_calendar),o AS (SELECT c.month_key,SUM(o.total_minor) AS cents FROM orders o JOIN business_calendar c ON o.order_date=c.calendar_date WHERE o.status='completed' GROUP BY c.month_key) SELECT m.month_key,COALESCE(o.cents,0) FROM m LEFT JOIN o ON m.month_key=o.month_key ORDER BY m.month_key",
+    "expected": "expected/calendar.missing_month.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Authored May has no sales and must appear zero; June-September unlisted months are not fabricated."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Authored May has no sales and must appear zero; June-September unlisted months are not fabricated.",
+    "distinguishing_rows": [
+      "Authored May has no sales and must appear zero; June-September unlisted months are not fabricated."
+    ]
+  },
+  {
+    "id": "calendar.spring_wall",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal"
+    ],
+    "question": "Return order IDs and local timestamps for the Zurich DST jump orders 106 and 107, by ID.",
+    "sql": "SELECT order_id,local_placed_at FROM orders WHERE order_id IN (106,107) ORDER BY order_id",
+    "expected": "expected/calendar.spring_wall.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": true
+    },
+    "requirements": [
+      "Wall 01:30 and 03:30; UTC instants only 1 hour apart."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Wall 01:30 and 03:30; UTC instants only 1 hour apart.",
+    "distinguishing_rows": [
+      "Wall 01:30 and 03:30; UTC instants only 1 hour apart."
+    ]
+  },
+  {
+    "id": "calendar.autumn_instant",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal"
+    ],
+    "question": "Return order ID then UTC placed instant for autumn repeated-wall-hour orders 109 and 110, by ID.",
+    "sql": "SELECT order_id,placed_at FROM orders WHERE order_id IN (109,110) ORDER BY order_id",
+    "expected": "expected/calendar.autumn_instant.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": true
+    },
+    "requirements": [
+      "UTC 00:30 and 01:30 are distinct though both wall 02:30."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. UTC 00:30 and 01:30 are distinct though both wall 02:30.",
+    "distinguishing_rows": [
+      "UTC 00:30 and 01:30 are distinct though both wall 02:30."
+    ]
+  },
+  {
+    "id": "calendar.fraction",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal"
+    ],
+    "question": "Return order date, local timestamp, then pickup time for order 101.",
+    "sql": "SELECT order_date,local_placed_at,pickup_time FROM orders WHERE order_id=101",
+    "expected": "expected/calendar.fraction.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": true
+    },
+    "requirements": [
+      "Fraction 123456 preserved; separate date,time,wall timestamp types."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Fraction 123456 preserved; separate date,time,wall timestamp types.",
+    "distinguishing_rows": [
+      "Fraction 123456 preserved; separate date,time,wall timestamp types."
+    ]
+  },
+  {
+    "id": "calendar.year_boundary",
+    "primary_group": "temporal",
+    "tags": [
+      "temporal"
+    ],
+    "question": "Return order ID then local order date for orders 101 and 102, by ID.",
+    "sql": "SELECT order_id,order_date FROM orders WHERE order_id IN (101,102) ORDER BY order_id",
+    "expected": "expected/calendar.year_boundary.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Both UTCDec 31 but local dates Dec 31/Jan 1."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Both UTCDec 31 but local dates Dec 31/Jan 1.",
+    "distinguishing_rows": [
+      "Both UTCDec 31 but local dates Dec 31/Jan 1."
+    ]
+  },
+  {
+    "id": "history.missing",
+    "primary_group": "historical",
+    "tags": [
+      "historical"
+    ],
+    "question": "Return order ID then historical payer region for Chen’s orders, retaining unknown history, by order ID.",
+    "sql": "SELECT o.order_id,h.region FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) WHERE o.billing_customer_id=3 ORDER BY o.order_id",
+    "expected": "expected/history.missing.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "104 beforeMarch 1 null,110 CH; never replace missing with currentCH."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 104 beforeMarch 1 null,110 CH; never replace missing with currentCH.",
+    "distinguishing_rows": [
+      "104 beforeMarch 1 null,110 CH; never replace missing with currentCH."
+    ]
+  },
+  {
+    "id": "history.current_vs_then",
+    "primary_group": "historical",
+    "tags": [
+      "historical",
+      "cross_source"
+    ],
+    "question": "For orders 101 and 102 return ID, current payer region, then payer region at order date, by ID.",
+    "sql": "SELECT o.order_id,c.region,h.region FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.order_id IN (101,102) ORDER BY o.order_id",
+    "expected": "expected/history.current_vs_then.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 currentCH historicalDE;102 bothCH."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 currentCH historicalDE;102 bothCH.",
+    "distinguishing_rows": [
+      "101 currentCH historicalDE;102 bothCH."
+    ]
+  },
+  {
+    "id": "history.all",
+    "primary_group": "historical",
+    "tags": [
+      "historical",
+      "cross_source"
+    ],
+    "question": "List completed order ID, payer name, then historical region, retaining missing names and histories, by order ID.",
+    "sql": "SELECT o.order_id,c.name,h.region FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) LEFT JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' ORDER BY o.order_id",
+    "expected": "expected/history.all.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "104 historynull;109 nameregionnull;101 DE despite currentCH."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 104 historynull;109 nameregionnull;101 DE despite currentCH.",
+    "distinguishing_rows": [
+      "104 historynull;109 nameregionnull;101 DE despite currentCH."
+    ]
+  },
+  {
+    "id": "history.region_sales",
+    "primary_group": "historical",
+    "tags": [
+      "historical"
+    ],
+    "question": "Return historical payer region then completed sales cents, excluding missing history, ordered by region.",
+    "sql": "SELECT h.region,SUM(o.total_minor) FROM orders o JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) WHERE o.status='completed' GROUP BY h.region ORDER BY h.region",
+    "expected": "expected/history.region_sales.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "AT-100 CH 4000 DE 4500;1043000 and 109500 unmatched excluded."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. AT-100 CH 4000 DE 4500;1043000 and 109500 unmatched excluded.",
+    "distinguishing_rows": [
+      "AT-100 CH 4000 DE 4500;1043000 and 109500 unmatched excluded."
+    ]
+  },
+  {
+    "id": "history.changed",
+    "primary_group": "historical",
+    "tags": [
+      "historical",
+      "cross_source"
+    ],
+    "question": "Return order IDs and buyer names where current payer region differs from known historical payer region, by ID.",
+    "sql": "SELECT o.order_id,c.name FROM orders o LEFT JOIN customer_region_history h ON o.billing_customer_id=h.customer_id AND h.valid_from<=o.order_date AND (h.valid_to IS NULL OR o.order_date<h.valid_to) JOIN customers c ON o.billing_customer_id=c.customer_id WHERE c.region<>h.region ORDER BY o.order_id",
+    "expected": "expected/history.changed.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Only 101 Ada;null history does not satisfy inequality."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Only 101 Ada;null history does not satisfy inequality.",
+    "distinguishing_rows": [
+      "Only 101 Ada;null history does not satisfy inequality."
+    ]
+  },
+  {
+    "id": "window.rank",
+    "primary_group": "windows",
+    "tags": [
+      "windows"
+    ],
+    "question": "Return completed order ID, cents, then dense rank by descending cents, sorted by cents descending then ID.",
+    "sql": "SELECT order_id,total_minor,DENSE_RANK() OVER (ORDER BY total_minor DESC) AS sales_rank FROM orders WHERE status='completed' ORDER BY total_minor DESC,order_id",
+    "expected": "expected/window.rank.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "102/106 tie rank 3;109/110 tie rank 5; next ranks no gaps."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 102/106 tie rank 3;109/110 tie rank 5; next ranks no gaps.",
+    "distinguishing_rows": [
+      "102/106 tie rank 3;109/110 tie rank 5; next ranks no gaps."
+    ]
+  },
+  {
+    "id": "window.rank_gaps",
+    "primary_group": "windows",
+    "tags": [
+      "windows"
+    ],
+    "question": "Return completed order ID then competition rank by descending cents, ordered by cents descending then ID.",
+    "sql": "SELECT order_id,RANK() OVER (ORDER BY total_minor DESC) AS sales_rank FROM orders WHERE status='completed' ORDER BY total_minor DESC,order_id",
+    "expected": "expected/window.rank_gaps.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Tied 102/106 rank 3 next 107 rank 5;109/110 rank 6 next 108 rank 8."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Tied 102/106 rank 3 next 107 rank 5;109/110 rank 6 next 108 rank 8.",
+    "distinguishing_rows": [
+      "Tied 102/106 rank 3 next 107 rank 5;109/110 rank 6 next 108 rank 8."
+    ]
+  },
+  {
+    "id": "window.per_buyer",
+    "primary_group": "windows",
+    "tags": [
+      "windows",
+      "cross_source"
+    ],
+    "question": "Return payer name, order ID, then newest-first row number within each known payer, ordered by payer ID then row number.",
+    "sql": "SELECT c.name,o.order_id,ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY o.order_date DESC,o.order_id DESC) AS position FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' ORDER BY c.customer_id,position",
+    "expected": "expected/window.per_buyer.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 107,102,101;Chen 110104. Billing partition not shipping."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 107,102,101;Chen 110104. Billing partition not shipping.",
+    "distinguishing_rows": [
+      "Ada 107,102,101;Chen 110104. Billing partition not shipping."
+    ]
+  },
+  {
+    "id": "window.running",
+    "primary_group": "windows",
+    "tags": [
+      "windows"
+    ],
+    "question": "Return completed order ID then running sales cents by date and ID, using a rows frame, in that order.",
+    "sql": "SELECT order_id,SUM(total_minor) OVER (ORDER BY order_date,order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_minor FROM orders WHERE status='completed' ORDER BY order_date,order_id",
+    "expected": "expected/window.running.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "106/107 and 109/110 same dates must accumulate rowwise separately."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 106/107 and 109/110 same dates must accumulate rowwise separately.",
+    "distinguishing_rows": [
+      "106/107 and 109/110 same dates must accumulate rowwise separately."
+    ]
+  },
+  {
+    "id": "window.region_running",
+    "primary_group": "windows",
+    "tags": [
+      "windows",
+      "cross_source"
+    ],
+    "question": "Return current billed region, order ID, then running sales cents within region by date and ID, ordered by region then date and ID.",
+    "sql": "SELECT c.region,o.order_id,SUM(o.total_minor) OVER (PARTITION BY c.region ORDER BY o.order_date,o.order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_minor FROM orders o JOIN customers c ON o.billing_customer_id=c.customer_id WHERE o.status='completed' ORDER BY c.region,o.order_date,o.order_id",
+    "expected": "expected/window.region_running.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "CH combinesAdaChen;104 then 107 totals 9000;1109500."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. CH combinesAdaChen;104 then 107 totals 9000;1109500.",
+    "distinguishing_rows": [
+      "CH combinesAdaChen;104 then 107 totals 9000;1109500."
+    ]
+  },
+  {
+    "id": "window.lag",
+    "primary_group": "windows",
+    "tags": [
+      "windows"
+    ],
+    "question": "Return completed order ID then previous completed order cents by date and ID, in that order.",
+    "sql": "SELECT order_id,LAG(total_minor) OVER (ORDER BY order_date,order_id) AS previous_minor FROM orders WHERE status='completed' ORDER BY order_date,order_id",
+    "expected": "expected/window.lag.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "First 101 previousnull;108 previous 1500;109 previous-100."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. First 101 previousnull;108 previous 1500;109 previous-100.",
+    "distinguishing_rows": [
+      "First 101 previousnull;108 previous 1500;109 previous-100."
+    ]
+  },
+  {
+    "id": "window.top_per_buyer",
+    "primary_group": "windows",
+    "tags": [
+      "windows",
+      "cross_source"
+    ],
+    "question": "Return known buyer name then their largest completed order ID, by buyer ID.",
+    "sql": "WITH ranked AS (SELECT c.customer_id,c.name,o.order_id,ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY o.total_minor DESC,o.order_id ASC) AS rn FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed') SELECT name,order_id FROM ranked WHERE rn=1 ORDER BY customer_id",
+    "expected": "expected/window.top_per_buyer.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 101,Chen 104,Dario 106,Éva 108."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 101,Chen 104,Dario 106,Éva 108.",
+    "distinguishing_rows": [
+      "Ada 101,Chen 104,Dario 106,Éva 108."
+    ]
+  },
+  {
+    "id": "window.final_limit",
+    "primary_group": "windows",
+    "tags": [
+      "windows"
+    ],
+    "question": "Return the top three completed order IDs then dense sales rank, sorted by cents descending then ID.",
+    "sql": "SELECT order_id,DENSE_RANK() OVER (ORDER BY total_minor DESC) AS sales_rank FROM orders WHERE status='completed' ORDER BY total_minor DESC,order_id LIMIT 3",
+    "expected": "expected/window.final_limit.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "104 rank 1,101 rank 2,102 rank 3; rank computed before limit."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 104 rank 1,101 rank 2,102 rank 3; rank computed before limit.",
+    "distinguishing_rows": [
+      "104 rank 1,101 rank 2,102 rank 3; rank computed before limit."
+    ]
+  },
+  {
+    "id": "sets.union_all",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "Return buyer IDs from completed orders plus buyer IDs from active subscriptions on April 1, retaining duplicates; output order does not matter.",
+    "sql": "SELECT billing_customer_id AS customer_id FROM orders WHERE status='completed' UNION ALL SELECT customer_id FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date)",
+    "expected": "expected/sets.union_all.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada 4 copies,Chen 3,Éva 2,Dario 1,99 one; unionall bag."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Ada 4 copies,Chen 3,Éva 2,Dario 1,99 one; unionall bag.",
+    "distinguishing_rows": [
+      "Ada 4 copies,Chen 3,Éva 2,Dario 1,99 one; unionall bag."
+    ]
+  },
+  {
+    "id": "sets.union",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "Return distinct buyer IDs occurring in completed orders or active subscriptions on April 1, sorted by ID.",
+    "sql": "SELECT billing_customer_id AS customer_id FROM orders WHERE status='completed' UNION SELECT customer_id FROM subscriptions WHERE status='active' AND start_date<='2024-04-01' AND (end_date IS NULL OR '2024-04-01'<end_date) ORDER BY customer_id",
+    "expected": "expected/sets.union.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,3,4,5,99 duplicates eliminated."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,3,4,5,99 duplicates eliminated.",
+    "distinguishing_rows": [
+      "1,3,4,5,99 duplicates eliminated."
+    ]
+  },
+  {
+    "id": "sets.intersect",
+    "primary_group": "sets",
+    "tags": [
+      "sets",
+      "cross_source"
+    ],
+    "question": "Return distinct known customer IDs that are both completed buyers and subscribers of any status, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' INTERSECT SELECT customer_id FROM subscriptions ORDER BY customer_id",
+    "expected": "expected/sets.intersect.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "1,3,5;4 buyer without subscription;2 subscriber without completed."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 1,3,5;4 buyer without subscription;2 subscriber without completed.",
+    "distinguishing_rows": [
+      "1,3,5;4 buyer without subscription;2 subscriber without completed."
+    ]
+  },
+  {
+    "id": "sets.except",
+    "primary_group": "sets",
+    "tags": [
+      "sets",
+      "cross_source"
+    ],
+    "question": "Return known completed buyer IDs who have no subscription of any status, ascending.",
+    "sql": "SELECT c.customer_id FROM customers c JOIN orders o ON c.customer_id=o.billing_customer_id WHERE o.status='completed' EXCEPT SELECT customer_id FROM subscriptions ORDER BY customer_id",
+    "expected": "expected/sets.except.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "4 only;99 not known."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 4 only;99 not known.",
+    "distinguishing_rows": [
+      "4 only;99 not known."
+    ]
+  },
+  {
+    "id": "calculation.line_allocation",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "For order 101 return line number then allocated NET order cents after all its refunds, proportional to original signed line cents, using exact integer allocation, by line number.",
+    "sql": "SELECT i.line_no,CAST((o.total_minor-COALESCE((SELECT SUM(r.refund_minor) FROM refunds r WHERE r.order_id=o.order_id),0))*i.line_minor/NULLIF((SELECT SUM(j.line_minor) FROM order_items j WHERE j.order_id=o.order_id),0) AS BIGINT) AS allocated_minor FROM order_items i JOIN orders o ON i.order_id=o.order_id WHERE i.order_id=101 ORDER BY i.line_no",
+    "expected": "expected/calculation.line_allocation.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "101 gross 2500 minusrefunds 500=net 2000, weights 1000/2500 and 1500/2500; allocations 800/1200 distinguish naïve rawline projection."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 101 gross 2500 minusrefunds 500=net 2000, weights 1000/2500 and 1500/2500; allocations 800/1200 distinguish naïve rawline projection.",
+    "distinguishing_rows": [
+      "101 gross 2500 minusrefunds 500=net 2000, weights 1000/2500 and 1500/2500; allocations 800/1200 distinguish naïve rawline projection."
+    ]
+  },
+  {
+    "id": "calculation.zero_ratio",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "For pending order 105 return its signed weighted unit price as decimal cents, null for zero quantity.",
+    "sql": "SELECT CAST(CAST(SUM(line_minor) AS DECIMAL(18,6))/NULLIF(CAST(SUM(quantity) AS DECIMAL(18,6)),0) AS DECIMAL(18,6)) AS weighted_price FROM order_items WHERE order_id=105",
+    "expected": "expected/calculation.zero_ratio.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "0/0 policy null, not zero or arithmetic failure."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. 0/0 policy null, not zero or arithmetic failure.",
+    "distinguishing_rows": [
+      "0/0 policy null, not zero or arithmetic failure."
+    ]
+  },
+  {
+    "id": "calculation.tax",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "Return completed order ID then exact tax amount in CHF, by order ID.",
+    "sql": "SELECT order_id,tax_amount FROM orders WHERE status='completed' ORDER BY order_id",
+    "expected": "expected/calculation.tax.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Exact decimal 1.25,1.00,1.50,1.00,0.75,-0.05,0.25,0.25."
+    ],
+    "oracle_reasoning": "Independent SQLite relational evaluation over canonical records; exact integer arithmetic for CHF cents. Exact decimal 1.25,1.00,1.50,1.00,0.75,-0.05,0.25,0.25.",
+    "distinguishing_rows": [
+      "Exact decimal 1.25,1.00,1.50,1.00,0.75,-0.05,0.25,0.25."
+    ]
+  },
+  {
+    "id": "calculation.exchange",
+    "primary_group": "sets",
+    "tags": [
+      "sets"
+    ],
+    "question": "For each leap-day exchange rate, return currency, exact CHF value of 100 foreign units, then value of negative 100 units; round half away from zero to two decimals and order by currency.",
+    "sql": "SELECT currency,CAST(ROUND(chf_per_unit*CAST(100 AS DECIMAL(18,0)),2) AS DECIMAL(18,2)) AS chf_value,CAST(ROUND(chf_per_unit*CAST(-100 AS DECIMAL(18,0)),2) AS DECIMAL(18,2)) AS negative_chf_value FROM exchange_rates WHERE rate_date=DATE '2024-02-29' ORDER BY currency",
+    "expected": "expected/calculation.exchange.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "CHF 100.00/-100.00 EUR 95.01/-95.01 USD 90.00/-90.00; both signs ofEUR 95.005 round away from zero."
+    ],
+    "oracle_reasoning": "Independent Python Decimal/reference arithmetic over canonical records. CHF 100.00/-100.00 EUR 95.01/-95.01 USD 90.00/-90.00; both signs ofEUR 95.005 round away from zero.",
+    "distinguishing_rows": [
+      "CHF 100.00/-100.00 EUR 95.01/-95.01 USD 90.00/-90.00; both signs ofEUR 95.005 round away from zero."
+    ]
+  },
+  {
+    "id": "clarify.customer_role",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "needs_clarification"
+    ],
+    "question": "List order IDs and customer names.",
+    "expected": "expected/clarify.customer_role.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Customer role unspecified for order listing;101 payerAda and recipientBéatrice differ. Default billing applies only sales attribution."
+    ],
+    "oracle_reasoning": "Customer role unspecified for order listing;101 payerAda and recipientBéatrice differ. Default billing applies only sales attribution.",
+    "distinguishing_rows": [
+      "Customer role unspecified for order listing;101 payerAda and recipientBéatrice differ. Default billing applies only sales attribution."
+    ]
+  },
+  {
+    "id": "clarify.healthy",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "needs_clarification"
+    ],
+    "question": "Which customers are healthy?",
+    "expected": "expected/clarify.healthy.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Healthy is not an authored business concept; VIP is not a substitute."
+    ],
+    "oracle_reasoning": "Healthy is not an authored business concept; VIP is not a substitute.",
+    "distinguishing_rows": [
+      "Healthy is not an authored business concept; VIP is not a substitute."
+    ]
+  },
+  {
+    "id": "clarify.currency",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "needs_clarification"
+    ],
+    "question": "How much is 100 dollars in francs?",
+    "expected": "expected/clarify.currency.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Dollar currency and rate date unspecified; USD rate only at leap day does not resolve date."
+    ],
+    "oracle_reasoning": "Dollar currency and rate date unspecified; USD rate only at leap day does not resolve date.",
+    "distinguishing_rows": [
+      "Dollar currency and rate date unspecified; USD rate only at leap day does not resolve date."
+    ]
+  },
+  {
+    "id": "clarify.period",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "needs_clarification"
+    ],
+    "question": "Show recent orders.",
+    "expected": "expected/clarify.period.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Recent has no authored duration; fixed clock does not define recent."
+    ],
+    "oracle_reasoning": "Recent has no authored duration; fixed clock does not define recent.",
+    "distinguishing_rows": [
+      "Recent has no authored duration; fixed clock does not define recent."
+    ]
+  },
+  {
+    "id": "clarify.top_metric",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "needs_clarification"
+    ],
+    "question": "Who are the top customers?",
+    "expected": "expected/clarify.top_metric.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Top could mean gross sales, net sales, order count, subscription fees; no default top metric."
+    ],
+    "oracle_reasoning": "Top could mean gross sales, net sales, order count, subscription fees; no default top metric.",
+    "distinguishing_rows": [
+      "Top could mean gross sales, net sales, order count, subscription fees; no default top metric."
+    ]
+  },
+  {
+    "id": "reject.denied_scope",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "rejected"
+    ],
+    "question": "Show completed order totals.",
+    "expected": "expected/reject.denied_scope.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Host scope permits only customers; orders forbidden."
+    ],
+    "oracle_reasoning": "Host scope permits only customers; orders forbidden.",
+    "distinguishing_rows": [
+      "Host scope permits only customers; orders forbidden."
+    ],
+    "context": {
+      "reference_time": "2024-04-01T00:00:00Z",
+      "timezone": "Europe/Zurich",
+      "calendar": "gregorian",
+      "allowed_relations": [
+        "customers"
+      ]
+    }
+  },
+  {
+    "id": "reject.invalid_rollup",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "rejected"
+    ],
+    "question": "Compute overall weighted unit price by averaging product weighted prices without weights.",
+    "expected": "expected/reject.invalid_rollup.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Governed weighted price requires ratio of summed signed numerator and denominator; averaging subgroup ratios violates rollup."
+    ],
+    "oracle_reasoning": "Governed weighted price requires ratio of summed signed numerator and denominator; averaging subgroup ratios violates rollup.",
+    "distinguishing_rows": [
+      "Governed weighted price requires ratio of summed signed numerator and denominator; averaging subgroup ratios violates rollup."
+    ]
+  },
+  {
+    "id": "reject.duplicate_rate",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "rejected"
+    ],
+    "question": "Convert 100 EUR to CHF on leap day using the quarantined exchange_rates_duplicate lookup.",
+    "expected": "expected/reject.duplicate_rate.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Diagnostic lookup has two EUR rates for same date; identity is not unique, must reject instead of first-row selection."
+    ],
+    "oracle_reasoning": "Diagnostic lookup has two EUR rates for same date; identity is not unique, must reject instead of first-row selection.",
+    "distinguishing_rows": [
+      "Diagnostic lookup has two EUR rates for same date; identity is not unique, must reject instead of first-row selection."
+    ]
+  },
+  {
+    "id": "reject.overlap_history",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "rejected"
+    ],
+    "question": "Find Ada’s region on 2024-01-01 using quarantined customer_region_history_overlap as the as-of lookup.",
+    "expected": "expected/reject.overlap_history.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Two half-open intervals match; reject temporal ambiguity rather than duplicate amount or pick arbitrary match."
+    ],
+    "oracle_reasoning": "Two half-open intervals match; reject temporal ambiguity rather than duplicate amount or pick arbitrary match.",
+    "distinguishing_rows": [
+      "Two half-open intervals match; reject temporal ambiguity rather than duplicate amount or pick arbitrary match."
+    ]
+  },
+  {
+    "id": "unsupported.payment",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "unsupported"
+    ],
+    "question": "List customer credit-card numbers.",
+    "expected": "expected/unsupported.payment.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Payment card data not present and outside authored model."
+    ],
+    "oracle_reasoning": "Payment card data not present and outside authored model.",
+    "distinguishing_rows": [
+      "Payment card data not present and outside authored model."
+    ]
+  },
+  {
+    "id": "unsupported.future_rate",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "unsupported"
+    ],
+    "question": "Convert 100 EUR using an available exact-date exchange rate for 2030-01-01; report unavailable data if no exact-date rate exists.",
+    "expected": "expected/unsupported.future_rate.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Request explicitly requires an available exact-date rate; missing lookup is unavailable data, not an empty answer or parity. Interface must return unsupported after checking availability; this is desired product behavior."
+    ],
+    "oracle_reasoning": "Request explicitly requires an available exact-date rate; missing lookup is unavailable data, not an empty answer or parity. Interface must return unsupported after checking availability; this is desired product behavior.",
+    "distinguishing_rows": [
+      "Request explicitly requires an available exact-date rate; missing lookup is unavailable data, not an empty answer or parity. Interface must return unsupported after checking availability; this is desired product behavior."
+    ]
+  },
+  {
+    "id": "unsupported.residual",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "unsupported"
+    ],
+    "question": "Allocate a one-cent order across three equal lines, deciding who gets the residual cent.",
+    "expected": "expected/unsupported.residual.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "No authored residual allocation policy; selected integral allocation does not imply rounding residual rule."
+    ],
+    "oracle_reasoning": "No authored residual allocation policy; selected integral allocation does not imply rounding residual rule.",
+    "distinguishing_rows": [
+      "No authored residual allocation policy; selected integral allocation does not imply rounding residual rule."
+    ]
+  },
+  {
+    "id": "error.invalid_cast",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "execution_error"
+    ],
+    "question": "Cast the name of customer 1 to a signed bigint.",
+    "expected": "expected/error.invalid_cast.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Ada O'Brien cannot be cast to bigint; explicit invalid conversion."
+    ],
+    "oracle_reasoning": "Ada O'Brien cannot be cast to bigint; explicit invalid conversion.",
+    "distinguishing_rows": [
+      "Ada O'Brien cannot be cast to bigint; explicit invalid conversion."
+    ],
+    "sql": "SELECT CAST(name AS BIGINT) FROM customers WHERE customer_id=1"
+  },
+  {
+    "id": "error.division_zero",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "execution_error"
+    ],
+    "question": "Divide order 101 total cents by the count of its zero-quantity lines; require an arithmetic error if that count is zero.",
+    "expected": "expected/error.division_zero.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Order 101 has no zero-quantity lines; denominator COUNT is zero. Unlike governed weighted price, this explicit division requests arithmetic error."
+    ],
+    "oracle_reasoning": "Order 101 has no zero-quantity lines; denominator COUNT is zero. Unlike governed weighted price, this explicit division requests arithmetic error.",
+    "distinguishing_rows": [
+      "Order 101 has no zero-quantity lines; denominator COUNT is zero. Unlike governed weighted price, this explicit division requests arithmetic error."
+    ],
+    "sql": "SELECT total_minor / (SELECT COUNT(*) FROM order_items WHERE order_id=101 AND quantity=0) AS quotient FROM orders WHERE order_id=101"
+  },
+  {
+    "id": "error.overflow",
+    "primary_group": "companions",
+    "tags": [
+      "companion",
+      "execution_error"
+    ],
+    "question": "Multiply the maximum signed 64-bit integer by two as a bigint.",
+    "expected": "expected/error.overflow.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Checked signed integer overflow must fail, not wrap or coerce to float."
+    ],
+    "oracle_reasoning": "Checked signed integer overflow must fail, not wrap or coerce to float.",
+    "distinguishing_rows": [
+      "Checked signed integer overflow must fail, not wrap or coerce to float."
+    ],
+    "sql": "SELECT CAST(9223372036854775807 AS BIGINT) * CAST(2 AS BIGINT) AS overflow_value"
+  }
+]

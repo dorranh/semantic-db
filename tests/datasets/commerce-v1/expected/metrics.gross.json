@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "gross_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "11900"
+    ]
+  ]
+}

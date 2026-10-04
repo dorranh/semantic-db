@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "lost_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      null
+    ]
+  ]
+}

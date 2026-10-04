@@ -1,0 +1,23 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "int64"
+    },
+    {
+      "name": "placed_at",
+      "type": "timestamp(us,UTC)"
+    }
+  ],
+  "rows": [
+    [
+      "109",
+      "2024-10-27T00:30:00.000000Z"
+    ],
+    [
+      "110",
+      "2024-10-27T01:30:00.000000Z"
+    ]
+  ]
+}

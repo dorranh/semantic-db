@@ -1,0 +1,59 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "region",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "101",
+      "Ada O'Brien",
+      "DE"
+    ],
+    [
+      "102",
+      "Ada O'Brien",
+      "CH"
+    ],
+    [
+      "104",
+      "Chen",
+      null
+    ],
+    [
+      "106",
+      "Dario",
+      "DE"
+    ],
+    [
+      "107",
+      "Ada O'Brien",
+      "CH"
+    ],
+    [
+      "108",
+      "Éva",
+      "AT"
+    ],
+    [
+      "109",
+      null,
+      null
+    ],
+    [
+      "110",
+      "Chen",
+      "CH"
+    ]
+  ]
+}

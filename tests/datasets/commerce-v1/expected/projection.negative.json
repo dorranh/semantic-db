@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "int64"
+    },
+    {
+      "name": "total_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "108",
+      "-100"
+    ]
+  ]
+}

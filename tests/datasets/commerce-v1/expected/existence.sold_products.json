@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "int32"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "10",
+      "Tea"
+    ],
+    [
+      "20",
+      "Mug"
+    ],
+    [
+      "30",
+      "Book"
+    ]
+  ]
+}

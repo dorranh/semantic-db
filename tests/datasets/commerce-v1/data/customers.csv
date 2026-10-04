@@ -1,0 +1,7 @@
+customer_id,name,region,vip,note,tier
+1,Ada O'Brien,CH,true,,2
+2,Béatrice,FR,false,\N,1
+3,Chen,CH,true,loyal,2
+4,Dario,DE,false,,0
+5,Éva,AT,false,\N,1
+6,No orders,CH,false,prospect,-1

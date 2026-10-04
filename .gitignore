@@ -7,3 +7,4 @@
 /docs/site/dist/
 /docs/site/.astro/
 scratch
+/.semantic-eval/

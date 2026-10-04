@@ -1,0 +1,34 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "currency",
+      "type": "utf8"
+    },
+    {
+      "name": "chf_value",
+      "type": "decimal128(18,2)"
+    },
+    {
+      "name": "negative_chf_value",
+      "type": "decimal128(18,2)"
+    }
+  ],
+  "rows": [
+    [
+      "CHF",
+      "100.00",
+      "-100.00"
+    ],
+    [
+      "EUR",
+      "95.01",
+      "-95.01"
+    ],
+    [
+      "USD",
+      "90.00",
+      "-90.00"
+    ]
+  ]
+}

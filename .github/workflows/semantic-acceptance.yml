@@ -1,0 +1,60 @@
+name: Semantic acceptance (informational)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['crates/**', 'apps/**', 'tests/datasets/**', 'Cargo.*', '.github/workflows/semantic-acceptance.yml']
+  push:
+    branches: [main]
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SEMANTIC_EVAL_MODEL: ${{ vars.SEMANTIC_EVAL_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - name: Build evaluator
+        run: cargo build --locked -p semantic-eval
+      - name: SQL acceptance
+        id: sql
+        continue-on-error: true
+        run: target/debug/semantic-eval run --dataset tests/datasets/commerce-v1/manifest.json --interface sql --artifacts .semantic-eval/sql
+      - name: Live typed Ask acceptance
+        id: ask
+        if: always()
+        continue-on-error: true
+        run: target/debug/semantic-eval run --dataset tests/datasets/commerce-v1/manifest.json --interface ask --context auto --artifacts .semantic-eval/ask
+      - name: Acceptance summary
+        if: always()
+        shell: python
+        run: |
+          import json, pathlib, os
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+            summary.write('## Informational acceptance\n\n')
+            for interface in ['sql', 'ask']:
+              paths = sorted((pathlib.Path('.semantic-eval') / interface).glob('run-*/report.json'))
+              path = paths[-1] if paths else pathlib.Path('missing-report.json')
+              if not path.exists():
+                summary.write(f'- {interface}: incomplete, no report produced\n')
+                continue
+              report = json.loads(path.read_text())
+              cases = report['cases']
+              passed = sum(c['passed'] for c in cases)
+              summary.write(f"- {interface}: {passed}/{len(cases)} passed; complete={report['complete']}; model={report['configured_model'] or 'unavailable'}\n")
+              if report.get('setup_error'): summary.write(f"  Setup: {report['setup_error']}\n")
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semantic-acceptance-reports
+          path: .semantic-eval/
+          if-no-files-found: warn
+      - name: Preserve acceptance failure status
+        if: always()
+        env:
+          SQL_OUTCOME: ${{ steps.sql.outcome }}
+          ASK_OUTCOME: ${{ steps.ask.outcome }}
+        run: test "$SQL_OUTCOME" = success && test "$ASK_OUTCOME" = success

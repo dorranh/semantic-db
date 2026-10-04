@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "region",
+      "type": "utf8"
+    },
+    {
+      "name": "gross_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "AT",
+      "-100"
+    ],
+    [
+      "CH",
+      "9500"
+    ],
+    [
+      "DE",
+      "2000"
+    ]
+  ]
+}

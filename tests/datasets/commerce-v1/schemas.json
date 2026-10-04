@@ -1,0 +1,448 @@
+{
+  "customers": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "name",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "region",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "vip",
+        "type": "boolean",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "note",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "tier",
+        "type": "int16",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "customer_id"
+    ],
+    "row_count": 6
+  },
+  "products": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "product_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "name",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "category",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "weight_kg",
+        "type": "float32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "rating",
+        "type": "float64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "list_price",
+        "type": "decimal128(18,2)",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "product_id"
+    ],
+    "row_count": 4
+  },
+  "exchange_rates": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "currency",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "rate_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "chf_per_unit",
+        "type": "decimal128(18,6)",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "currency",
+      "rate_date"
+    ],
+    "row_count": 3
+  },
+  "business_calendar": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "calendar_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "month_key",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "fiscal_year",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "fiscal_quarter",
+        "type": "int16",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "business_day",
+        "type": "boolean",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "calendar_date"
+    ],
+    "row_count": 10
+  },
+  "orders": {
+    "source": "postgres",
+    "columns": [
+      {
+        "name": "order_id",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "billing_customer_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "shipping_customer_id",
+        "type": "int32",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "status",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "order_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "placed_at",
+        "type": "timestamp(us,UTC)",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "local_placed_at",
+        "type": "timestamp(us)",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "pickup_time",
+        "type": "time64(us)",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "total_minor",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "tax_amount",
+        "type": "decimal128(18,2)",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "currency",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "order_id"
+    ],
+    "row_count": 10
+  },
+  "order_items": {
+    "source": "postgres",
+    "columns": [
+      {
+        "name": "order_id",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "line_no",
+        "type": "int16",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "product_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "quantity",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "line_minor",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "order_id",
+      "line_no"
+    ],
+    "row_count": 11
+  },
+  "refunds": {
+    "source": "postgres",
+    "columns": [
+      {
+        "name": "refund_id",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "order_id",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "line_no",
+        "type": "int16",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "refund_minor",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "refund_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "refund_id"
+    ],
+    "row_count": 5
+  },
+  "subscriptions": {
+    "source": "postgres",
+    "columns": [
+      {
+        "name": "subscription_id",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "customer_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "start_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "end_date",
+        "type": "date32",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "monthly_minor",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "status",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "subscription_id"
+    ],
+    "row_count": 5
+  },
+  "customer_region_history": {
+    "source": "postgres",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "valid_from",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "valid_to",
+        "type": "date32",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "region",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [
+      "customer_id",
+      "valid_from"
+    ],
+    "row_count": 6
+  },
+  "exchange_rates_duplicate": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "currency",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "rate_date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "chf_per_unit",
+        "type": "decimal128(18,6)",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [],
+    "row_count": 2
+  },
+  "customer_region_history_overlap": {
+    "source": "csv",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "int32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "valid_from",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "valid_to",
+        "type": "date32",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "region",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ],
+    "primary_key": [],
+    "row_count": 2
+  }
+}

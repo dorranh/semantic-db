@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "smallest",
+      "type": "int64"
+    },
+    {
+      "name": "largest",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "-100",
+      "3000"
+    ]
+  ]
+}

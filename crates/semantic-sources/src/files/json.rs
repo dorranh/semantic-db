@@ -40,7 +40,7 @@ pub(super) fn table(
         .collect();
     Ok(Arc::new(StreamingTable::try_new(schema, partitions)?))
 }
-fn list(path: &Path, extension: &str, paths: &mut Vec<PathBuf>) -> Result<()> {
+pub(super) fn list(path: &Path, extension: &str, paths: &mut Vec<PathBuf>) -> Result<()> {
     if path.is_dir() {
         for entry in std::fs::read_dir(path)? {
             let entry = entry?;

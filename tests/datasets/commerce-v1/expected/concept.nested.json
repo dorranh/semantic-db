@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "id",
+      "type": "int32"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "2",
+      "Béatrice"
+    ]
+  ]
+}

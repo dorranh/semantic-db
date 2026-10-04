@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "lost_count",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "0"
+    ]
+  ]
+}

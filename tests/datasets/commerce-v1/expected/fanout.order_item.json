@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "orders_minor",
+      "type": "int64"
+    },
+    {
+      "name": "items_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "11900",
+      "11900"
+    ]
+  ]
+}

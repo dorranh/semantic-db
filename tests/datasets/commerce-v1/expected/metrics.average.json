@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "average_minor",
+      "type": "decimal128(18,2)"
+    }
+  ],
+  "rows": [
+    [
+      "1487.50"
+    ]
+  ]
+}

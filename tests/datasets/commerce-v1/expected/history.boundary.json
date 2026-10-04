@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "int64"
+    },
+    {
+      "name": "region",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "101",
+      "DE"
+    ],
+    [
+      "102",
+      "CH"
+    ],
+    [
+      "107",
+      "CH"
+    ]
+  ]
+}

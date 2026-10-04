@@ -1,0 +1,49 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "COALESCE(o.cents,0)",
+      "type": "int64"
+    },
+    {
+      "name": "COALESCE(s.cents,0)",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Ada O'Brien",
+      "6000",
+      "1200"
+    ],
+    [
+      "Béatrice",
+      "0",
+      "0"
+    ],
+    [
+      "Chen",
+      "3500",
+      "0"
+    ],
+    [
+      "Dario",
+      "2000",
+      "0"
+    ],
+    [
+      "Éva",
+      "-100",
+      "1500"
+    ],
+    [
+      "No orders",
+      "0",
+      "0"
+    ]
+  ]
+}

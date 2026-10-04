@@ -1,0 +1,39 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "COUNT(o.order_id)",
+      "type": "int64"
+    },
+    {
+      "name": "SUM(COALESCE(r.events,0))",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Ada O'Brien",
+      "3",
+      "2"
+    ],
+    [
+      "Chen",
+      "2",
+      "2"
+    ],
+    [
+      "Dario",
+      "1",
+      "1"
+    ],
+    [
+      "Éva",
+      "1",
+      "0"
+    ]
+  ]
+}

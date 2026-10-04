@@ -1,0 +1,5 @@
+product_id,name,category,weight_kg,rating,list_price
+10,Tea,grocery,0.25,4.5,10.00
+20,Mug,home,0.5,4.5,15.00
+30,Book,books,0.75,4.75,20.00
+40,Unused,home,0.0,3.0,0.00

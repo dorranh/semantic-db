@@ -1,0 +1,31 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "net_minor",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Ada O'Brien",
+      "5500"
+    ],
+    [
+      "Chen",
+      "2400"
+    ],
+    [
+      "Dario",
+      "2000"
+    ],
+    [
+      "Éva",
+      "-100"
+    ]
+  ]
+}

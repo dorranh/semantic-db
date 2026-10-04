@@ -1,0 +1,161 @@
+{
+  "ossie": "model.ossie.yaml",
+  "connections": {
+    "files": {
+      "connector": "csv"
+    },
+    "facts": {
+      "connector": "postgres",
+      "connection_string_env": "EVAL_DATABASE_URL",
+      "allow_insecure_transport": true
+    }
+  },
+  "sources": {
+    "files.customers": {
+      "connection": "files",
+      "path": "data/customers.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "customer_id",
+        "name",
+        "region",
+        "vip",
+        "tier"
+      ],
+      "physical_types": {
+        "customer_id": "Int32",
+        "name": "Utf8",
+        "region": "Utf8",
+        "vip": "Boolean",
+        "note": "Utf8",
+        "tier": "Int16"
+      }
+    },
+    "files.products": {
+      "connection": "files",
+      "path": "data/products.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "product_id",
+        "name",
+        "category",
+        "weight_kg",
+        "rating",
+        "list_price"
+      ],
+      "physical_types": {
+        "product_id": "Int32",
+        "name": "Utf8",
+        "category": "Utf8",
+        "weight_kg": "Float32",
+        "rating": "Float64",
+        "list_price": {
+          "Decimal128": [
+            18,
+            2
+          ]
+        }
+      }
+    },
+    "files.exchange_rates": {
+      "connection": "files",
+      "path": "data/exchange_rates.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "currency",
+        "rate_date",
+        "chf_per_unit"
+      ],
+      "physical_types": {
+        "currency": "Utf8",
+        "rate_date": "Date32",
+        "chf_per_unit": {
+          "Decimal128": [
+            18,
+            6
+          ]
+        }
+      }
+    },
+    "files.business_calendar": {
+      "connection": "files",
+      "path": "data/business_calendar.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "calendar_date",
+        "month_key",
+        "fiscal_year",
+        "fiscal_quarter",
+        "business_day"
+      ],
+      "physical_types": {
+        "calendar_date": "Date32",
+        "month_key": "Utf8",
+        "fiscal_year": "Int32",
+        "fiscal_quarter": "Int16",
+        "business_day": "Boolean"
+      }
+    },
+    "facts.orders": {
+      "connection": "facts",
+      "schema": "commerce",
+      "table": "orders"
+    },
+    "facts.order_items": {
+      "connection": "facts",
+      "schema": "commerce",
+      "table": "order_items"
+    },
+    "facts.refunds": {
+      "connection": "facts",
+      "schema": "commerce",
+      "table": "refunds"
+    },
+    "facts.subscriptions": {
+      "connection": "facts",
+      "schema": "commerce",
+      "table": "subscriptions"
+    },
+    "facts.customer_region_history": {
+      "connection": "facts",
+      "schema": "commerce",
+      "table": "customer_region_history"
+    },
+    "files.exchange_rates_duplicate": {
+      "connection": "files",
+      "path": "data/exchange_rates_duplicate.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "currency",
+        "rate_date",
+        "chf_per_unit"
+      ],
+      "physical_types": {
+        "currency": "Utf8",
+        "rate_date": "Date32",
+        "chf_per_unit": {
+          "Decimal128": [
+            18,
+            6
+          ]
+        }
+      }
+    },
+    "files.customer_region_history_overlap": {
+      "connection": "files",
+      "path": "data/customer_region_history_overlap.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "customer_id",
+        "valid_from",
+        "region"
+      ],
+      "physical_types": {
+        "customer_id": "Int32",
+        "valid_from": "Date32",
+        "valid_to": "Date32",
+        "region": "Utf8"
+      }
+    }
+  }
+}

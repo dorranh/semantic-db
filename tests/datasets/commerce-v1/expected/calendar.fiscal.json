@@ -1,0 +1,23 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "fiscal_year",
+      "type": "int32"
+    },
+    {
+      "name": "SUM(o.total_minor)",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "2023",
+      "11000"
+    ],
+    [
+      "2024",
+      "900"
+    ]
+  ]
+}

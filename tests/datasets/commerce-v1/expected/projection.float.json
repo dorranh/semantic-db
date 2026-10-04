@@ -1,0 +1,24 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "int32"
+    },
+    {
+      "name": "weight_kg",
+      "type": "float32"
+    },
+    {
+      "name": "rating",
+      "type": "float64"
+    }
+  ],
+  "rows": [
+    [
+      "30",
+      0.75,
+      4.75
+    ]
+  ]
+}

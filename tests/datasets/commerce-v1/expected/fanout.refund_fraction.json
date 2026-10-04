@@ -1,0 +1,35 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "refund_fraction",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-10,
+        "relative": 1e-12
+      }
+    }
+  ],
+  "rows": [
+    [
+      "Ada O'Brien",
+      0.08333333333333333
+    ],
+    [
+      "Chen",
+      0.3142857142857143
+    ],
+    [
+      "Dario",
+      0.0
+    ],
+    [
+      "Éva",
+      -0.0
+    ]
+  ]
+}

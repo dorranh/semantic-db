@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "buyer_count",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "4"
+    ]
+  ]
+}
