@@ -206,6 +206,7 @@ async fn typed_row_and_graph_execute_bound_values() {
             RunOptions {
                 interface: Interface::Ask,
                 context: ContextMode::Full,
+                debug_capture: true,
                 artifacts: path.clone(),
                 ..Default::default()
             },
@@ -217,6 +218,22 @@ async fn typed_row_and_graph_execute_bound_values() {
         assert_eq!(
             report.cases[0].actual.as_ref().unwrap().rows,
             vec![vec![serde_json::json!("7")], vec![serde_json::json!("7")]]
+        );
+        let evidence = report.cases[0].debug_evidence.as_ref().unwrap();
+        let captured: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(evidence).unwrap()).unwrap();
+        assert_eq!(captured["calls_started"], 1);
+        assert_eq!(captured["truncated"], false);
+        let outcome = &report.cases[0].compilation.as_ref().unwrap()["outcome"];
+        assert!(matches!(
+            outcome["status"].as_str(),
+            Some("compiled" | "compiled_graph")
+        ));
+        assert!(
+            outcome["query"]["sql"]["statement"]
+                .as_str()
+                .unwrap()
+                .contains("SELECT")
         );
         std::fs::remove_dir_all(path).unwrap();
     }
@@ -649,4 +666,59 @@ fn malformed_execution_capacity_fails_artifact_loading_offline() {
         Some(1024)
     );
     std::fs::remove_dir_all(path).unwrap();
+}
+
+#[tokio::test]
+async fn debug_capture_retains_wrong_candidate_and_default_omits_it() {
+    for capture in [false, true] {
+        let d = tiny();
+        let path = output();
+        let proposal = serde_json::json!({"status":"query","query":row_proposal()});
+        let report = run_with_provider(
+            &d,
+            RunOptions {
+                interface: Interface::Ask,
+                artifacts: path.clone(),
+                debug_capture: capture,
+                ..Default::default()
+            },
+            OwnedScript(proposal.to_string()),
+        )
+        .await
+        .unwrap();
+        assert!(!report.cases[0].passed);
+        assert_eq!(report.cases[0].outcome, "result");
+        let compilation = report.cases[0].compilation.as_ref().unwrap();
+        assert_eq!(compilation.get("outcome").is_some(), capture);
+        if capture {
+            let transcript: semantic_interpreter::typed::ModelTranscript = serde_json::from_slice(
+                &std::fs::read(report.cases[0].debug_evidence.as_ref().unwrap()).unwrap(),
+            )
+            .unwrap();
+            let replay =
+                semantic_interpreter::typed::TranscriptProvider::new(transcript, 1024 * 1024)
+                    .unwrap();
+            let replay_path = output();
+            let replay_report = run_with_provider(
+                &d,
+                RunOptions {
+                    interface: Interface::Ask,
+                    artifacts: replay_path.clone(),
+                    ..Default::default()
+                },
+                replay,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                replay_report.cases[0].actual.as_ref().unwrap().rows,
+                report.cases[0].actual.as_ref().unwrap().rows
+            );
+            assert!(!replay_report.cases[0].passed);
+            std::fs::remove_dir_all(replay_path).unwrap();
+        } else {
+            assert!(report.cases[0].debug_evidence.is_none());
+        }
+        std::fs::remove_dir_all(path).unwrap();
+    }
 }

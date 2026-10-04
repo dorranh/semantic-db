@@ -7,7 +7,7 @@ use semantic_engine::Engine;
 use semantic_interpreter::{
     Interpreter,
     provider::{ModelProvider, OpenAiConfig, OpenAiProvider},
-    typed::{InterpretOptions, SelectionMode},
+    typed::{CaptureLimits, InterpretOptions, RecordingProvider, SelectionMode},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -58,6 +58,8 @@ pub struct RunOptions {
     pub env_file: Option<PathBuf>,
     pub cli_binary: Option<PathBuf>,
     pub public_interfaces: bool,
+    /// Explicitly retain bounded model transcripts and compiled artifacts.
+    pub debug_capture: bool,
 }
 impl Default for RunOptions {
     fn default() -> Self {
@@ -81,6 +83,7 @@ impl Default for RunOptions {
             env_file: None,
             cli_binary: None,
             public_interfaces: false,
+            debug_capture: false,
         }
     }
 }
@@ -100,6 +103,9 @@ pub struct CaseReport {
     pub differences: Vec<String>,
     pub actual: Option<TypedResult>,
     pub compilation: Option<serde_json::Value>,
+    /// Opt-in bounded model transcript artifact, including interrupted calls.
+    #[serde(default)]
+    pub debug_evidence: Option<PathBuf>,
     pub latency_millis: u128,
 }
 /// Identity of one planned independent case/interface/repetition attempt.
@@ -326,8 +332,11 @@ async fn ask<P: ModelProvider>(
         .compile_typed(engine, &c.question, options)
         .await;
     // Retain diagnostics/accounting only: model receives the question and imported catalog, never oracle/SQL/ledger.
-    let record =
+    let mut record =
         serde_json::json!({"record":compiled.record,"interpretation":compiled.interpretation});
+    if o.debug_capture {
+        record["outcome"] = serde_json::to_value(&compiled.outcome)?;
+    }
     let mut actual = Actual {
         outcome: String::new(),
         result: None,
@@ -753,11 +762,11 @@ async fn run_inner<P: ModelProvider>(
         report.limitations.push(
             "Application-owned provider: this run is diagnostic, not live release evidence".into(),
         );
-        Some(Interpreter::new(EvaluationProvider::Injected(
+        Some(EvaluationProvider::Injected(
             injected,
             provider_diagnostics.clone(),
             model_request_gate.clone(),
-        )))
+        ))
     } else if options.interface != Interface::Sql {
         match (getenv("OPENAI_API_KEY"), model) {
             (Some(key), Some(model)) => {
@@ -769,11 +778,11 @@ async fn run_inner<P: ModelProvider>(
                     config.base_url = base;
                 }
                 match OpenAiProvider::new(config) {
-                    Ok(p) => Some(Interpreter::new(EvaluationProvider::Live(
+                    Ok(p) => Some(EvaluationProvider::Live(
                         p,
                         provider_diagnostics.clone(),
                         model_request_gate.clone(),
-                    ))),
+                    )),
                     Err(e) => {
                         provider_error = Some(e.to_string());
                         None
@@ -785,6 +794,12 @@ async fn run_inner<P: ModelProvider>(
     } else {
         None
     };
+    let normal_interpreter = provider
+        .as_ref()
+        .map(|p| Interpreter::new(BorrowedProvider(p)));
+    if options.debug_capture {
+        report.limitations.push("Debug capture retains bounded request/catalog/model content; per-attempt recording uses a fresh context cache and is not cache-performance evidence".into());
+    }
     for repetition in 0..options.repetitions {
         let mut ordered = selected.clone();
         shuffle(&mut ordered, repetition as u64 + 0x5eed);
@@ -800,6 +815,14 @@ async fn run_inner<P: ModelProvider>(
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .clear();
+                let recording = if options.debug_capture && interface == Interface::Ask {
+                    provider.as_ref().map(|p| {
+                        RecordingProvider::new(BorrowedProvider(p), CaptureLimits::default())
+                    })
+                } else {
+                    None
+                };
+                let recorder = recording.as_ref().map(RecordingProvider::recorder);
                 let start = Instant::now();
                 let attempt = async {
                     let engine = engine
@@ -825,18 +848,31 @@ async fn run_inner<P: ModelProvider>(
                         }
                         sql(engine, c.sql.as_deref().ok_or("missing SQL")?, &options).await
                     } else {
-                        let provider=provider.as_ref().ok_or_else(||provider_error.clone().unwrap_or_else(||"live model unavailable: OPENAI_API_KEY and explicit model required".into()))?;
-                        ask(
-                            engine,
-                            provider,
-                            c,
-                            c.context.as_ref().unwrap_or(&dataset.manifest.context),
-                            &options,
-                        )
-                        .await
+                        let _provider=provider.as_ref().ok_or_else(||provider_error.clone().unwrap_or_else(||"live model unavailable: OPENAI_API_KEY and explicit model required".into()))?;
+                        if let Some(recording) = recording.as_ref() {
+                            ask(
+                                engine,
+                                &Interpreter::new(BorrowedProvider(recording)),
+                                c,
+                                c.context.as_ref().unwrap_or(&dataset.manifest.context),
+                                &options,
+                            )
+                            .await
+                        } else {
+                            ask(
+                                engine,
+                                normal_interpreter
+                                    .as_ref()
+                                    .ok_or("live model unavailable")?,
+                                c,
+                                c.context.as_ref().unwrap_or(&dataset.manifest.context),
+                                &options,
+                            )
+                            .await
+                        }
                     }
                 };
-                let actual = if cancelled {
+                let mut actual = if cancelled {
                     Actual {
                         outcome: "cancelled".into(),
                         result: None,
@@ -883,11 +919,32 @@ async fn run_inner<P: ModelProvider>(
                 if actual.incomplete {
                     report.complete = false
                 }
+                let debug_evidence = if let Some(recorder) = recorder {
+                    let path = options
+                        .artifacts
+                        .join(format!("debug-attempt-{}.json", report.cases.len()));
+                    match serde_json::to_vec_pretty(&recorder.snapshot())
+                        .map_err(crate::Error::from)
+                        .and_then(|bytes| std::fs::write(&path, bytes).map_err(crate::Error::from))
+                    {
+                        Ok(()) => Some(path),
+                        Err(_) => {
+                            actual.incomplete = true;
+                            report.complete = false;
+                            report
+                                .limitations
+                                .push("Debug transcript artifact could not be written".into());
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
                 report.cases.push(CaseReport {
                     id: c.id.clone(),
                     interface,
                     repetition,
-                    passed,
+                    passed: passed && !actual.incomplete,
                     incomplete: actual.incomplete,
                     outcome: actual.outcome,
                     diagnostic: actual.diagnostic,
@@ -899,6 +956,7 @@ async fn run_inner<P: ModelProvider>(
                     differences,
                     actual: actual.result,
                     compilation: actual.compilation,
+                    debug_evidence,
                     latency_millis: start.elapsed().as_millis(),
                 });
                 report.completed_case_attempts = report.cases.len();
@@ -1120,4 +1178,26 @@ fn output_directory(dataset: &Dataset, requested: &std::path::Path) -> Result<Pa
         return Err("artifact output must be outside the immutable dataset bundle".into());
     }
     Ok(resolved)
+}
+
+struct BorrowedProvider<'a, P>(&'a P);
+impl<P: ModelProvider> ModelProvider for BorrowedProvider<'_, P> {
+    fn capabilities(&self) -> semantic_interpreter::provider::ProviderCapabilities {
+        self.0.capabilities()
+    }
+    async fn complete(
+        &self,
+        messages: &[semantic_interpreter::provider::Message],
+    ) -> std::result::Result<String, semantic_interpreter::provider::ProviderError> {
+        self.0.complete(messages).await
+    }
+    async fn complete_envelope(
+        &self,
+        messages: &[semantic_interpreter::provider::Message],
+    ) -> std::result::Result<
+        semantic_interpreter::provider::ModelCompletion,
+        semantic_interpreter::provider::ProviderError,
+    > {
+        self.0.complete_envelope(messages).await
+    }
 }

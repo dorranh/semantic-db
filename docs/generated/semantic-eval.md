@@ -178,3 +178,13 @@ PostgreSQL cursor fetch. Capacity must be positive, bounded to 1,000,000 request
 1 TiB per byte limit, and pass the engine's query-budget validation. Invalid artifact
 capacity fails offline validation. This configuration applies to every selected case
 and both in-process interfaces. Reports retain the resolved budgets.
+
+Opt-in `--debug-capture` retains each harness Ask attempt's bounded transcript
+(default 1 MiB and 8 calls) and its compiled outcome, including generated SQL and
+bound parameters. `debug_evidence` points to the transcript; truncation and
+interrupted calls remain explicit. These private artifacts contain request,
+catalog and model text, so choose retention accordingly. Provider configuration
+and environment credentials are not captured. SQL/gold never enters model input.
+Recording uses a fresh context cache per attempt; captured runs are not context
+cache performance evidence. Default runs retain the shared interpreter cache and
+omit transcript and compiled SQL capture. Public subprocess calls are not captured.

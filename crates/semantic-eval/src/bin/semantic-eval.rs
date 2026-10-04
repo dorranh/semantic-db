@@ -58,6 +58,9 @@ struct Args {
     cli_binary: Option<PathBuf>,
     #[arg(long)]
     public_interfaces: bool,
+    /// Retain bounded model transcripts and compiled SQL/parameters in private artifacts.
+    #[arg(long)]
+    debug_capture: bool,
 }
 #[tokio::main]
 async fn main() {
@@ -106,6 +109,7 @@ async fn execute() -> semantic_eval::Result<()> {
         env_file: args.env_file,
         cli_binary: args.cli_binary,
         public_interfaces: args.public_interfaces,
+        debug_capture: args.debug_capture,
     };
     let report = semantic_eval::run(&dataset, options).await?;
     let passed = report.cases.iter().filter(|c| c.passed).count();
