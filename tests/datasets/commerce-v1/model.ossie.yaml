@@ -5,7 +5,7 @@
       "name": "commerce",
       "description": "Small Swiss commerce acceptance model; monetary amounts in CHF cents; fiscal year begins April 1.",
       "ai_context": {
-        "instructions": "Completed orders mean status completed, including negative credit adjustments. Active subscriptions at date D have status active, start_date <= D, and end_date IS NULL OR D < end_date. History uses valid_from <= order_date < valid_to, with null valid_to open ended. Current region is customers.region, never a substitute for missing historical region. Billing and shipping roles differ; clarify unspecified recipient/order-list roles. The default billing rule applies only to sales attribution metrics. Default customer sales attribution is billing. Net sales are completed order totals minus all linked refunds; aggregate facts independently. Weighted unit price is sum(line_minor)/sum(quantity), null for zero denominator. CHF cents are exact integers; tax_amount is exact CHF. Fiscal year is year of April start, authored business_calendar is authoritative. Local wall timestamps are not instants; repeated October 02:30 timestamps represent two different UTC instants. Do not infer unavailable secrets, private payment data, ambiguous healthy/valuable labels, or unique matches in deliberately corrupted diagnostic fixtures. Active memberships at today use the explicit request clock converted to Europe/Zurich business date. Customer membership counts and zero-filled active MRR reporting use all customer dimension rows, retaining customers without matching memberships; explicitly unmatched subscriber rows are excluded when customer identity is requested. Gross sales by customer region omit unmatched billing customers when requested. Aggregate columns and ranked IDs use ascending order only when specified; otherwise no implicit ordering policy is required.\nGoverned rules version 1: {\"active_membership\": {\"empty\": \"zero count; null sum; reporting zero-fill must be explicit\", \"grain\": [\"subscription_id\"], \"predicate\": \"status = active AND start_date <= D AND (end_date IS NULL OR D < end_date)\"}, \"allocation\": {\"formula\": \"explicitly requested gross or net order cents * line_minor / SUM(line_minor for order); selected net amount is total_minor minus SUM(refund_minor for order)\", \"rounding\": \"selected case has exact integral allocations; broader residual policy unavailable\", \"unit\": \"CHF_cent\", \"zero_denominator\": \"null\"}, \"currency_conversion\": {\"duplicate_rate\": \"reject ambiguous lookup\", \"formula\": \"foreign units * rate chf_per_unit at matching currency/rate_date\", \"missing_rate\": \"unknown; not parity\", \"rounding\": \"half away from zero to 2 CHF decimal places\"}, \"fiscal_calendar\": {\"mapping\": \"business_calendar authoritative; missing periods not inferred\", \"quarter\": \"Apr-Jun1,Jul-Sep2,Oct-Dec3,Jan-Mar4\", \"year_label\": \"calendar year containing start\", \"year_start\": \"April 1\"}, \"history\": {\"keys\": [\"customer_id\"], \"missing\": \"null, never current-region substitution\", \"multiple_matches\": \"reject ambiguous historical lookup\", \"predicate\": \"valid_from <= D AND (valid_to IS NULL OR D < valid_to)\"}, \"net_completed_sales\": {\"empty\": \"null unless explicit reporting zero-fill\", \"expression\": \"SUM(completed order total_minor) - SUM(refund_minor linked to completed orders)\", \"fanout\": \"Aggregate each fact independently; do not join raw items/refunds before order aggregation\", \"grain\": [\"order_id\"], \"unit\": \"CHF_cent\"}, \"refund_fraction\": {\"expression\": \"SUM(linked refund_minor) / SUM(completed total_minor)\", \"rollup\": \"Recompute ratio of sums\", \"unit\": \"dimensionless\", \"zero_denominator\": \"null\"}, \"weighted_unit_price\": {\"expression\": \"SUM(line_minor) / SUM(quantity)\", \"grain\": [\"order_id\", \"line_no\"], \"rollup\": \"Recompute ratio of signed sums; never average subgroup averages\", \"rounding\": \"half away from zero to six fractional CHF-cent digits when requested\", \"unit\": \"CHF_cent_per_item\", \"zero_denominator\": \"null\"}}"
+        "instructions": "Completed orders mean status completed, including negative credit adjustments. Active subscriptions at date D have status active, start_date <= D, and end_date IS NULL OR D < end_date. History uses valid_from <= order_date < valid_to, with null valid_to open ended. Current region is customers.region, never a substitute for missing historical region. Billing and shipping roles differ; Payer, paying customer and billed buyer explicitly mean billing_customer. Recipient, receiving customer and received by explicitly mean shipping_customer. Clarify customer involvement only when the role is actually unspecified; explicit payer or recipient wording already resolves it. The default billing rule applies only to sales attribution metrics. Default customer sales attribution is billing. Net sales are completed order totals minus all linked refunds; aggregate facts independently. Weighted unit price is sum(line_minor)/sum(quantity), null for zero denominator. CHF cents are exact integers; tax_amount is exact CHF. Fiscal year is year of April start, authored business_calendar is authoritative. Local wall timestamps are not instants; repeated October 02:30 timestamps represent two different UTC instants. Do not infer unavailable secrets, private payment data, ambiguous healthy/valuable labels, or unique matches in deliberately corrupted diagnostic fixtures. Active memberships at today use the explicit request clock converted to Europe/Zurich business date. Customer membership counts and zero-filled active MRR reporting use all customer dimension rows, retaining customers without matching memberships; explicitly unmatched subscriber rows are excluded when customer identity is requested. Gross sales by customer region omit unmatched billing customers when requested. Aggregate columns and ranked IDs use ascending order only when specified; otherwise no implicit ordering policy is required.\nGoverned rules version 1: {\"active_membership\": {\"empty\": \"zero count; null sum; reporting zero-fill must be explicit\", \"grain\": [\"subscription_id\"], \"predicate\": \"status = active AND start_date <= D AND (end_date IS NULL OR D < end_date)\"}, \"allocation\": {\"formula\": \"explicitly requested gross or net order cents * line_minor / SUM(line_minor for order); selected net amount is total_minor minus SUM(refund_minor for order)\", \"rounding\": \"selected case has exact integral allocations; broader residual policy unavailable\", \"unit\": \"CHF_cent\", \"zero_denominator\": \"null\"}, \"currency_conversion\": {\"duplicate_rate\": \"reject ambiguous lookup\", \"formula\": \"foreign units * rate chf_per_unit at matching currency/rate_date\", \"missing_rate\": \"unknown; not parity\", \"rounding\": \"half away from zero to 2 CHF decimal places\"}, \"fiscal_calendar\": {\"mapping\": \"business_calendar authoritative; missing periods not inferred\", \"quarter\": \"Apr-Jun1,Jul-Sep2,Oct-Dec3,Jan-Mar4\", \"year_label\": \"calendar year containing start\", \"year_start\": \"April 1\"}, \"history\": {\"keys\": [\"customer_id\"], \"missing\": \"null, never current-region substitution\", \"multiple_matches\": \"reject ambiguous historical lookup\", \"predicate\": \"valid_from <= D AND (valid_to IS NULL OR D < valid_to)\"}, \"net_completed_sales\": {\"empty\": \"null unless explicit reporting zero-fill\", \"expression\": \"SUM(completed order total_minor) - SUM(refund_minor linked to completed orders)\", \"fanout\": \"Aggregate each fact independently; do not join raw items/refunds before order aggregation\", \"grain\": [\"order_id\"], \"unit\": \"CHF_cent\"}, \"refund_fraction\": {\"expression\": \"SUM(linked refund_minor) / SUM(completed total_minor)\", \"rollup\": \"Recompute ratio of sums\", \"unit\": \"dimensionless\", \"zero_denominator\": \"null\"}, \"weighted_unit_price\": {\"expression\": \"SUM(line_minor) / SUM(quantity)\", \"grain\": [\"order_id\", \"line_no\"], \"rollup\": \"Recompute ratio of signed sums; never average subgroup averages\", \"rounding\": \"half away from zero to six fractional CHF-cent digits when requested\", \"unit\": \"CHF_cent_per_item\", \"zero_denominator\": \"null\"}}"
       },
       "datasets": [
         {
@@ -964,7 +964,13 @@
             "customer_id"
           ],
           "ai_context": {
-            "instructions": "Payer / billed buyer. Default customer sales attribution is billing. 99 intentionally has no matching dimension."
+            "instructions": "Payer / billed buyer. Default customer sales attribution is billing. 99 intentionally has no matching dimension.",
+            "synonyms": [
+              "payer",
+              "paying customer",
+              "paying buyer",
+              "billed buyer"
+            ]
           }
         },
         {
@@ -978,7 +984,13 @@
             "customer_id"
           ],
           "ai_context": {
-            "instructions": "Recipient; distinct from payer. Null shipping customer is unknown."
+            "instructions": "Recipient; distinct from payer. Null shipping customer is unknown.",
+            "synonyms": [
+              "recipient",
+              "receiving customer",
+              "received",
+              "received by"
+            ]
           }
         },
         {
@@ -1050,7 +1062,11 @@
             "billing_customer_id"
           ],
           "ai_context": {
-            "instructions": "Orders attributed to this billed buyer. Reverse traversal can return many orders; retain customers without orders when zero-filled customer reporting is requested."
+            "instructions": "Orders attributed to this billed buyer. Reverse traversal can return many orders; retain customers without orders when zero-filled customer reporting is requested.",
+            "synonyms": [
+              "orders billed to a customer",
+              "payer orders"
+            ]
           }
         },
         {
@@ -1064,7 +1080,11 @@
             "shipping_customer_id"
           ],
           "ai_context": {
-            "instructions": "Orders received by this customer; distinct from billed_orders. Reverse traversal can return many orders."
+            "instructions": "Orders received by this customer; distinct from billed_orders. Reverse traversal can return many orders.",
+            "synonyms": [
+              "orders received by a customer",
+              "recipient orders"
+            ]
           }
         },
         {
