@@ -248,3 +248,8 @@ The frozen v1.0.2 full run passed SQL 66/66 and Ask 18/66 (84/132 total); finali
 ## Terminal commerce shared-context evidence
 
 The frozen full run passed SQL 103/103 and Ask 51/115 (154/218 total), with no provider errors and null setup/cleanup/artifact errors. Finalized/full coverage are true; complete is false due to five unresolved expansion-limit outcomes. All 64 failed Ask cases and full diagnostics/differences appear in [the terminal commerce failure ledger](commerce-v1-shared-context-failure-ledger.md), alongside separate integer-width focused evidence (2/4, SQL only passing). The 122 provider calls have input median 33015 and maximum 33927. Historical baselines remain preserved; these results do not claim full Ask acceptance.
+
+
+## Incomplete pipeline 38 full Ask attempt
+
+The attempted commerce full Ask run stopped after 78/115 attempts (48 pass, 30 fail) due to disk exhaustion before report finalization. It is not a full score or evidence of full-suite improvement. The report SHA, resource failure and parent-verified manual cleanup, plus every observed failure diagnostic/difference, are preserved in [the incomplete checkpoint ledger](commerce-pipeline38-incomplete-ask-ledger.md). The remaining 37 attempts are unevaluated. A new verified full run is required; no selected subset may replace it.
