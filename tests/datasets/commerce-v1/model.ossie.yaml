@@ -5,7 +5,7 @@
       "name": "commerce",
       "description": "Small Swiss commerce acceptance model; monetary amounts in CHF cents; fiscal year begins April 1.",
       "ai_context": {
-        "instructions": "Completed orders mean status completed, including negative credit adjustments. Active subscriptions at date D have status active, start_date <= D, and end_date IS NULL OR D < end_date. History uses valid_from <= order_date < valid_to, with null valid_to open ended. Current region is customers.region, never a substitute for missing historical region. Billing and shipping roles differ; clarify unspecified recipient/order-list roles. The default billing rule applies only to sales attribution metrics. Default customer sales attribution is billing. Net sales are completed order totals minus all linked refunds; aggregate facts independently. Weighted unit price is sum(line_minor)/sum(quantity), null for zero denominator. CHF cents are exact integers; tax_amount is exact CHF. Fiscal year is year of April start, authored business_calendar is authoritative. Local wall timestamps are not instants; repeated October 02:30 timestamps represent two different UTC instants. Do not infer unavailable secrets, private payment data, ambiguous healthy/valuable labels, or unique matches in deliberately corrupted diagnostic fixtures.\nGoverned rules version 1: {\"active_membership\": {\"empty\": \"zero count; null sum; reporting zero-fill must be explicit\", \"grain\": [\"subscription_id\"], \"predicate\": \"status = active AND start_date <= D AND (end_date IS NULL OR D < end_date)\"}, \"allocation\": {\"formula\": \"explicitly requested gross or net order cents * line_minor / SUM(line_minor for order); selected net amount is total_minor minus SUM(refund_minor for order)\", \"rounding\": \"selected case has exact integral allocations; broader residual policy unavailable\", \"unit\": \"CHF_cent\", \"zero_denominator\": \"null\"}, \"currency_conversion\": {\"duplicate_rate\": \"reject ambiguous lookup\", \"formula\": \"foreign units * rate chf_per_unit at matching currency/rate_date\", \"missing_rate\": \"unknown; not parity\", \"rounding\": \"half away from zero to 2 CHF decimal places\"}, \"fiscal_calendar\": {\"mapping\": \"business_calendar authoritative; missing periods not inferred\", \"quarter\": \"Apr-Jun1,Jul-Sep2,Oct-Dec3,Jan-Mar4\", \"year_label\": \"calendar year containing start\", \"year_start\": \"April 1\"}, \"history\": {\"keys\": [\"customer_id\"], \"missing\": \"null, never current-region substitution\", \"multiple_matches\": \"reject ambiguous historical lookup\", \"predicate\": \"valid_from <= D AND (valid_to IS NULL OR D < valid_to)\"}, \"net_completed_sales\": {\"empty\": \"null unless explicit reporting zero-fill\", \"expression\": \"SUM(completed order total_minor) - SUM(refund_minor linked to completed orders)\", \"fanout\": \"Aggregate each fact independently; do not join raw items/refunds before order aggregation\", \"grain\": [\"order_id\"], \"unit\": \"CHF_cent\"}, \"refund_fraction\": {\"expression\": \"SUM(linked refund_minor) / SUM(completed total_minor)\", \"rollup\": \"Recompute ratio of sums\", \"unit\": \"dimensionless\", \"zero_denominator\": \"null\"}, \"weighted_unit_price\": {\"expression\": \"SUM(line_minor) / SUM(quantity)\", \"grain\": [\"order_id\", \"line_no\"], \"rollup\": \"Recompute ratio of signed sums; never average subgroup averages\", \"rounding\": \"half away from zero to six fractional CHF-cent digits when requested\", \"unit\": \"CHF_cent_per_item\", \"zero_denominator\": \"null\"}}"
+        "instructions": "Completed orders mean status completed, including negative credit adjustments. Active subscriptions at date D have status active, start_date <= D, and end_date IS NULL OR D < end_date. History uses valid_from <= order_date < valid_to, with null valid_to open ended. Current region is customers.region, never a substitute for missing historical region. Billing and shipping roles differ; clarify unspecified recipient/order-list roles. The default billing rule applies only to sales attribution metrics. Default customer sales attribution is billing. Net sales are completed order totals minus all linked refunds; aggregate facts independently. Weighted unit price is sum(line_minor)/sum(quantity), null for zero denominator. CHF cents are exact integers; tax_amount is exact CHF. Fiscal year is year of April start, authored business_calendar is authoritative. Local wall timestamps are not instants; repeated October 02:30 timestamps represent two different UTC instants. Do not infer unavailable secrets, private payment data, ambiguous healthy/valuable labels, or unique matches in deliberately corrupted diagnostic fixtures. Active memberships at today use the explicit request clock converted to Europe/Zurich business date. Customer membership counts and zero-filled active MRR reporting use all customer dimension rows, retaining customers without matching memberships; explicitly unmatched subscriber rows are excluded when customer identity is requested. Gross sales by customer region omit unmatched billing customers when requested. Aggregate columns and ranked IDs use ascending order only when specified; otherwise no implicit ordering policy is required.\nGoverned rules version 1: {\"active_membership\": {\"empty\": \"zero count; null sum; reporting zero-fill must be explicit\", \"grain\": [\"subscription_id\"], \"predicate\": \"status = active AND start_date <= D AND (end_date IS NULL OR D < end_date)\"}, \"allocation\": {\"formula\": \"explicitly requested gross or net order cents * line_minor / SUM(line_minor for order); selected net amount is total_minor minus SUM(refund_minor for order)\", \"rounding\": \"selected case has exact integral allocations; broader residual policy unavailable\", \"unit\": \"CHF_cent\", \"zero_denominator\": \"null\"}, \"currency_conversion\": {\"duplicate_rate\": \"reject ambiguous lookup\", \"formula\": \"foreign units * rate chf_per_unit at matching currency/rate_date\", \"missing_rate\": \"unknown; not parity\", \"rounding\": \"half away from zero to 2 CHF decimal places\"}, \"fiscal_calendar\": {\"mapping\": \"business_calendar authoritative; missing periods not inferred\", \"quarter\": \"Apr-Jun1,Jul-Sep2,Oct-Dec3,Jan-Mar4\", \"year_label\": \"calendar year containing start\", \"year_start\": \"April 1\"}, \"history\": {\"keys\": [\"customer_id\"], \"missing\": \"null, never current-region substitution\", \"multiple_matches\": \"reject ambiguous historical lookup\", \"predicate\": \"valid_from <= D AND (valid_to IS NULL OR D < valid_to)\"}, \"net_completed_sales\": {\"empty\": \"null unless explicit reporting zero-fill\", \"expression\": \"SUM(completed order total_minor) - SUM(refund_minor linked to completed orders)\", \"fanout\": \"Aggregate each fact independently; do not join raw items/refunds before order aggregation\", \"grain\": [\"order_id\"], \"unit\": \"CHF_cent\"}, \"refund_fraction\": {\"expression\": \"SUM(linked refund_minor) / SUM(completed total_minor)\", \"rollup\": \"Recompute ratio of sums\", \"unit\": \"dimensionless\", \"zero_denominator\": \"null\"}, \"weighted_unit_price\": {\"expression\": \"SUM(line_minor) / SUM(quantity)\", \"grain\": [\"order_id\", \"line_no\"], \"rollup\": \"Recompute ratio of signed sums; never average subgroup averages\", \"rounding\": \"half away from zero to six fractional CHF-cent digits when requested\", \"unit\": \"CHF_cent_per_item\", \"zero_denominator\": \"null\"}}"
       },
       "datasets": [
         {
@@ -59,7 +59,7 @@
                   }
                 ]
               },
-              "description": "region at customers grain."
+              "description": "Region country code: CH Switzerland, FR France, DE Germany, AT Austria. Unknown historical region remains null."
             },
             {
               "name": "vip",
@@ -163,7 +163,13 @@
                   }
                 ]
               },
-              "description": "weight_kg at products grain."
+              "description": "Product mass in kilograms; authoritative named unit kg, measured Float32.",
+              "custom_extensions": [
+                {
+                  "vendor_name": "SEMANTIC_DB",
+                  "data": "{\"kind\":\"unit\",\"unit\":{\"kind\":\"named\",\"id\":\"kg\"}}"
+                }
+              ]
             },
             {
               "name": "rating",
@@ -828,7 +834,7 @@
                   }
                 ]
               },
-              "description": "region at customer_region_history grain."
+              "description": "Region country code: CH Switzerland, FR France, DE Germany, AT Austria. Unknown historical region remains null."
             }
           ]
         },
@@ -941,7 +947,7 @@
                   }
                 ]
               },
-              "description": "region at customer_region_history_overlap grain."
+              "description": "Region country code: CH Switzerland, FR France, DE Germany, AT Austria. Unknown historical region remains null."
             }
           ]
         }
@@ -1032,6 +1038,78 @@
           "ai_context": {
             "instructions": "Subscriptions aggregate independently before combining with orders."
           }
+        },
+        {
+          "name": "billed_orders",
+          "from": "customers",
+          "to": "orders",
+          "from_columns": [
+            "customer_id"
+          ],
+          "to_columns": [
+            "billing_customer_id"
+          ],
+          "ai_context": {
+            "instructions": "Orders attributed to this billed buyer. Reverse traversal can return many orders; retain customers without orders when zero-filled customer reporting is requested."
+          }
+        },
+        {
+          "name": "received_orders",
+          "from": "customers",
+          "to": "orders",
+          "from_columns": [
+            "customer_id"
+          ],
+          "to_columns": [
+            "shipping_customer_id"
+          ],
+          "ai_context": {
+            "instructions": "Orders received by this customer; distinct from billed_orders. Reverse traversal can return many orders."
+          }
+        },
+        {
+          "name": "customer_subscriptions",
+          "from": "customers",
+          "to": "subscriptions",
+          "from_columns": [
+            "customer_id"
+          ],
+          "to_columns": [
+            "customer_id"
+          ],
+          "ai_context": {
+            "instructions": "Memberships for this customer; multiple subscriptions possible. Active customer reporting starts from all customers and retains those with no active matching membership when requested."
+          }
+        },
+        {
+          "name": "order_lines",
+          "from": "orders",
+          "to": "order_items",
+          "from_columns": [
+            "order_id"
+          ],
+          "to_columns": [
+            "order_id"
+          ],
+          "ai_context": {
+            "instructions": "All item lines belonging to the order; reverse traversal can fan out and must not multiply order metrics."
+          }
+        },
+        {
+          "name": "line_refunds",
+          "from": "order_items",
+          "to": "refunds",
+          "from_columns": [
+            "order_id",
+            "line_no"
+          ],
+          "to_columns": [
+            "order_id",
+            "line_no"
+          ],
+          "ai_context": {
+            "instructions": "All refund events for this exact composite item key; multiple and missing events are possible."
+          }
         }
       ],
       "metrics": [
@@ -1050,7 +1128,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"order_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"order_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1069,7 +1147,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"billing_customer_id\",\"shipping_customer_id\",\"status\",\"order_date\",\"placed_at\",\"local_placed_at\",\"pickup_time\",\"currency\"],\"unit\":{\"kind\":\"named\",\"id\":\"order\"},\"empty\":\"zero\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"billing_customer_id\",\"shipping_customer_id\",\"status\",\"order_date\",\"placed_at\",\"local_placed_at\",\"pickup_time\",\"currency\"],\"unit\":{\"kind\":\"named\",\"id\":\"order\"},\"empty\":\"zero\",\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1088,7 +1166,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"refunds\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"refunds\",\"field\":\"refund_id\"}]},\"dimensions\":[\"order_id\",\"line_no\",\"refund_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"refund_event\"},\"empty\":\"zero\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"refunds\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"refunds\",\"field\":\"refund_id\"}]},\"dimensions\":[\"order_id\",\"line_no\",\"refund_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"refund_event\"},\"empty\":\"zero\",\"lookup_dimensions\":[{\"relationship\":\"refund_item\",\"field\":\"order_id\",\"missing\":\"null\"},{\"relationship\":\"refund_item\",\"field\":\"order_id\",\"missing\":\"exclude\"},{\"relationship\":\"refund_item\",\"field\":\"line_no\",\"missing\":\"null\"},{\"relationship\":\"refund_item\",\"field\":\"line_no\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1107,7 +1185,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"refunds\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"refunds\",\"field\":\"refund_id\"}]},\"dimensions\":[\"order_id\",\"line_no\",\"refund_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"refunds\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"refunds\",\"field\":\"refund_id\"}]},\"dimensions\":[\"order_id\",\"line_no\",\"refund_date\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"refund_item\",\"field\":\"order_id\",\"missing\":\"null\"},{\"relationship\":\"refund_item\",\"field\":\"order_id\",\"missing\":\"exclude\"},{\"relationship\":\"refund_item\",\"field\":\"line_no\",\"missing\":\"null\"},{\"relationship\":\"refund_item\",\"field\":\"line_no\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1126,7 +1204,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"order_items\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"order_items\",\"field\":\"order_id\"},{\"relation\":\"order_items\",\"field\":\"line_no\"}]},\"dimensions\":[\"product_id\",\"quantity\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"order_items\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"order_items\",\"field\":\"order_id\"},{\"relation\":\"order_items\",\"field\":\"line_no\"}]},\"dimensions\":[\"product_id\",\"quantity\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"item_product\",\"field\":\"product_id\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"product_id\",\"missing\":\"exclude\"},{\"relationship\":\"item_product\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"item_product\",\"field\":\"category\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"category\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"order_id\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"order_id\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"status\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"status\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"order_date\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"order_date\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"currency\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"currency\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1145,7 +1223,7 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"order_items\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"order_items\",\"field\":\"order_id\"},{\"relation\":\"order_items\",\"field\":\"line_no\"}]},\"dimensions\":[\"product_id\",\"quantity\"],\"unit\":{\"kind\":\"named\",\"id\":\"item\"},\"empty\":\"null\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"order_items\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"order_items\",\"field\":\"order_id\"},{\"relation\":\"order_items\",\"field\":\"line_no\"}]},\"dimensions\":[\"product_id\",\"quantity\"],\"unit\":{\"kind\":\"named\",\"id\":\"item\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"item_product\",\"field\":\"product_id\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"product_id\",\"missing\":\"exclude\"},{\"relationship\":\"item_product\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"item_product\",\"field\":\"category\",\"missing\":\"null\"},{\"relationship\":\"item_product\",\"field\":\"category\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"order_id\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"order_id\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"status\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"status\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"order_date\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"order_date\",\"missing\":\"exclude\"},{\"relationship\":\"item_order\",\"field\":\"currency\",\"missing\":\"null\"},{\"relationship\":\"item_order\",\"field\":\"currency\",\"missing\":\"exclude\"}]}"
             }
           ]
         },
@@ -1164,7 +1242,64 @@
           "custom_extensions": [
             {
               "vendor_name": "SEMANTIC_DB",
-              "data": "{\"kind\":\"metric\",\"dataset\":\"subscriptions\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"subscriptions\",\"field\":\"subscription_id\"}]},\"dimensions\":[\"customer_id\",\"start_date\",\"end_date\",\"status\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent_per_month\"},\"empty\":\"null\"}"
+              "data": "{\"kind\":\"metric\",\"dataset\":\"subscriptions\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"subscriptions\",\"field\":\"subscription_id\"}]},\"dimensions\":[\"customer_id\",\"start_date\",\"end_date\",\"status\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent_per_month\"},\"empty\":\"null\",\"lookup_dimensions\":[{\"relationship\":\"subscriber\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"subscriber\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"subscriber\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"subscriber\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"subscriber\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"subscriber\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
+            }
+          ]
+        },
+        {
+          "name": "average_completed_order_minor",
+          "datatype": "Decimal",
+          "description": "Exact mean completed order amount in CHF cents, including signed credit adjustments. Finalize only after combining exact sum and order count; presentation rounding must be explicitly requested.",
+          "expression": {
+            "dialects": [
+              {
+                "dialect": "ANSI_SQL",
+                "expression": "SUM(total_minor)"
+              }
+            ]
+          },
+          "custom_extensions": [
+            {
+              "vendor_name": "SEMANTIC_DB",
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"shipping_customer_id\",\"order_date\",\"currency\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"row_filters\":[{\"field\":\"status\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"completed\"}}],\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}],\"state\":{\"version\":2,\"state\":{\"kind\":\"sum_count_average\"},\"merge_dimensions\":[\"status\",\"billing_customer_id\",\"shipping_customer_id\",\"order_date\",\"currency\"]},\"result_type\":{\"Decimal128\":[38,18]}}"
+            }
+          ]
+        },
+        {
+          "name": "smallest_completed_order_minor",
+          "datatype": "Integer",
+          "description": "Smallest completed order amount in exact signed CHF cents; empty population is null.",
+          "expression": {
+            "dialects": [
+              {
+                "dialect": "ANSI_SQL",
+                "expression": "MIN(total_minor)"
+              }
+            ]
+          },
+          "custom_extensions": [
+            {
+              "vendor_name": "SEMANTIC_DB",
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"shipping_customer_id\",\"order_date\",\"currency\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"row_filters\":[{\"field\":\"status\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"completed\"}}],\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
+            }
+          ]
+        },
+        {
+          "name": "largest_completed_order_minor",
+          "datatype": "Integer",
+          "description": "Largest completed order amount in exact signed CHF cents; empty population is null.",
+          "expression": {
+            "dialects": [
+              {
+                "dialect": "ANSI_SQL",
+                "expression": "MAX(total_minor)"
+              }
+            ]
+          },
+          "custom_extensions": [
+            {
+              "vendor_name": "SEMANTIC_DB",
+              "data": "{\"kind\":\"metric\",\"dataset\":\"orders\",\"source_grain\":{\"entity\":null,\"keys\":[{\"relation\":\"orders\",\"field\":\"order_id\"}]},\"dimensions\":[\"status\",\"billing_customer_id\",\"shipping_customer_id\",\"order_date\",\"currency\"],\"unit\":{\"kind\":\"named\",\"id\":\"CHF_cent\"},\"empty\":\"null\",\"row_filters\":[{\"field\":\"status\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"completed\"}}],\"lookup_dimensions\":[{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"billing_customer\",\"field\":\"region\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"customer_id\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"name\",\"missing\":\"exclude\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"null\"},{\"relationship\":\"shipping_customer\",\"field\":\"region\",\"missing\":\"exclude\"}]}"
             }
           ]
         }
@@ -1233,6 +1368,22 @@
         {
           "vendor_name": "SEMANTIC_DB",
           "data": "{\"kind\":\"concept\",\"dataset\":\"subscriptions\",\"name\":\"paused\",\"description\":\"Paused subscriptions are excluded from active MRR.\",\"predicate\":{\"kind\":\"compare\",\"field\":\"status\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"paused\"}}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"concept\",\"dataset\":\"subscriptions\",\"name\":\"active_at_date\",\"description\":\"Active membership at explicitly bound business date as_of_date: active status, inclusive start, exclusive end, null end open-ended. The date argument is required and typed from Date32 fields; today binds the request clock interpreted in Europe/Zurich.\",\"predicate\":{\"kind\":\"all\",\"predicates\":[{\"kind\":\"compare\",\"field\":\"status\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"active\"}},{\"kind\":\"compare_parameter\",\"field\":\"start_date\",\"operator\":\"lt_eq\",\"parameter\":\"as_of_date\"},{\"kind\":\"any\",\"predicates\":[{\"kind\":\"is_null\",\"field\":\"end_date\",\"negated\":false},{\"kind\":\"compare_parameter\",\"field\":\"end_date\",\"operator\":\"gt\",\"parameter\":\"as_of_date\"}]}]}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"business_calendar\",\"dataset\":\"orders\",\"name\":\"swiss_order_date\",\"rule\":{\"version\":1,\"id\":\"commerce/swiss_order_date\",\"source_relation\":\"orders\",\"calendar_relation\":\"business_calendar\",\"source_date_field\":\"order_date\",\"calendar_date_field\":\"calendar_date\",\"fiscal_year_field\":\"fiscal_year\",\"fiscal_period_field\":\"fiscal_quarter\",\"business_day_field\":\"business_day\",\"source_basis\":\"date32\",\"timezone\":\"Europe/Zurich\",\"mapping_revision\":\"sha256:d6241593d9c16e638079435b5ee6b31863d49a06c9ec441596a2260817d3c5ce\",\"source_refs\":[]}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"business_calendar\",\"dataset\":\"orders\",\"name\":\"swiss_order_instant\",\"rule\":{\"version\":1,\"id\":\"commerce/swiss_order_instant\",\"source_relation\":\"orders\",\"calendar_relation\":\"business_calendar\",\"source_date_field\":\"placed_at\",\"calendar_date_field\":\"calendar_date\",\"fiscal_year_field\":\"fiscal_year\",\"fiscal_period_field\":\"fiscal_quarter\",\"business_day_field\":\"business_day\",\"source_basis\":\"utc_instant_micros\",\"timezone\":\"Europe/Zurich\",\"mapping_revision\":\"sha256:d6241593d9c16e638079435b5ee6b31863d49a06c9ec441596a2260817d3c5ce\",\"source_refs\":[]}}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"concept\",\"dataset\":\"customers\",\"name\":\"french_region\",\"description\":\"Customers whose exact region code FR denotes France\",\"predicate\":{\"kind\":\"compare\",\"field\":\"region\",\"operator\":\"eq\",\"value\":{\"type\":\"utf8\",\"value\":\"FR\"}}}"
         }
       ]
     }
