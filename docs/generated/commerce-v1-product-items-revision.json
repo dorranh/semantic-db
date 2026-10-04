@@ -1,0 +1,34 @@
+{
+  "baseline_hash_manifest": "docs/generated/commerce-v1-product-items-baseline-hashes.json",
+  "changed_files": {
+    "bootstrap/author_dataset.py": {
+      "before": "01ec7602b1ff291f0a561763a7ddfaeca744b05706450a52713fdd020067e7ca",
+      "after": "0a62e71d7a2ddc7e8e17d01c2a34621ed50d4e90b806257d737993de70c99d79"
+    },
+    "manifest.json": {
+      "before": "a799b16b9ef7e4bdebbba399fbc60ce6663682d20f9107e2e6402aad47188f52",
+      "after": "990c8b57c404557d7081e6d07b3847d067419dea43357003c5e95b7eba6f4041"
+    },
+    "model.ossie.yaml": {
+      "before": "946b48c5d07ad94268031f1776104f6041c6168cd160a9514933d8611e5be9fc",
+      "after": "ff53d7c83b5ce7775de918da9fa66c074da1a4083732a30e870a14bed7098e25"
+    }
+  },
+  "unchanged_file_count": 145,
+  "product_items": {
+    "name": "product_items",
+    "from": "products",
+    "to": "order_items",
+    "from_columns": [
+      "product_id"
+    ],
+    "to_columns": [
+      "product_id"
+    ],
+    "ai_context": {
+      "instructions": "Item lines referencing this catalog product. Multiple lines or no matching lines are possible. Sale qualification uses item quantity and the referenced order status; the equality relationship itself imposes neither condition."
+    }
+  },
+  "version": "1.0.1",
+  "artifact_digest": "d435dffd97a15fd0994de19ffc595d56c571494404a6dee65704f79626d07a7a"
+}

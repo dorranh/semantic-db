@@ -1022,6 +1022,20 @@
           }
         },
         {
+          "name": "product_items",
+          "from": "products",
+          "to": "order_items",
+          "from_columns": [
+            "product_id"
+          ],
+          "to_columns": [
+            "product_id"
+          ],
+          "ai_context": {
+            "instructions": "Item lines referencing this catalog product. Multiple lines or no matching lines are possible. Sale qualification uses item quantity and the referenced order status; the equality relationship itself imposes neither condition."
+          }
+        },
+        {
           "name": "refund_item",
           "from": "refunds",
           "to": "order_items",
