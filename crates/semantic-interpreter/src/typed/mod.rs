@@ -5,6 +5,7 @@
 mod capture;
 mod context;
 mod context_manifest;
+mod shared_model_context;
 mod span_recovery;
 pub use span_recovery::SpanNormalization;
 

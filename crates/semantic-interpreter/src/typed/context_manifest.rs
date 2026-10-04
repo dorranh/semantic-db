@@ -119,11 +119,12 @@ pub fn audit_context_manifest(
             "payload_snapshot_id",
         ));
     }
-    if parsed
-        .as_ref()
-        .and_then(|value| value.get("version"))
-        .and_then(Value::as_u64)
-        != Some(u64::from(manifest.version))
+    if !matches!(manifest.version, 1 | 2)
+        || parsed
+            .as_ref()
+            .and_then(|value| value.get("version"))
+            .and_then(Value::as_u64)
+            != Some(u64::from(manifest.version))
         || parsed.as_ref().and_then(|value| value.get("coverage"))
             != Some(&serde_json::to_value(manifest.selection_mode).expect("mode serializes"))
         || parsed
@@ -131,6 +132,10 @@ pub fn audit_context_manifest(
             .and_then(|value| value.get("semantic_sufficiency_proven"))
             .and_then(Value::as_bool)
             != Some(false)
+        || (manifest.version == 1
+            && parsed
+                .as_ref()
+                .is_some_and(|value| value.get("shared_model_contexts").is_some()))
     {
         gaps.push(gap(
             ContextGapKind::PayloadMismatch,
@@ -153,6 +158,7 @@ pub fn audit_context_manifest(
         }
     }
     let mut included = BTreeSet::new();
+    let mut expected_shared = BTreeMap::new();
     for object in &manifest.included {
         let name = object.reference.id.as_str();
         if !included.insert(name) {
@@ -323,6 +329,21 @@ pub fn audit_context_manifest(
         }
         if let Some(semantics) = &relation.semantics {
             let rendered_semantics = rendered.get("semantics");
+            let mixed_model_contract = if manifest.version == 1 {
+                rendered_semantics.is_some_and(|value| value.get("model_context_ref").is_some())
+            } else {
+                rendered_semantics.is_some_and(|value| {
+                    value.get("model_description").is_some()
+                        || value.get("model_ai_context").is_some()
+                })
+            };
+            if mixed_model_contract {
+                gaps.push(gap(
+                    ContextGapKind::PayloadMismatch,
+                    Some(name),
+                    "mixed_model_context_contract",
+                ));
+            }
             let expected_coverage =
                 serde_json::to_value(&semantics.view_coverage).expect("view coverage serializes");
             if rendered_semantics.and_then(|value| value.get("view_coverage"))
@@ -376,19 +397,49 @@ pub fn audit_context_manifest(
                 ),
                 ("origin", serde_json::to_value(&semantics.origin)),
                 ("capability", serde_json::to_value(&semantics.capability)),
-                (
-                    "model_description",
-                    serde_json::to_value(&semantics.model_description),
-                ),
-                (
-                    "model_ai_context",
-                    serde_json::to_value(&semantics.model_ai_context),
-                ),
                 ("ai_context", serde_json::to_value(&semantics.ai_context)),
             ] {
                 let expected = expected.expect("catalog context metadata serializes");
                 if rendered_semantics.and_then(|value| value.get(kind)) != Some(&expected) {
                     gaps.push(gap(ContextGapKind::MissingFactGroup, Some(name), kind));
+                }
+            }
+            if manifest.version == 1 {
+                for (kind, expected) in [
+                    (
+                        "model_description",
+                        serde_json::to_value(&semantics.model_description),
+                    ),
+                    (
+                        "model_ai_context",
+                        serde_json::to_value(&semantics.model_ai_context),
+                    ),
+                ] {
+                    if rendered_semantics.and_then(|value| value.get(kind))
+                        != Some(&expected.expect("model context serializes"))
+                    {
+                        gaps.push(gap(ContextGapKind::MissingFactGroup, Some(name), kind));
+                    }
+                }
+            } else {
+                let reference =
+                    super::shared_model_context::from_relation(relation).map(|(id, shared)| {
+                        expected_shared.insert(
+                            id.clone(),
+                            serde_json::to_value(shared).expect("model context serializes"),
+                        );
+                        id
+                    });
+                let expected =
+                    serde_json::to_value(reference).expect("context reference serializes");
+                if rendered_semantics.and_then(|value| value.get("model_context_ref"))
+                    != Some(&expected)
+                {
+                    gaps.push(gap(
+                        ContextGapKind::MissingFactGroup,
+                        Some(name),
+                        "model_context_ref",
+                    ));
                 }
             }
             if !semantics.declared_primary_key.is_empty() {
@@ -558,6 +609,21 @@ pub fn audit_context_manifest(
             {
                 gaps.push(gap(ContextGapKind::MissingDependency, Some(name), target));
             }
+        }
+    }
+    if manifest.version == 2 {
+        let expected =
+            serde_json::to_value(expected_shared).expect("shared model context serializes");
+        if parsed
+            .as_ref()
+            .and_then(|value| value.get("shared_model_contexts"))
+            != Some(&expected)
+        {
+            gaps.push(gap(
+                ContextGapKind::MissingFactGroup,
+                None,
+                "shared_model_contexts",
+            ));
         }
     }
     for search in &manifest.searches {

@@ -71,7 +71,7 @@ impl ContextCache {
             },
         });
         let identity = AnalysisCacheIdentity {
-            stage: "initial_context_v1".into(),
+            stage: "initial_context_v2".into(),
             input_digest: semantic_catalog::canonical_digest(&serde_json::json!({
                 "snapshot": snapshot.id(),
                 "input": selection_input.clone(),
@@ -82,7 +82,7 @@ impl ContextCache {
             parameter_digest: semantic_catalog::canonical_digest(&serde_json::json!(
                 options.request_context
             )),
-            renderer_revision: "context-render-v1".into(),
+            renderer_revision: "context-render-v2".into(),
             function_revision: "context-functions-v1".into(),
             acceptance_revision: "strict-v1".into(),
         };
@@ -95,7 +95,7 @@ impl ContextCache {
             .filter(|relations| relations.len() == 1)
             .and_then(|relations| relations.iter().next());
         let selection_identity = AnalysisCacheIdentity {
-            stage: "full_single_relation_selection_v1".into(),
+            stage: "full_single_relation_selection_v2".into(),
             input_digest: semantic_catalog::canonical_digest(&selection_input),
             ..identity.clone()
         };
@@ -884,6 +884,8 @@ impl ContextState {
             coverage: SelectionMode,
             semantic_sufficiency_proven: bool,
             relations: Vec<RelationContext<'a>>,
+            shared_model_contexts:
+                BTreeMap<String, super::shared_model_context::SharedModelContext<'a>>,
         }
         #[derive(Serialize)]
         struct RelationContext<'a> {
@@ -901,8 +903,7 @@ impl ContextState {
         struct ScopedSemantics<'a> {
             view_coverage: &'a Option<semantic_catalog::ViewTemporalCoverage>,
             view_lineage: &'a Option<semantic_catalog::ViewOutputLineage>,
-            model_description: &'a Option<String>,
-            model_ai_context: &'a Option<semantic_catalog::AiContext>,
+            model_context_ref: Option<String>,
             ai_context: &'a Option<semantic_catalog::AiContext>,
             declared_primary_key: &'a [String],
             declared_unique_keys: &'a [Vec<String>],
@@ -929,13 +930,14 @@ impl ContextState {
             semantics: Option<&'a semantic_catalog::FieldSemantics>,
         }
         let mut context = Context {
-            version: 1,
+            version: 2,
             snapshot_id: snapshot.id(),
             request,
             request_context: &options.request_context,
             coverage: self.mode,
             semantic_sufficiency_proven: false,
             relations: Vec::new(),
+            shared_model_contexts: BTreeMap::new(),
         };
         let mut included = Vec::new();
         for (name, selection) in &self.selected {
@@ -961,6 +963,14 @@ impl ContextState {
             }
             work.context_relations += 1;
             let complete = selection.fields.len() == relation.schema.fields().len();
+            let model_context_ref =
+                super::shared_model_context::from_relation(relation).map(|(id, shared)| {
+                    context
+                        .shared_model_contexts
+                        .entry(id.clone())
+                        .or_insert(shared);
+                    id
+                });
             context.relations.push(RelationContext {
                 name: &relation.name,
                 revision: &entry.reference().revision,
@@ -969,8 +979,7 @@ impl ContextState {
                 semantics: relation.semantics.as_ref().map(|s| ScopedSemantics {
                     view_coverage: &s.view_coverage,
                     view_lineage: &s.view_lineage,
-                    model_description: &s.model_description,
-                    model_ai_context: &s.model_ai_context,
+                    model_context_ref,
                     ai_context: &s.ai_context,
                     declared_primary_key: &s.declared_primary_key,
                     declared_unique_keys: &s.declared_unique_keys,
@@ -1030,7 +1039,7 @@ impl ContextState {
             )
         );
         let mut manifest = ContextManifest {
-            version: 1,
+            version: 2,
             snapshot_id: snapshot.id().into(),
             selection_mode: self.mode,
             index_revision: (self.mode == SelectionMode::Retrieved).then(|| snapshot.id().into()),
