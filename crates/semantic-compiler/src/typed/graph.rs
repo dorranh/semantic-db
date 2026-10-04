@@ -35,6 +35,9 @@ struct CheckedNode {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum CheckedOperation {
+    Project {
+        projection: Box<calculate::Projection>,
+    },
     Calculate {
         calculation: Box<calculate::Calculation>,
     },
@@ -204,6 +207,9 @@ impl CompiledGraph {
         let mut frames: Vec<DataFrame> = Vec::new();
         for node in &self.nodes {
             let frame = match &node.operation {
+                CheckedOperation::Project { projection } => {
+                    calculate::plan_projection(projection, frames[projection.input].clone())?
+                }
                 CheckedOperation::Calculate { calculation } => {
                     calculate::plan_calculation(calculation, frames[calculation.input].clone())?
                 }
@@ -452,7 +458,8 @@ pub(super) async fn build(
             .iter()
             .map(|node| match &node.operation {
                 GraphOperation::Rows { .. } => 0,
-                GraphOperation::Calculate { .. }
+                GraphOperation::Project { .. }
+                | GraphOperation::Calculate { .. }
                 | GraphOperation::Conditional { .. }
                 | GraphOperation::Cast { .. }
                 | GraphOperation::NullTest { .. }
@@ -468,6 +475,7 @@ pub(super) async fn build(
             .iter()
             .map(|node| match &node.operation {
                 GraphOperation::Rows { .. } => 0,
+                GraphOperation::Project { columns, .. } => columns.len(),
                 GraphOperation::Set { columns, .. } => columns.len(),
                 GraphOperation::Compose { keys, outputs, .. } => keys.len() + outputs.len(),
                 GraphOperation::Calculate {
@@ -598,6 +606,18 @@ pub(super) async fn build(
                 (
                     CheckedOperation::Compose {
                         composition: Box::new(composition),
+                    },
+                    slots,
+                    grain,
+                )
+            }
+            GraphOperation::Project { input, columns } => {
+                let source = indexes[input];
+                let (projection, slots, grain) =
+                    calculate::bind_projection(source, &nodes[source], columns, options)?;
+                (
+                    CheckedOperation::Project {
+                        projection: Box::new(projection),
                     },
                     slots,
                     grain,
@@ -1019,7 +1039,8 @@ fn topological(
     for (i, n) in query.nodes.iter().enumerate() {
         let children = match &n.operation {
             GraphOperation::Rows { .. } => vec![],
-            GraphOperation::Calculate { input, .. }
+            GraphOperation::Project { input, .. }
+            | GraphOperation::Calculate { input, .. }
             | GraphOperation::Conditional { input, .. }
             | GraphOperation::Cast { input, .. }
             | GraphOperation::NullTest { input, .. }
@@ -1174,6 +1195,9 @@ fn emit(
     let mut parameters = Vec::new();
     for (i, node) in nodes.iter().enumerate() {
         let q = match &node.operation {
+            CheckedOperation::Project { projection } => {
+                calculate::emit_projection(projection, &names)
+            }
             CheckedOperation::Calculate { calculation } => {
                 calculate::emit_calculation(calculation, &names)
             }

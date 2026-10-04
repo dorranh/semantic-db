@@ -101,6 +101,11 @@ pub enum GraphOperation {
         keys: Vec<SetColumn>,
         outputs: Vec<CompositionOutput>,
     },
+    /// Select and rename existing slots without changing row multiplicity.
+    Project {
+        input: String,
+        columns: Vec<GraphProjection>,
+    },
     /// Project selected upstream slots and derive exact ratios after composition.
     Calculate {
         input: String,
@@ -126,7 +131,7 @@ pub enum GraphOperation {
         passthrough: Vec<GraphProjection>,
         tests: Vec<GraphNullTest>,
     },
-    /// Compare two scoped Int64 slots and emit a nullable Boolean value.
+    /// Compare two scoped slots of the same exact integer type and emit a nullable Boolean value.
     CompareSlots {
         input: String,
         passthrough: Vec<GraphProjection>,

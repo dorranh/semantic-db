@@ -87,18 +87,10 @@ pub(super) fn bind_slot_comparison(
     let mut aliases = BTreeSet::new();
     let mut slots = Vec::new();
     let mut projections = Vec::new();
-    let mut keys = BTreeSet::new();
     for projection in passthrough {
         options.check()?;
         unique_output(&projection.id, &projection.alias, &mut ids, &mut aliases)?;
         let prior = slot(source, &projection.slot)?;
-        if source
-            .group_keys
-            .as_ref()
-            .is_some_and(|g| g.contains(&projection.slot))
-        {
-            keys.insert(projection.id.clone());
-        }
         projections.push((prior.field.name().clone(), projection.alias.clone()));
         slots.push(Slot {
             id: projection.id.clone(),
@@ -139,10 +131,7 @@ pub(super) fn bind_slot_comparison(
             alias: comparison.alias.clone(),
         });
     }
-    let grain = source
-        .group_keys
-        .as_ref()
-        .and_then(|g| (keys.len() == g.len()).then_some(keys));
+    let grain = projected_grain(source, passthrough);
     Ok((
         SlotComparison {
             input,
@@ -194,18 +183,10 @@ pub(super) fn bind_null_test(
     let mut aliases = BTreeSet::new();
     let mut slots = Vec::new();
     let mut projections = Vec::new();
-    let mut keys = BTreeSet::new();
     for projection in passthrough {
         options.check()?;
         unique_output(&projection.id, &projection.alias, &mut ids, &mut aliases)?;
         let prior = slot(source, &projection.slot)?;
-        if source
-            .group_keys
-            .as_ref()
-            .is_some_and(|g| g.contains(&projection.slot))
-        {
-            keys.insert(projection.id.clone());
-        }
         projections.push((prior.field.name().clone(), projection.alias.clone()));
         slots.push(Slot {
             id: projection.id.clone(),
@@ -243,10 +224,7 @@ pub(super) fn bind_null_test(
             alias: test.alias.clone(),
         });
     }
-    let grain = source
-        .group_keys
-        .as_ref()
-        .and_then(|g| (keys.len() == g.len()).then_some(keys));
+    let grain = projected_grain(source, passthrough);
     Ok((
         NullTest {
             input,
@@ -275,18 +253,10 @@ pub(super) fn bind_cast(
     let mut aliases = BTreeSet::new();
     let mut slots = Vec::new();
     let mut projections = Vec::new();
-    let mut keys = BTreeSet::new();
     for projection in passthrough {
         options.check()?;
         unique_output(&projection.id, &projection.alias, &mut ids, &mut aliases)?;
         let prior = slot(source, &projection.slot)?;
-        if source
-            .group_keys
-            .as_ref()
-            .is_some_and(|g| g.contains(&projection.slot))
-        {
-            keys.insert(projection.id.clone());
-        }
         projections.push((prior.field.name().clone(), projection.alias.clone()));
         slots.push(Slot {
             id: projection.id.clone(),
@@ -325,10 +295,7 @@ pub(super) fn bind_cast(
             alias: cast.alias.clone(),
         });
     }
-    let grain = source
-        .group_keys
-        .as_ref()
-        .and_then(|g| (keys.len() == g.len()).then_some(keys));
+    let grain = projected_grain(source, passthrough);
     Ok((
         Cast {
             input,
@@ -357,18 +324,10 @@ pub(super) fn bind_conditional(
     let mut aliases = BTreeSet::new();
     let mut slots = Vec::new();
     let mut projections = Vec::new();
-    let mut keys = BTreeSet::new();
     for projection in passthrough {
         options.check()?;
         unique_output(&projection.id, &projection.alias, &mut ids, &mut aliases)?;
         let prior = slot(source, &projection.slot)?;
-        if source
-            .group_keys
-            .as_ref()
-            .is_some_and(|g| g.contains(&projection.slot))
-        {
-            keys.insert(projection.id.clone());
-        }
         projections.push((prior.field.name().clone(), projection.alias.clone()));
         slots.push(Slot {
             id: projection.id.clone(),
@@ -407,10 +366,7 @@ pub(super) fn bind_conditional(
             alias: output.alias.clone(),
         });
     }
-    let grain = source
-        .group_keys
-        .as_ref()
-        .and_then(|g| (keys.len() == g.len()).then_some(keys));
+    let grain = projected_grain(source, passthrough);
     Ok((
         Conditional {
             input,
@@ -439,18 +395,10 @@ pub(super) fn bind_calculation(
     let mut aliases = BTreeSet::new();
     let mut slots = Vec::new();
     let mut projections = Vec::new();
-    let mut keys = BTreeSet::new();
     for projection in passthrough {
         options.check()?;
         unique_output(&projection.id, &projection.alias, &mut ids, &mut aliases)?;
         let prior = slot(source, &projection.slot)?;
-        if source
-            .group_keys
-            .as_ref()
-            .is_some_and(|g| g.contains(&projection.slot))
-        {
-            keys.insert(projection.id.clone());
-        }
         projections.push((prior.field.name().clone(), projection.alias.clone()));
         slots.push(Slot {
             id: projection.id.clone(),
@@ -526,10 +474,7 @@ pub(super) fn bind_calculation(
             meaning,
         });
     }
-    let grain = source
-        .group_keys
-        .as_ref()
-        .and_then(|g| (keys.len() == g.len()).then_some(keys));
+    let grain = projected_grain(source, passthrough);
     Ok((
         Calculation {
             input,
@@ -831,4 +776,91 @@ pub(super) fn emit_slot_comparison(
 }
 fn sql_column(column: &str) -> ast::Expr {
     ast::Expr::CompoundIdentifier(vec![ident("src"), ident(column)])
+}
+
+/// Preserve a proved grain only when every original key survives exactly once.
+fn projected_grain(source: &CheckedNode, columns: &[GraphProjection]) -> Option<BTreeSet<String>> {
+    let original = source.group_keys.as_ref()?;
+    let mut result = BTreeSet::new();
+    for key in original {
+        let mut matches = columns.iter().filter(|column| &column.slot == key);
+        let projected = matches.next()?;
+        if matches.next().is_some() {
+            return None;
+        }
+        result.insert(projected.id.clone());
+    }
+    Some(result)
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(super) struct Projection {
+    pub(super) input: usize,
+    columns: Vec<(String, String)>,
+}
+pub(super) fn bind_projection(
+    input: usize,
+    source: &CheckedNode,
+    columns: &[GraphProjection],
+    options: &CompileOptions,
+) -> Result<BoundOutputs<Projection>, CompileDiagnostic> {
+    if columns.is_empty() || columns.len() > options.max_nodes {
+        return Err(diagnostic(
+            "graph_projection",
+            "Projection requires bounded nonempty columns",
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    let mut aliases = BTreeSet::new();
+    let mut outputs = Vec::new();
+    let mut slots = Vec::new();
+    for column in columns {
+        options.check()?;
+        unique_output(&column.id, &column.alias, &mut ids, &mut aliases)?;
+        let prior = slot(source, &column.slot)?;
+        outputs.push((prior.field.name().clone(), column.alias.clone()));
+        slots.push(Slot {
+            id: column.id.clone(),
+            field: prior.field.clone().with_name(&column.alias),
+            origin: prior.origin.clone(),
+            meaning: prior.meaning.clone(),
+        });
+    }
+    Ok((
+        Projection {
+            input,
+            columns: outputs,
+        },
+        slots,
+        projected_grain(source, columns),
+    ))
+}
+pub(super) fn plan_projection(
+    projection: &Projection,
+    frame: DataFrame,
+) -> Result<DataFrame, CompileDiagnostic> {
+    frame
+        .select(
+            projection
+                .columns
+                .iter()
+                .map(|(column, alias)| col(column).alias(alias))
+                .collect::<Vec<_>>(),
+        )
+        .map_err(lower::backend_error)
+}
+pub(super) fn emit_projection(projection: &Projection, names: &[String]) -> Box<ast::Query> {
+    let mut query = table_query(projection.input, names);
+    let ast::SetExpr::Select(select) = query.body.as_mut() else {
+        unreachable!()
+    };
+    select.projection = projection
+        .columns
+        .iter()
+        .map(|(column, alias)| ast::SelectItem::ExprWithAlias {
+            expr: sql_column(column),
+            alias: ident(alias),
+        })
+        .collect();
+    query
 }

@@ -805,3 +805,144 @@ async fn metric_request_distinguishes_currency_from_same_named_unit() {
         }
     }
 }
+
+#[tokio::test]
+async fn projection_preserves_only_complete_unique_original_group_keys() {
+    for mode in ["complete", "duplicate", "missing", "global"] {
+        for calculate in [false, true] {
+            let global = mode == "global";
+            let engine = if global { fixture() } else { grouped_fixture() };
+            let mut graph = query();
+            graph.nodes.truncate(3);
+            graph.root = "aligned".into();
+            graph.ordering.clear();
+            graph.limit = None;
+            if !global {
+                graph.nodes[0] = grouped_leaf("revenue");
+                graph.nodes[1] = grouped_leaf("spend");
+            }
+            let columns = if global {
+                vec![GraphProjection {
+                    id: "total".into(),
+                    slot: "sum".into(),
+                    alias: "total".into(),
+                }]
+            } else {
+                let mut columns = vec![GraphProjection {
+                    id: "total".into(),
+                    slot: "amount".into(),
+                    alias: "total".into(),
+                }];
+                if mode != "missing" {
+                    columns.extend([
+                        GraphProjection {
+                            id: "key_a".into(),
+                            slot: "region".into(),
+                            alias: "key_a".into(),
+                        },
+                        GraphProjection {
+                            id: "key_b".into(),
+                            slot: if mode == "duplicate" {
+                                "region"
+                            } else {
+                                "product"
+                            }
+                            .into(),
+                            alias: "key_b".into(),
+                        },
+                    ]);
+                }
+                columns
+            };
+            graph.nodes.insert(
+                2,
+                QueryNode {
+                    id: "selected".into(),
+                    source_text: "select totals and keys".into(),
+                    operation: if calculate {
+                        GraphOperation::Calculate {
+                            input: "revenue".into(),
+                            passthrough: columns,
+                            ratios: vec![GraphRatio {
+                                id: "check_ratio".into(),
+                                numerator: if global { "sum" } else { "amount" }.into(),
+                                denominator: if global { "sum" } else { "amount" }.into(),
+                                required_unit: None,
+                                zero: ZeroDivision::Null,
+                                alias: "check_ratio".into(),
+                            }],
+                        }
+                    } else {
+                        GraphOperation::Project {
+                            input: "revenue".into(),
+                            columns,
+                        }
+                    },
+                },
+            );
+            let GraphOperation::Compose {
+                left,
+                relationship_relation,
+                relationship,
+                role,
+                keys,
+                outputs,
+                ..
+            } = &mut graph.nodes[3].operation
+            else {
+                unreachable!()
+            };
+            *left = "selected".into();
+            outputs[0].slot = "total".into();
+            if !global {
+                *relationship_relation = "revenue".into();
+                *relationship = "same_group".into();
+                *role = "same_group".into();
+                outputs[1].slot = "amount".into();
+                *keys = if mode == "missing" {
+                    vec![]
+                } else {
+                    [("key_a", "region"), ("key_b", "product")]
+                        .into_iter()
+                        .map(|(left, right)| SetColumn {
+                            id: right.into(),
+                            left: left.into(),
+                            right: right.into(),
+                            alias: right.into(),
+                        })
+                        .collect()
+                };
+            }
+            let result = compile_graph(&engine, graph, CompileOptions::default()).await;
+            if matches!(mode, "duplicate" | "missing") {
+                assert!(
+                    matches!(result.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "composition_grain"),
+                    "mode={mode}"
+                );
+            } else {
+                let TypedOutcome::CompiledGraph { query } = result.outcome else {
+                    panic!("mode={mode}: {:?}", result.outcome)
+                };
+                let direct = query
+                    .plan_direct(&engine)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                let sql = query
+                    .execute(&engine, QueryOptions::default())
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(direct[0].schema(), sql[0].schema());
+                assert_eq!(
+                    direct.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                    sql.iter().map(RecordBatch::num_rows).sum::<usize>()
+                );
+            }
+        }
+    }
+}

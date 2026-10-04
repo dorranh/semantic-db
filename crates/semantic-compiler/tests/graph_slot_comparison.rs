@@ -576,3 +576,202 @@ async fn integer_slot_comparisons_reject_width_and_signedness_coercion() {
         );
     }
 }
+
+#[tokio::test]
+async fn project_trims_comparison_operands_without_changing_rows_or_nulls() {
+    let engine = fixture();
+    let mut graph = query();
+    graph.nodes.push(QueryNode {
+        id: "selected".into(),
+        source_text: "show equality".into(),
+        operation: GraphOperation::Project {
+            input: "compare".into(),
+            columns: vec![
+                GraphProjection {
+                    id: "row_id".into(),
+                    slot: "row_id".into(),
+                    alias: "row_id".into(),
+                },
+                GraphProjection {
+                    id: "answer".into(),
+                    slot: "equal".into(),
+                    alias: "answer".into(),
+                },
+            ],
+        },
+    });
+    graph.root = "selected".into();
+    let result = compile_graph(&engine, graph.clone(), CompileOptions::default()).await;
+    let TypedOutcome::CompiledGraph { query } = result.outcome else {
+        panic!("{:?}", result.outcome)
+    };
+    let direct = query
+        .plan_direct(&engine)
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    let sql = query
+        .execute(&engine, QueryOptions::default())
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    assert_eq!(direct[0].schema(), sql[0].schema());
+    assert_eq!(
+        boolean_rows(&direct),
+        vec![vec![Some(false)], vec![Some(true)], vec![None], vec![None]]
+    );
+    assert_eq!(boolean_rows(&sql), boolean_rows(&direct));
+    for columns in [
+        vec![],
+        vec![GraphProjection {
+            id: "a".into(),
+            slot: "missing".into(),
+            alias: "a".into(),
+        }],
+        vec![
+            GraphProjection {
+                id: "a".into(),
+                slot: "equal".into(),
+                alias: "a".into()
+            };
+            2
+        ],
+    ] {
+        let GraphOperation::Project {
+            columns: target, ..
+        } = &mut graph.nodes[2].operation
+        else {
+            unreachable!()
+        };
+        *target = columns;
+        assert!(matches!(
+            compile_graph(&engine, graph.clone(), CompileOptions::default())
+                .await
+                .outcome,
+            TypedOutcome::Rejected { .. }
+        ));
+    }
+}
+
+#[tokio::test]
+async fn projection_requires_node_and_each_output_evidence() {
+    let engine = fixture();
+    let mut graph = query();
+    graph.ordering.clear();
+    graph.nodes.push(QueryNode {
+        id: "selected".into(),
+        source_text: "selected equality".into(),
+        operation: GraphOperation::Project {
+            input: "compare".into(),
+            columns: vec![GraphProjection {
+                id: "answer".into(),
+                slot: "equal".into(),
+                alias: "answer".into(),
+            }],
+        },
+    });
+    graph.root = "selected".into();
+    let mut request = String::new();
+    let mut requirements = Vec::new();
+    let mut add = |target, text: &str| {
+        let start = request.len();
+        request.push_str(text);
+        let end = request.len();
+        request.push(' ');
+        requirements.push(GraphRequirementEvidence {
+            target,
+            source_spans: vec![RequestSpan { start, end }],
+        });
+    };
+    for node in &graph.nodes {
+        add(
+            GraphRequirementRef::Node {
+                node: node.id.clone(),
+            },
+            &node.source_text,
+        );
+        match &node.operation {
+            GraphOperation::Rows { query } => {
+                for r in &query.requirements {
+                    add(
+                        GraphRequirementRef::Leaf {
+                            node: node.id.clone(),
+                            requirement: r.id.clone(),
+                        },
+                        &r.source_text,
+                    );
+                }
+            }
+            GraphOperation::CompareSlots {
+                passthrough,
+                comparisons,
+                ..
+            } => {
+                for id in passthrough
+                    .iter()
+                    .map(|p| &p.id)
+                    .chain(comparisons.iter().map(|p| &p.id))
+                {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: id.clone(),
+                        },
+                        &node.source_text,
+                    );
+                }
+            }
+            GraphOperation::Project { columns, .. } => {
+                for p in columns {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: p.id.clone(),
+                        },
+                        &node.source_text,
+                    );
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+    let evidence = GraphRequestEvidence {
+        version: 1,
+        request_id: "projection".into(),
+        original_request: request,
+        requirements,
+        unresolved_alternatives: vec![],
+    };
+    assert!(matches!(
+        compile_graph_intent(
+            &engine,
+            GraphIntentQuery {
+                query: graph.clone(),
+                evidence: evidence.clone()
+            },
+            CompileOptions::default()
+        )
+        .await
+        .outcome,
+        TypedOutcome::CompiledGraph { .. }
+    ));
+    for target in [
+        GraphRequirementRef::Node {
+            node: "selected".into(),
+        },
+        GraphRequirementRef::Output {
+            node: "selected".into(),
+            slot: "answer".into(),
+        },
+    ] {
+        let mut missing = evidence.clone();
+        missing.requirements.retain(|r| r.target != target);
+        assert!(
+            matches!(compile_graph_intent(&engine, GraphIntentQuery { query: graph.clone(), evidence: missing }, CompileOptions::default()).await.outcome, TypedOutcome::Rejected { diagnostic } if diagnostic.code == "request_coverage")
+        );
+    }
+}

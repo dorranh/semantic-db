@@ -98,6 +98,17 @@ pub(super) fn requirements<'a>(
                     )?;
                 }
             }
+            GraphOperation::Project { columns, .. } => {
+                for column in columns {
+                    add(
+                        GraphRequirementRef::Output {
+                            node: node.id.clone(),
+                            slot: column.id.clone(),
+                        },
+                        None,
+                    )?;
+                }
+            }
             GraphOperation::Conditional {
                 passthrough,
                 outputs,
