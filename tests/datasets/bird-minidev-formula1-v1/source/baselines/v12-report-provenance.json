@@ -1,0 +1,14 @@
+{
+  "artifact_digest": "9c2b85d1a3abbb899a31e26a758a60ccc3b66afbd83ef7be2cc9fb5fa4695e62",
+  "reports": [
+    {
+      "path": ".semantic-eval/bird-sql-v12/run-209884-18db58aace290bb1/report.json",
+      "sha256": "dad31be8e7d2a37316fea65c13180a0ffcb2dbfc97882651592522868b58bdcf"
+    },
+    {
+      "path": ".semantic-eval/bird-luna-v12/run-210719-18db58ba059a4381/report.json",
+      "sha256": "4aa0af473cd81ed390649dc071419c14b75f1766842905a93579c116dcf41d71"
+    }
+  ],
+  "changes": "Four independently reviewed SQL dialect-portability corrections only; original NL/golds/tolerance retained."
+}

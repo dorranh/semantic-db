@@ -1,0 +1,4271 @@
+{
+  "source_sqlite_sha256": "79770caf966707e35516fa566e24b40ae515c74ec1ec4631235245645b87b24d",
+  "clock": "2026-10-04T00:00:00Z",
+  "method": "Original SQLite engine and independent native PostgreSQL 16.6; every original record loaded. This is an oracle, not the mixed-source product test.",
+  "cases": [
+    {
+      "question_id": 846,
+      "sqlite": {
+        "columns": [
+          "driverRef"
+        ],
+        "rows": [
+          [
+            "sato"
+          ],
+          [
+            "davidson"
+          ],
+          [
+            "vettel"
+          ],
+          [
+            "sutil"
+          ],
+          [
+            "fisichella"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.driverref FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 20 ORDER BY t1.q1 DESC NULLS LAST LIMIT 5",
+        "columns": [
+          {
+            "name": "driverref",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "sato"
+          ],
+          [
+            "davidson"
+          ],
+          [
+            "vettel"
+          ],
+          [
+            "sutil"
+          ],
+          [
+            "fisichella"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 847,
+      "sqlite": {
+        "columns": [
+          "surname"
+        ],
+        "rows": [
+          [
+            "Räikkönen"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT d.surname FROM qualifying AS q JOIN drivers AS d ON d.driverid = q.driverid WHERE q.raceid = 19 AND q.q2 IS NOT NULL ORDER BY q.q2, d.driverid LIMIT 1",
+        "columns": [
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Räikkönen"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 850,
+      "sqlite": {
+        "columns": [
+          "name"
+        ],
+        "rows": [
+          [
+            "German Grand Prix"
+          ],
+          [
+            "European Grand Prix"
+          ],
+          [
+            "Luxembourg Grand Prix"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t2.name FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t1.country = 'Germany'",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "European Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Luxembourg Grand Prix"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 854,
+      "sqlite": {
+        "columns": [
+          "lat",
+          "lng"
+        ],
+        "rows": [
+          [
+            -34.9272,
+            138.617
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Australian Grand Prix'",
+        "columns": [
+          {
+            "name": "lat",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lng",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            -34.9272,
+            138.617
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 857,
+      "sqlite": {
+        "columns": [
+          "lat",
+          "lng"
+        ],
+        "rows": [
+          [
+            24.4672,
+            54.6031
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Abu Dhabi Grand Prix'",
+        "columns": [
+          {
+            "name": "lat",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lng",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            24.4672,
+            54.6031
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 859,
+      "sqlite": {
+        "columns": [
+          "q1"
+        ],
+        "rows": [
+          [
+            "1:23.796"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.q1 FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 354 AND t2.forename = 'Bruno' AND t2.surname = 'Senna'",
+        "columns": [
+          {
+            "name": "q1",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "1:23.796"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 861,
+      "sqlite": {
+        "columns": [
+          "number"
+        ],
+        "rows": [
+          [
+            3
+          ],
+          [
+            5
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.number FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 903 AND t1.q3 LIKE '1:54%'",
+        "columns": [
+          {
+            "name": "number",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            3
+          ],
+          [
+            5
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 862,
+      "sqlite": {
+        "columns": [
+          "COUNT(T3.driverId)"
+        ],
+        "rows": [
+          [
+            12
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(t3.driverid) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t1.year = 2007 AND t1.name = 'Bahrain Grand Prix' AND t2.time IS NULL",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            12
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 865,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            "Jean-Pierre",
+            "Beltoise"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 592 AND NOT t2.time IS NULL AND NOT t1.dob IS NULL ORDER BY t1.dob ASC NULLS FIRST LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Jean-Pierre",
+            "Beltoise"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 866,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "url"
+        ],
+        "rows": [
+          [
+            "David",
+            "Coulthard",
+            "http://en.wikipedia.org/wiki/David_Coulthard"
+          ],
+          [
+            "Jarno",
+            "Trulli",
+            "http://en.wikipedia.org/wiki/Jarno_Trulli"
+          ],
+          [
+            "Jenson",
+            "Button",
+            "http://en.wikipedia.org/wiki/Jenson_Button"
+          ],
+          [
+            "Rubens",
+            "Barrichello",
+            "http://en.wikipedia.org/wiki/Rubens_Barrichello"
+          ],
+          [
+            "Ralf",
+            "Schumacher",
+            "http://en.wikipedia.org/wiki/Ralf_Schumacher"
+          ],
+          [
+            "Michael",
+            "Schumacher",
+            "http://en.wikipedia.org/wiki/Michael_Schumacher"
+          ],
+          [
+            "Ricardo",
+            "Zonta",
+            "http://en.wikipedia.org/wiki/Ricardo_Zonta"
+          ],
+          [
+            "Heinz-Harald",
+            "Frentzen",
+            "http://en.wikipedia.org/wiki/Heinz-Harald_Frentzen"
+          ],
+          [
+            "Mika",
+            "Häkkinen",
+            "http://en.wikipedia.org/wiki/Mika_H%C3%A4kkinen"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t2.forename, t2.surname, t2.url FROM laptimes AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 161 AND t1.time LIKE '1:27%'",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "url",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "David",
+            "Coulthard",
+            "http://en.wikipedia.org/wiki/David_Coulthard"
+          ],
+          [
+            "Heinz-Harald",
+            "Frentzen",
+            "http://en.wikipedia.org/wiki/Heinz-Harald_Frentzen"
+          ],
+          [
+            "Jarno",
+            "Trulli",
+            "http://en.wikipedia.org/wiki/Jarno_Trulli"
+          ],
+          [
+            "Jenson",
+            "Button",
+            "http://en.wikipedia.org/wiki/Jenson_Button"
+          ],
+          [
+            "Michael",
+            "Schumacher",
+            "http://en.wikipedia.org/wiki/Michael_Schumacher"
+          ],
+          [
+            "Mika",
+            "Häkkinen",
+            "http://en.wikipedia.org/wiki/Mika_H%C3%A4kkinen"
+          ],
+          [
+            "Ralf",
+            "Schumacher",
+            "http://en.wikipedia.org/wiki/Ralf_Schumacher"
+          ],
+          [
+            "Ricardo",
+            "Zonta",
+            "http://en.wikipedia.org/wiki/Ricardo_Zonta"
+          ],
+          [
+            "Rubens",
+            "Barrichello",
+            "http://en.wikipedia.org/wiki/Rubens_Barrichello"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 868,
+      "sqlite": {
+        "columns": [
+          "lat",
+          "lng"
+        ],
+        "rows": [
+          [
+            2.76083,
+            101.738
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Malaysian Grand Prix'",
+        "columns": [
+          {
+            "name": "lat",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lng",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            2.76083,
+            101.738
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 869,
+      "sqlite": {
+        "columns": [
+          "url"
+        ],
+        "rows": [
+          [
+            "http://en.wikipedia.org/wiki/Red_Bull_Racing"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.url FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t2.constructorid = t1.constructorid WHERE t1.raceid = 9 ORDER BY t1.points DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "url",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "http://en.wikipedia.org/wiki/Red_Bull_Racing"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 872,
+      "sqlite": {
+        "columns": [
+          "code"
+        ],
+        "rows": [
+          [
+            "HAM"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.code FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 45 AND t1.q3 LIKE '1:33%'",
+        "columns": [
+          {
+            "name": "code",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "HAM"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 875,
+      "sqlite": {
+        "columns": [
+          "url"
+        ],
+        "rows": [
+          [
+            "http://en.wikipedia.org/wiki/2014_Formula_One_season"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.url FROM races AS t1 INNER JOIN seasons AS t2 ON t2.year = t1.year WHERE t1.raceid = 901",
+        "columns": [
+          {
+            "name": "url",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "http://en.wikipedia.org/wiki/2014_Formula_One_season"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 877,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            "Sergio",
+            "Pérez"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 872 AND NOT t2.time IS NULL ORDER BY t1.dob DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Sergio",
+            "Pérez"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 879,
+      "sqlite": {
+        "columns": [
+          "nationality"
+        ],
+        "rows": [
+          [
+            "Brazilian"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.nationality FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid ORDER BY CAST(t2.fastestlapspeed AS DOUBLE PRECISION) DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "nationality",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Brazilian"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 880,
+      "sqlite": {
+        "columns": [
+          "(SUM(IIF(T2.raceId = 853, T2.fastestLapSpeed, 0)) - SUM(IIF(T2.raceId = 854, T2.fastestLapSpeed, 0))) * 100 / SUM(IIF(T2.raceId = 853, T2.fastestLapSpeed, 0))"
+        ],
+        "rows": [
+          [
+            32.50155167390781
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT (SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END) - SUM(CASE WHEN t2.raceid = 854 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END)) * 100 / NULLIF(SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END), 0) FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t1.forename = 'Paul' AND t1.surname = 'di Resta') AS measured(value)",
+        "columns": [
+          {
+            "name": "value",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            32.50155167390781
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 881,
+      "sqlite": {
+        "columns": [
+          "CAST(COUNT(CASE WHEN T2.time IS NOT NULL THEN T2.driverId END) AS REAL) * 100 / COUNT(T2.driverId)"
+        ],
+        "rows": [
+          [
+            17.24137931034483
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(COUNT(CASE WHEN NOT t2.time IS NULL THEN t2.driverid END) AS REAL) * 100 / NULLIF(COUNT(t2.driverid), 0) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.date = '1983-07-16'",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            17.24137931034483
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 884,
+      "sqlite": {
+        "columns": [
+          "name"
+        ],
+        "rows": [
+          [
+            "British Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Indianapolis 500"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT name FROM races WHERE TO_CHAR(CAST(date AS TIMESTAMP), 'YYYY') = (SELECT TO_CHAR(CAST(date AS TIMESTAMP), 'YYYY') FROM races ORDER BY date ASC NULLS FIRST LIMIT 1) AND TO_CHAR(CAST(date AS TIMESTAMP), 'MM') = (SELECT TO_CHAR(CAST(date AS TIMESTAMP), 'MM') FROM races ORDER BY date ASC NULLS FIRST LIMIT 1)",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "British Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Indianapolis 500"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 892,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "points"
+        ],
+        "rows": [
+          [
+            "Sebastian",
+            "Vettel",
+            397.0
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t3.forename, t3.surname, t2.points FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid ORDER BY t2.points DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "points",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Sebastian",
+            "Vettel",
+            397.0
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 894,
+      "sqlite": {
+        "columns": [
+          "milliseconds",
+          "forename",
+          "surname",
+          "name"
+        ],
+        "rows": [
+          [
+            67411,
+            "Lewis",
+            "Hamilton",
+            "Austrian Grand Prix"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.milliseconds, t1.forename, t1.surname, t3.name FROM drivers AS t1 INNER JOIN laptimes AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t2.raceid = t3.raceid ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+        "columns": [
+          {
+            "name": "milliseconds",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            67411,
+            "Lewis",
+            "Hamilton",
+            "Austrian Grand Prix"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 895,
+      "sqlite": {
+        "columns": [
+          "AVG(T2.milliseconds)"
+        ],
+        "rows": [
+          [
+            109398.54838709677
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(t2.milliseconds) FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.year = 2009 AND t1.name = 'Malaysian Grand Prix') AS measured(value)",
+        "columns": [
+          {
+            "name": "value",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            109398.54838709677
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 896,
+      "sqlite": {
+        "columns": [
+          "CAST(COUNT(CASE WHEN T2.position <> 1 THEN T2.position END) AS REAL) * 100 / COUNT(T2.driverStandingsId)"
+        ],
+        "rows": [
+          [
+            73.2394366197183
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(COUNT(CASE WHEN t2.position <> 1 THEN t2.position END) AS REAL) * 100 / NULLIF(COUNT(t2.driverstandingsid), 0) FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.surname = 'Hamilton' AND t1.year >= 2010",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            73.2394366197183
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 897,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "nationality",
+          "MAX(T2.points)"
+        ],
+        "rows": [
+          [
+            "Michael",
+            "Schumacher",
+            "German",
+            148.0
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.forename, t1.surname, t1.nationality, MAX(t2.points) FROM drivers AS t1 INNER JOIN driverstandings AS t2 ON t2.driverid = t1.driverid WHERE t2.wins >= 1 GROUP BY t1.forename, t1.surname, t1.nationality ORDER BY COUNT(t2.wins) DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "nationality",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "max",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Michael",
+            "Schumacher",
+            "German",
+            148.0
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 898,
+      "sqlite": {
+        "columns": [
+          "STRFTIME('%Y', CURRENT_TIMESTAMP) - STRFTIME('%Y', dob)",
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            40,
+            "Kamui",
+            "Kobayashi"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(EXTRACT(YEAR FROM CAST('2026-10-04 00:00:00' AS TIMESTAMP)) - EXTRACT(YEAR FROM dob) AS BIGINT) AS age, forename, surname FROM drivers WHERE nationality = 'Japanese' ORDER BY dob DESC LIMIT 1",
+        "columns": [
+          {
+            "name": "age",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            40,
+            "Kamui",
+            "Kobayashi"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 901,
+      "sqlite": {
+        "columns": [
+          "name",
+          "name",
+          "location"
+        ],
+        "rows": [
+          [
+            "Italian Grand Prix",
+            "Autodromo Nazionale di Monza",
+            "Monza"
+          ],
+          [
+            "Belgian Grand Prix",
+            "Circuit de Spa-Francorchamps",
+            "Spa"
+          ],
+          [
+            "Brazilian Grand Prix",
+            "Autódromo José Carlos Pace",
+            "São Paulo"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT t2.name, t1.name, t1.location FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.year = 2005 AND TO_CHAR(CAST(t2.date AS TIMESTAMP), 'MM') = '09'",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "location",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Belgian Grand Prix",
+            "Circuit de Spa-Francorchamps",
+            "Spa"
+          ],
+          [
+            "Brazilian Grand Prix",
+            "Autódromo José Carlos Pace",
+            "São Paulo"
+          ],
+          [
+            "Italian Grand Prix",
+            "Autodromo Nazionale di Monza",
+            "Monza"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 902,
+      "sqlite": {
+        "columns": [
+          "name"
+        ],
+        "rows": [
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "San Marino Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Canadian Grand Prix"
+          ],
+          [
+            "European Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "French Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Hungarian Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "United States Grand Prix"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.name FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Alex' AND t3.surname = 'Yoong' AND t2.position < 20",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "San Marino Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Canadian Grand Prix"
+          ],
+          [
+            "European Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "French Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Hungarian Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "United States Grand Prix"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 904,
+      "sqlite": {
+        "columns": [
+          "name",
+          "year"
+        ],
+        "rows": [
+          [
+            "Austrian Grand Prix",
+            2003
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.name, t1.year FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Michael' AND t3.surname = 'Schumacher' ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "year",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Austrian Grand Prix",
+            2003
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 906,
+      "sqlite": {
+        "columns": [
+          "name",
+          "points"
+        ],
+        "rows": [
+          [
+            "Malaysian Grand Prix",
+            14.0
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT r.name, s.points FROM races AS r JOIN driverstandings AS s ON s.raceid = r.raceid JOIN drivers AS d ON d.driverid = s.driverid WHERE d.forename = 'Lewis' AND d.surname = 'Hamilton' ORDER BY r.date, r.round, r.raceid LIMIT 1",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "points",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Malaysian Grand Prix",
+            14.0
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 909,
+      "sqlite": {
+        "columns": [
+          "CAST(COUNT(CASE WHEN T1.country = 'Germany' THEN T2.circuitID END) AS REAL) * 100 / COUNT(T2.circuitId)"
+        ],
+        "rows": [
+          [
+            52.17391304347826
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(COUNT(CASE WHEN t1.country = 'Germany' THEN t2.circuitid END) AS REAL) * 100 / NULLIF(COUNT(t2.circuitid), 0) FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'European Grand Prix'",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            52.17391304347826
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 910,
+      "sqlite": {
+        "columns": [
+          "lat",
+          "lng"
+        ],
+        "rows": [
+          [
+            52.0786,
+            -1.01694
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT lat, lng FROM circuits WHERE name = 'Silverstone Circuit'",
+        "columns": [
+          {
+            "name": "lat",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lng",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            52.0786,
+            -1.01694
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 912,
+      "sqlite": {
+        "columns": [
+          "circuitRef"
+        ],
+        "rows": [
+          [
+            "marina_bay"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT circuitref FROM circuits WHERE name = 'Marina Bay Street Circuit'",
+        "columns": [
+          {
+            "name": "circuitref",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "marina_bay"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 915,
+      "sqlite": {
+        "columns": [
+          "nationality"
+        ],
+        "rows": [
+          [
+            "French"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT nationality FROM drivers WHERE NOT dob IS NULL ORDER BY dob ASC NULLS FIRST LIMIT 1",
+        "columns": [
+          {
+            "name": "nationality",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "French"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 928,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "driverRef"
+        ],
+        "rows": [
+          [
+            "Lewis",
+            "Hamilton",
+            "hamilton"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT d.forename, d.surname, d.driverref FROM races AS r JOIN results AS x ON x.raceid = r.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2007 AND x.positionorder = 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "driverref",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Lewis",
+            "Hamilton",
+            "hamilton"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 930,
+      "sqlite": {
+        "columns": [
+          "name"
+        ],
+        "rows": [
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Abu Dhabi Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Singapore Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Abu Dhabi Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Bahrain Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Canadian Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "Singapore Grand Prix"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT name FROM races WHERE raceid IN (SELECT raceid FROM results WHERE rank = 1 AND driverid = (SELECT driverid FROM drivers WHERE forename = 'Lewis' AND surname = 'Hamilton'))",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "German Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Abu Dhabi Grand Prix"
+          ],
+          [
+            "British Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "Spanish Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Abu Dhabi Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Canadian Grand Prix"
+          ],
+          [
+            "Bahrain Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "Malaysian Grand Prix"
+          ],
+          [
+            "Monaco Grand Prix"
+          ],
+          [
+            "Chinese Grand Prix"
+          ],
+          [
+            "Singapore Grand Prix"
+          ],
+          [
+            "Austrian Grand Prix"
+          ],
+          [
+            "Belgian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Italian Grand Prix"
+          ],
+          [
+            "Brazilian Grand Prix"
+          ],
+          [
+            "Japanese Grand Prix"
+          ],
+          [
+            "Singapore Grand Prix"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 931,
+      "sqlite": {
+        "columns": [
+          "fastestLapSpeed"
+        ],
+        "rows": [
+          [
+            "202.484"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.fastestlapspeed FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.name = 'Spanish Grand Prix' AND t1.year = 2009 AND NOT t2.fastestlapspeed IS NULL ORDER BY t2.fastestlapspeed DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "fastestlapspeed",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "202.484"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 933,
+      "sqlite": {
+        "columns": [
+          "positionOrder"
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.positionorder FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.name = 'Chinese Grand Prix' AND t1.year = 2008",
+        "columns": [
+          {
+            "name": "positionorder",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 937,
+      "sqlite": {
+        "columns": [
+          "time"
+        ],
+        "rows": [
+          [
+            "+14.925"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid WHERE r.name = 'Chinese Grand Prix' AND r.year = 2008 AND x.positionorder = 2",
+        "columns": [
+          {
+            "name": "time",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "+14.925"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 940,
+      "sqlite": {
+        "columns": [
+          "COUNT(*)"
+        ],
+        "rows": [
+          [
+            14
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(*) FROM (SELECT t1.driverid FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Chinese Grand Prix' AND t2.year = 2008 AND t1.time IS NOT NULL GROUP BY t1.driverid HAVING COUNT(t2.raceid) > 0) AS subquery",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            14
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 944,
+      "sqlite": {
+        "columns": [
+          "(CAST((SELECT time_seconds FROM last_driver_incremental) AS REAL) * 100) / (SELECT time_seconds + (SELECT time_seconds FROM last_driver_incremental) FROM champion_time)"
+        ],
+        "rows": [
+          [
+            null
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH time_in_seconds AS (SELECT t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CAST(SUBSTRING(t1.time FROM 1 FOR 1) AS REAL) * 3600) + (CAST(SUBSTRING(t1.time FROM 3 FOR 2) AS REAL) * 60) + CAST(SUBSTRING(t1.time FROM 6) AS REAL) ELSE CAST(SUBSTRING(t1.time FROM 2) AS REAL) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Australian Grand Prix' AND NOT t1.time IS NULL AND t2.year = 2008), champion_time AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = 1), last_driver_incremental AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = (SELECT MAX(positionorder) FROM time_in_seconds)) SELECT (CAST((SELECT time_seconds FROM last_driver_incremental) AS REAL) * 100) / NULLIF((SELECT time_seconds + (SELECT time_seconds FROM last_driver_incremental) FROM champion_time), 0)",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 945,
+      "sqlite": {
+        "columns": [
+          "COUNT(circuitId)"
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(circuitid) FROM circuits WHERE location = 'Adelaide' AND country = 'Australia'",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 948,
+      "sqlite": {
+        "columns": [
+          "MAX(T1.points)"
+        ],
+        "rows": [
+          [
+            497.0
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT MAX(t1.points) FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t2.nationality = 'British'",
+        "columns": [
+          {
+            "name": "max",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            497.0
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 950,
+      "sqlite": {
+        "columns": [
+          "name"
+        ],
+        "rows": [
+          [
+            "Ligier"
+          ],
+          [
+            "Jordan"
+          ],
+          [
+            "Larrousse"
+          ],
+          [
+            "Brabham"
+          ],
+          [
+            "Dallara"
+          ],
+          [
+            "Minardi"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.name FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t1.points = 0 AND t1.raceid = 291",
+        "columns": [
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Ligier"
+          ],
+          [
+            "Jordan"
+          ],
+          [
+            "Larrousse"
+          ],
+          [
+            "Brabham"
+          ],
+          [
+            "Dallara"
+          ],
+          [
+            "Minardi"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 951,
+      "sqlite": {
+        "columns": [
+          "COUNT(*)"
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(*) FROM (SELECT s.constructorid FROM constructorstandings AS s JOIN constructors AS c ON c.constructorid = s.constructorid WHERE s.points = 0 AND c.nationality = 'Japanese' GROUP BY s.constructorid HAVING COUNT(s.raceid) = 2) AS eligible",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 954,
+      "sqlite": {
+        "columns": [
+          "CAST(SUM(IIF(T1.time IS NOT NULL, 1, 0)) AS REAL) * 100 / COUNT(T1.raceId)"
+        ],
+        "rows": [
+          [
+            29.032258064516128
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(SUM(CASE WHEN NOT t1.time IS NULL THEN 1 ELSE 0 END) AS REAL) * 100 / NULLIF(COUNT(t1.raceid), 0) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN drivers AS t3 ON t1.driverid = t3.driverid WHERE t3.nationality = 'Japanese' AND t2.year BETWEEN 2007 AND 2009",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            29.032258064516128
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 955,
+      "sqlite": {
+        "columns": [
+          "year",
+          "AVG(time_seconds)"
+        ],
+        "rows": [
+          [
+            1950,
+            9712.01842857143
+          ],
+          [
+            1951,
+            10870.343222222224
+          ],
+          [
+            1952,
+            11061.26325
+          ],
+          [
+            1953,
+            10828.015666666666
+          ],
+          [
+            1954,
+            11212.563444444444
+          ],
+          [
+            1955,
+            10791.868714285714
+          ],
+          [
+            1956,
+            10871.124888888888
+          ],
+          [
+            1957,
+            11322.675666666668
+          ],
+          [
+            1958,
+            8379.745
+          ],
+          [
+            1959,
+            8745.455555555556
+          ],
+          [
+            1960,
+            8771.807
+          ],
+          [
+            1961,
+            8258.129125
+          ],
+          [
+            1962,
+            8410.781555555555
+          ],
+          [
+            1963,
+            8280.7054
+          ],
+          [
+            1964,
+            8005.1086
+          ],
+          [
+            1965,
+            8165.3046
+          ],
+          [
+            1966,
+            7834.341444444445
+          ],
+          [
+            1967,
+            7645.46409090909
+          ],
+          [
+            1968,
+            7626.180083333334
+          ],
+          [
+            1969,
+            7006.474909090909
+          ],
+          [
+            1970,
+            6520.316
+          ],
+          [
+            1971,
+            6111.651454545455
+          ],
+          [
+            1972,
+            6526.003250000001
+          ],
+          [
+            1973,
+            6235.945266666667
+          ],
+          [
+            1974,
+            6046.8204
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH time_in_seconds AS (SELECT t2.year, t2.raceid, t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CASE WHEN SPLIT_PART(t1.time, ':', 1) <> '' AND SPLIT_PART(t1.time, ':', 2) <> '' AND SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) <> '' THEN (CAST(SPLIT_PART(t1.time, ':', 1) AS REAL) * 3600) + (CAST(SPLIT_PART(t1.time, ':', 2) AS REAL) * 60) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) AS REAL) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 2) AS REAL) / 1000 ELSE 0 END) ELSE (CASE WHEN SUBSTRING(t1.time FROM 2) <> '' THEN CAST(SUBSTRING(t1.time FROM 2) AS REAL) ELSE 0 END) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t1.time IS NOT NULL AND t1.time <> ''), champion_time AS (SELECT year, raceid, time_seconds FROM time_in_seconds WHERE positionorder = 1) SELECT year, AVG(time_seconds) FROM champion_time WHERE year < 1975 GROUP BY year HAVING AVG(time_seconds) IS NOT NULL",
+        "columns": [
+          {
+            "name": "year",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "avg",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            1950,
+            9712.01842857143
+          ],
+          [
+            1951,
+            10870.343222222222
+          ],
+          [
+            1952,
+            11061.26325
+          ],
+          [
+            1953,
+            10828.015666666666
+          ],
+          [
+            1954,
+            11212.563444444446
+          ],
+          [
+            1955,
+            10791.868714285714
+          ],
+          [
+            1956,
+            10871.124888888888
+          ],
+          [
+            1957,
+            11322.675666666668
+          ],
+          [
+            1958,
+            8379.745
+          ],
+          [
+            1959,
+            8745.455555555554
+          ],
+          [
+            1960,
+            8771.807
+          ],
+          [
+            1961,
+            8258.129125
+          ],
+          [
+            1962,
+            8410.781555555555
+          ],
+          [
+            1963,
+            8280.7054
+          ],
+          [
+            1964,
+            8005.108600000001
+          ],
+          [
+            1965,
+            8165.3046
+          ],
+          [
+            1966,
+            7834.341444444445
+          ],
+          [
+            1967,
+            7645.46409090909
+          ],
+          [
+            1968,
+            7626.180083333333
+          ],
+          [
+            1969,
+            7006.474909090909
+          ],
+          [
+            1970,
+            6520.316
+          ],
+          [
+            1971,
+            6111.651454545455
+          ],
+          [
+            1972,
+            6526.003249999999
+          ],
+          [
+            1973,
+            6235.945266666666
+          ],
+          [
+            1974,
+            6046.8204
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 959,
+      "sqlite": {
+        "columns": [
+          "fastestLap"
+        ],
+        "rows": [
+          [
+            18
+          ],
+          [
+            42
+          ],
+          [
+            11
+          ],
+          [
+            17
+          ],
+          [
+            49
+          ],
+          [
+            40
+          ],
+          [
+            16
+          ],
+          [
+            37
+          ],
+          [
+            16
+          ],
+          [
+            39
+          ],
+          [
+            42
+          ],
+          [
+            48
+          ],
+          [
+            36
+          ],
+          [
+            43
+          ],
+          [
+            25
+          ],
+          [
+            54
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t1.fastestlap FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+        "columns": [
+          {
+            "name": "fastestlap",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            18
+          ],
+          [
+            42
+          ],
+          [
+            11
+          ],
+          [
+            17
+          ],
+          [
+            49
+          ],
+          [
+            40
+          ],
+          [
+            16
+          ],
+          [
+            37
+          ],
+          [
+            16
+          ],
+          [
+            39
+          ],
+          [
+            42
+          ],
+          [
+            48
+          ],
+          [
+            36
+          ],
+          [
+            43
+          ],
+          [
+            25
+          ],
+          [
+            54
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 960,
+      "sqlite": {
+        "columns": [
+          "AVG(T1.fastestLapSpeed)"
+        ],
+        "rows": [
+          [
+            199.6415625
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(CAST(t1.fastestlapspeed AS DECIMAL)) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t2.name = 'Spanish Grand Prix') AS measured(value)",
+        "columns": [
+          {
+            "name": "value",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            199.6415625
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 962,
+      "sqlite": {
+        "columns": [
+          "CAST(SUM(IIF(STRFTIME('%Y', T3.dob) < '1985' AND T1.laps > 50, 1, 0)) AS REAL) * 100 / COUNT(*)"
+        ],
+        "rows": [
+          [
+            64.88474742520843
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT CAST(SUM(CASE WHEN TO_CHAR(CAST(t3.dob AS TIMESTAMP), 'YYYY') < '1985' AND t1.laps > 50 THEN 1 ELSE 0 END) AS REAL) * 100 / NULLIF(COUNT(*), 0) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN drivers AS t3 ON t1.driverid = t3.driverid WHERE t2.year BETWEEN 2000 AND 2005",
+        "columns": [
+          {
+            "name": "?column?",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            64.88474742520843
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 963,
+      "sqlite": {
+        "columns": [
+          "COUNT(DISTINCT d.driverid)"
+        ],
+        "rows": [
+          [
+            9
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(DISTINCT d.driverid) FROM drivers AS d JOIN laptimes AS l ON l.driverid = d.driverid WHERE d.nationality = 'French' AND (CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) < 120",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            9
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 964,
+      "sqlite": {
+        "columns": [
+          "code"
+        ],
+        "rows": [
+          [
+            "SPE"
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            "RSS"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT code FROM drivers WHERE nationality = 'American'",
+        "columns": [
+          {
+            "name": "code",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "SPE"
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            null
+          ],
+          [
+            "RSS"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 967,
+      "sqlite": {
+        "columns": [
+          "code1",
+          "code2",
+          "code3",
+          "dutch_count"
+        ],
+        "rows": [
+          [
+            "STR",
+            "VER",
+            "OCO",
+            1
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH ranked AS (SELECT code, nationality, ROW_NUMBER() OVER (ORDER BY dob DESC, driverid) AS n FROM drivers WHERE dob IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE n <= 3) SELECT MAX(CASE WHEN n = 1 THEN code END) AS code1, MAX(CASE WHEN n = 2 THEN code END) AS code2, MAX(CASE WHEN n = 3 THEN code END) AS code3, SUM(CASE WHEN nationality = 'Dutch' THEN 1 ELSE 0 END) AS dutch_count FROM top3",
+        "columns": [
+          {
+            "name": "code1",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "code2",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "code3",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "dutch_count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "STR",
+            "VER",
+            "OCO",
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 971,
+      "sqlite": {
+        "columns": [
+          "driverRef"
+        ],
+        "rows": [
+          [
+            "brudes"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT driverref FROM drivers WHERE nationality = 'German' ORDER BY dob ASC LIMIT 1",
+        "columns": [
+          {
+            "name": "driverref",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "brudes"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 972,
+      "sqlite": {
+        "columns": [
+          "driverId",
+          "code"
+        ],
+        "rows": [
+          [
+            14,
+            "COU"
+          ],
+          [
+            35,
+            "VIL"
+          ],
+          [
+            37,
+            "DLR"
+          ],
+          [
+            69,
+            "BAD"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT DISTINCT d.driverid, d.code FROM results AS x JOIN drivers AS d ON d.driverid = x.driverid WHERE EXTRACT(YEAR FROM d.dob) = 1971 AND x.fastestlaptime IS NOT NULL",
+        "columns": [
+          {
+            "name": "driverid",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "code",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            14,
+            "COU"
+          ],
+          [
+            35,
+            "VIL"
+          ],
+          [
+            37,
+            "DLR"
+          ],
+          [
+            69,
+            "BAD"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 977,
+      "sqlite": {
+        "columns": [
+          "SUM(IIF(time IS NOT NULL, 1, 0))"
+        ],
+        "rows": [
+          [
+            2
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT SUM(CASE WHEN NOT time IS NULL THEN 1 ELSE 0 END) FROM results WHERE statusid = 2 AND raceid < 100 AND raceid > 50",
+        "columns": [
+          {
+            "name": "sum",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 978,
+      "sqlite": {
+        "columns": [
+          "venue_count",
+          "location",
+          "lat",
+          "lng"
+        ],
+        "rows": [
+          [
+            2,
+            "Spielburg",
+            47.2197,
+            14.7647
+          ],
+          [
+            2,
+            "Styria",
+            47.2039,
+            14.7478
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH venues AS (SELECT DISTINCT location, lat, lng FROM circuits WHERE country = 'Austria') SELECT COUNT(*) OVER () AS venue_count, location, lat, lng FROM venues ORDER BY location, lat, lng",
+        "columns": [
+          {
+            "name": "venue_count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "location",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lat",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lng",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            2,
+            "Spielburg",
+            47.2197,
+            14.7647
+          ],
+          [
+            2,
+            "Styria",
+            47.2039,
+            14.7478
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 981,
+      "sqlite": {
+        "columns": [
+          "year",
+          "name",
+          "date",
+          "time"
+        ],
+        "rows": [
+          [
+            2017,
+            "Chinese Grand Prix",
+            "2017-04-09",
+            "06:00:00"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t3.year, t3.name, t3.date, t3.time FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE t1.driverid = (SELECT driverid FROM drivers ORDER BY dob DESC NULLS LAST LIMIT 1) ORDER BY t3.date ASC NULLS FIRST LIMIT 1",
+        "columns": [
+          {
+            "name": "year",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "date",
+            "oid": 1082,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "time",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            2017,
+            "Chinese Grand Prix",
+            {
+              "temporal": "2017-04-09"
+            },
+            "06:00:00"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 988,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            "Timo",
+            "Glock"
+          ],
+          [
+            "Adrian",
+            "Sutil"
+          ],
+          [
+            "Nico",
+            "Rosberg"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT d.forename, d.surname FROM pitstops AS p JOIN drivers AS d ON d.driverid = p.driverid WHERE d.nationality = 'German' AND EXTRACT(YEAR FROM d.dob) BETWEEN 1980 AND 1985 GROUP BY d.driverid, d.forename, d.surname ORDER BY AVG(CASE WHEN SPLIT_PART(p.duration, ':', 3) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(p.duration, ':', 2) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) ELSE CAST(p.duration AS DOUBLE PRECISION) END), d.driverid LIMIT 3",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Timo",
+            "Glock"
+          ],
+          [
+            "Adrian",
+            "Sutil"
+          ],
+          [
+            "Nico",
+            "Rosberg"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 989,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "time"
+        ],
+        "rows": [
+          [
+            "Robert",
+            "Kubica",
+            "1:36:24.227"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT d.forename, d.surname, x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2008 AND x.positionorder = 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "time",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Robert",
+            "Kubica",
+            "1:36:24.227"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 990,
+      "sqlite": {
+        "columns": [
+          "constructorRef",
+          "url"
+        ],
+        "rows": [
+          [
+            "mclaren",
+            "http://en.wikipedia.org/wiki/McLaren"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t3.constructorref, t3.url FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN constructors AS t3 ON t1.constructorid = t3.constructorid WHERE t2.name = 'Singapore Grand Prix' AND t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+        "columns": [
+          {
+            "name": "constructorref",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "url",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "mclaren",
+            "http://en.wikipedia.org/wiki/McLaren"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 994,
+      "sqlite": {
+        "columns": [
+          "SUM(T1.points)",
+          "name",
+          "nationality"
+        ],
+        "rows": [
+          [
+            218.5,
+            "McLaren",
+            "British"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT SUM(t1.points), t2.name, t2.nationality FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid INNER JOIN races AS t3 ON t3.raceid = t1.raceid WHERE t3.name = 'Monaco Grand Prix' AND t3.year BETWEEN 1980 AND 2010 GROUP BY t2.name, t2.nationality ORDER BY SUM(t1.points) DESC LIMIT 1",
+        "columns": [
+          {
+            "name": "sum",
+            "oid": 701,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "nationality",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            218.5,
+            "McLaren",
+            "British"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 1001,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            "Felipe",
+            "Massa"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT t2.forename, t2.surname FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE q3 IS NOT NULL AND t3.year = 2008 AND t3.circuitid IN (SELECT circuitid FROM circuits WHERE name = 'Marina Bay Street Circuit') ORDER BY CAST(SPLIT_PART(q3, ':', 1) AS INT) * 60 + CAST(SPLIT_PART(SPLIT_PART(q3, ':', 2), '.', 1) AS REAL) + CAST(SPLIT_PART(q3, '.', 2) AS REAL) / 1000 ASC LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Felipe",
+            "Massa"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 1002,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname",
+          "nationality",
+          "name"
+        ],
+        "rows": [
+          [
+            "Lance",
+            "Stroll",
+            "Canadian",
+            "Chinese Grand Prix"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH youngest AS (SELECT driverid, forename, surname, nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob DESC, driverid LIMIT 1) SELECT d.forename, d.surname, d.nationality, r.name FROM youngest AS d JOIN driverstandings AS s ON s.driverid = d.driverid JOIN races AS r ON r.raceid = s.raceid ORDER BY r.date, r.round, r.raceid LIMIT 1",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "nationality",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Lance",
+            "Stroll",
+            "Canadian",
+            "Chinese Grand Prix"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 1003,
+      "sqlite": {
+        "columns": [
+          "COUNT(T1.driverId)"
+        ],
+        "rows": [
+          [
+            2
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "SELECT COUNT(t1.driverid) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN status AS t3 ON t1.statusid = t3.statusid WHERE t3.statusid = 3 AND t2.name = 'Canadian Grand Prix' GROUP BY t1.driverid ORDER BY COUNT(t1.driverid) DESC NULLS LAST LIMIT 1",
+        "columns": [
+          {
+            "name": "count",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 1011,
+      "sqlite": {
+        "columns": [
+          "forename",
+          "surname"
+        ],
+        "rows": [
+          [
+            "Lewis",
+            "Hamilton"
+          ],
+          [
+            "Daniel",
+            "Ricciardo"
+          ],
+          [
+            "Kimi",
+            "Räikkönen"
+          ],
+          [
+            "Sebastian",
+            "Vettel"
+          ],
+          [
+            "Valtteri",
+            "Bottas"
+          ],
+          [
+            "Daniil",
+            "Kvyat"
+          ],
+          [
+            "Michael",
+            "Schumacher"
+          ],
+          [
+            "Felipe",
+            "Massa"
+          ],
+          [
+            "Stoffel",
+            "Vandoorne"
+          ],
+          [
+            "Sergio",
+            "Pérez"
+          ],
+          [
+            "Nico",
+            "Rosberg"
+          ],
+          [
+            "Romain",
+            "Grosjean"
+          ],
+          [
+            "Jolyon",
+            "Palmer"
+          ],
+          [
+            "Esteban",
+            "Ocon"
+          ],
+          [
+            "Lance",
+            "Stroll"
+          ],
+          [
+            "Rubens",
+            "Barrichello"
+          ],
+          [
+            "Mark",
+            "Webber"
+          ],
+          [
+            "Nico",
+            "Hülkenberg"
+          ],
+          [
+            "Carlos",
+            "Sainz"
+          ],
+          [
+            "Pascal",
+            "Wehrlein"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH minimums AS (SELECT l.driverid, MIN(CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) AS seconds FROM laptimes AS l GROUP BY l.driverid) SELECT d.forename, d.surname FROM minimums AS m JOIN drivers AS d ON d.driverid = m.driverid ORDER BY m.seconds, d.driverid LIMIT 20",
+        "columns": [
+          {
+            "name": "forename",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "surname",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            "Lewis",
+            "Hamilton"
+          ],
+          [
+            "Daniel",
+            "Ricciardo"
+          ],
+          [
+            "Kimi",
+            "Räikkönen"
+          ],
+          [
+            "Sebastian",
+            "Vettel"
+          ],
+          [
+            "Valtteri",
+            "Bottas"
+          ],
+          [
+            "Daniil",
+            "Kvyat"
+          ],
+          [
+            "Michael",
+            "Schumacher"
+          ],
+          [
+            "Felipe",
+            "Massa"
+          ],
+          [
+            "Stoffel",
+            "Vandoorne"
+          ],
+          [
+            "Sergio",
+            "Pérez"
+          ],
+          [
+            "Nico",
+            "Rosberg"
+          ],
+          [
+            "Romain",
+            "Grosjean"
+          ],
+          [
+            "Jolyon",
+            "Palmer"
+          ],
+          [
+            "Esteban",
+            "Ocon"
+          ],
+          [
+            "Lance",
+            "Stroll"
+          ],
+          [
+            "Rubens",
+            "Barrichello"
+          ],
+          [
+            "Mark",
+            "Webber"
+          ],
+          [
+            "Nico",
+            "Hülkenberg"
+          ],
+          [
+            "Carlos",
+            "Sainz"
+          ],
+          [
+            "Pascal",
+            "Wehrlein"
+          ]
+        ]
+      }
+    },
+    {
+      "question_id": 1014,
+      "sqlite": {
+        "columns": [
+          "circuitid",
+          "name",
+          "lap_record"
+        ],
+        "rows": [
+          [
+            14,
+            "Autodromo Nazionale di Monza",
+            "1:21.046"
+          ],
+          [
+            21,
+            "Autodromo Enzo e Dino Ferrari",
+            "1:20.411"
+          ]
+        ]
+      },
+      "postgresql": {
+        "sql": "WITH ranked AS (SELECT c.circuitid, c.name, x.fastestlaptime, ROW_NUMBER() OVER (PARTITION BY c.circuitid ORDER BY (CASE WHEN SPLIT_PART(x.fastestlaptime, ':', 3) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(x.fastestlaptime, ':', 2) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) ELSE CAST(x.fastestlaptime AS DOUBLE PRECISION) END), r.date, r.raceid, x.resultid) AS n FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN circuits AS c ON c.circuitid = r.circuitid WHERE c.country = 'Italy' AND x.fastestlaptime IS NOT NULL) SELECT circuitid, name, fastestlaptime AS lap_record FROM ranked WHERE n = 1 ORDER BY circuitid",
+        "columns": [
+          {
+            "name": "circuitid",
+            "oid": 20,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "name",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "name": "lap_record",
+            "oid": 25,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "rows": [
+          [
+            14,
+            "Autodromo Nazionale di Monza",
+            "1:21.046"
+          ],
+          [
+            21,
+            "Autodromo Enzo e Dino Ferrari",
+            "1:20.411"
+          ]
+        ]
+      }
+    }
+  ]
+}

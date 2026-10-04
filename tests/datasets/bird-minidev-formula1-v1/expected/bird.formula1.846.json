@@ -1,0 +1,26 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "driverref",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "sato"
+    ],
+    [
+      "davidson"
+    ],
+    [
+      "vettel"
+    ],
+    [
+      "sutil"
+    ],
+    [
+      "fisichella"
+    ]
+  ]
+}

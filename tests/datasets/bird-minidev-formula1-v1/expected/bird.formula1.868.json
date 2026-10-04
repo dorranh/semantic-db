@@ -1,0 +1,27 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "lat",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    },
+    {
+      "name": "lng",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    }
+  ],
+  "rows": [
+    [
+      2.76083,
+      101.738
+    ]
+  ]
+}

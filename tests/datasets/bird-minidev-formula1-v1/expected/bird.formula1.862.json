@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "count",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "12"
+    ]
+  ]
+}

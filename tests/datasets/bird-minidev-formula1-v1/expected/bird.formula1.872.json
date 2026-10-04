@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "code",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "HAM"
+    ]
+  ]
+}

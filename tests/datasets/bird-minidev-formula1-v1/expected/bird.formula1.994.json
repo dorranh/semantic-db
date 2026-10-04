@@ -1,0 +1,28 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "sum",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "nationality",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      218.5,
+      "McLaren",
+      "British"
+    ]
+  ]
+}

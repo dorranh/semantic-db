@@ -1,0 +1,24 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    },
+    {
+      "name": "driverref",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "Lewis",
+      "Hamilton",
+      "hamilton"
+    ]
+  ]
+}

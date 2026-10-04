@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "surname",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "Räikkönen"
+    ]
+  ]
+}

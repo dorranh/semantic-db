@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "milliseconds",
+      "type": "int64"
+    },
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "67411",
+      "Lewis",
+      "Hamilton",
+      "Austrian Grand Prix"
+    ]
+  ]
+}

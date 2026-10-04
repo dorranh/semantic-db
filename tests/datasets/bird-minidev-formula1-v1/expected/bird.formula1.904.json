@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "year",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "Austrian Grand Prix",
+      "2003"
+    ]
+  ]
+}

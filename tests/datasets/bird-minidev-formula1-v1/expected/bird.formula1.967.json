@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "code1",
+      "type": "utf8"
+    },
+    {
+      "name": "code2",
+      "type": "utf8"
+    },
+    {
+      "name": "code3",
+      "type": "utf8"
+    },
+    {
+      "name": "dutch_count",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "STR",
+      "VER",
+      "OCO",
+      "1"
+    ]
+  ]
+}

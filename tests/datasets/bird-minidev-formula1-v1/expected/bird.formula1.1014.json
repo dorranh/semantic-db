@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "circuitid",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "lap_record",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "14",
+      "Autodromo Nazionale di Monza",
+      "1:21.046"
+    ],
+    [
+      "21",
+      "Autodromo Enzo e Dino Ferrari",
+      "1:20.411"
+    ]
+  ]
+}

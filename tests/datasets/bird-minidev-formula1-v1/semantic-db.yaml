@@ -1,0 +1,144 @@
+{
+  "ossie": "model.ossie.yaml",
+  "connections": {
+    "csv": {
+      "connector": "csv"
+    },
+    "facts": {
+      "connector": "postgres",
+      "connection_string_env": "BIRD_DATABASE_URL",
+      "allow_insecure_transport": true
+    }
+  },
+  "sources": {
+    "csv.circuits": {
+      "connection": "csv",
+      "path": "data/circuits.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "circuitid",
+        "circuitref",
+        "name",
+        "url"
+      ],
+      "physical_types": {
+        "circuitid": "Int64",
+        "circuitref": "Utf8",
+        "name": "Utf8",
+        "location": "Utf8",
+        "country": "Utf8",
+        "lat": "Float64",
+        "lng": "Float64",
+        "alt": "Int64",
+        "url": "Utf8"
+      }
+    },
+    "facts.constructorresults": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "constructorresults"
+    },
+    "facts.constructorstandings": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "constructorstandings"
+    },
+    "csv.constructors": {
+      "connection": "csv",
+      "path": "data/constructors.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "constructorid",
+        "constructorref",
+        "name",
+        "url"
+      ],
+      "physical_types": {
+        "constructorid": "Int64",
+        "constructorref": "Utf8",
+        "name": "Utf8",
+        "nationality": "Utf8",
+        "url": "Utf8"
+      }
+    },
+    "facts.driverstandings": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "driverstandings"
+    },
+    "csv.drivers": {
+      "connection": "csv",
+      "path": "data/drivers.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "driverid",
+        "driverref",
+        "forename",
+        "surname",
+        "url"
+      ],
+      "physical_types": {
+        "driverid": "Int64",
+        "driverref": "Utf8",
+        "number": "Int64",
+        "code": "Utf8",
+        "forename": "Utf8",
+        "surname": "Utf8",
+        "dob": "Date32",
+        "nationality": "Utf8",
+        "url": "Utf8"
+      }
+    },
+    "facts.laptimes": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "laptimes"
+    },
+    "facts.pitstops": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "pitstops"
+    },
+    "facts.qualifying": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "qualifying"
+    },
+    "facts.races": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "races"
+    },
+    "facts.results": {
+      "connection": "facts",
+      "schema": "bird_formula1",
+      "table": "results"
+    },
+    "csv.seasons": {
+      "connection": "csv",
+      "path": "data/seasons.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "year",
+        "url"
+      ],
+      "physical_types": {
+        "year": "Int64",
+        "url": "Utf8"
+      }
+    },
+    "csv.status": {
+      "connection": "csv",
+      "path": "data/status.csv",
+      "null_regex": "^\\\\N$",
+      "non_nullable_columns": [
+        "statusid",
+        "status"
+      ],
+      "physical_types": {
+        "statusid": "Int64",
+        "status": "Utf8"
+      }
+    }
+  }
+}

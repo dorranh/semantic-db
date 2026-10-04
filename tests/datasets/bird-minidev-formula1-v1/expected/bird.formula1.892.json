@@ -1,0 +1,28 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    },
+    {
+      "name": "points",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    }
+  ],
+  "rows": [
+    [
+      "Sebastian",
+      "Vettel",
+      397.0
+    ]
+  ]
+}

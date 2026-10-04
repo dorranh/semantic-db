@@ -1,0 +1,18 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "?column?",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    }
+  ],
+  "rows": [
+    [
+      17.24137931034483
+    ]
+  ]
+}

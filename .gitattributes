@@ -1,2 +1,5 @@
 # Preserve authored fixture bytes and recognize CSV CRLF line endings.
 tests/datasets/commerce-v1/data/*.csv -text whitespace=cr-at-eol
+tests/datasets/bird-minidev-formula1-v1/data/*.csv -text whitespace=cr-at-eol
+# Preserve immutable upstream descriptions, including spaces inside CSV text.
+tests/datasets/bird-minidev-formula1-v1/source/database_description/*.csv -text whitespace=cr-at-eol,-blank-at-eol

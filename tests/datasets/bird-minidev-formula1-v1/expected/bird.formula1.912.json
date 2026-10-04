@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "circuitref",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "marina_bay"
+    ]
+  ]
+}

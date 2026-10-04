@@ -1,0 +1,91 @@
+{
+  "format_version": 1,
+  "id": "bird-minidev-formula1-v1",
+  "version": "1.0.2",
+  "project": "semantic-db.yaml",
+  "cases": "cases.json",
+  "schemas": "schemas.json",
+  "required_paired_cases": 66,
+  "required_companion_cases": 0,
+  "context": {
+    "reference_time": "2026-10-04T00:00:00Z",
+    "timezone": "UTC"
+  },
+  "environment": {
+    "compose_files": [
+      "compose.yaml"
+    ],
+    "services": [
+      "postgres"
+    ],
+    "bootstrap_service": "bootstrap",
+    "startup_timeout_seconds": 120,
+    "bootstrap_timeout_seconds": 180,
+    "bindings": {
+      "BIRD_DATABASE_URL": {
+        "service": "postgres",
+        "port": 5432,
+        "template": "postgres://bird:bird@{host}:{port}/bird?sslmode=disable"
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM circuits",
+      "expected": "expected/fixture-circuits.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM constructorresults",
+      "expected": "expected/fixture-constructorresults.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM constructorstandings",
+      "expected": "expected/fixture-constructorstandings.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM constructors",
+      "expected": "expected/fixture-constructors.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM driverstandings",
+      "expected": "expected/fixture-driverstandings.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM drivers",
+      "expected": "expected/fixture-drivers.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM laptimes",
+      "expected": "expected/fixture-laptimes.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM pitstops",
+      "expected": "expected/fixture-pitstops.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM qualifying",
+      "expected": "expected/fixture-qualifying.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM races",
+      "expected": "expected/fixture-races.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM results",
+      "expected": "expected/fixture-results.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM seasons",
+      "expected": "expected/fixture-seasons.json"
+    },
+    {
+      "sql": "SELECT COUNT(*) AS row_count FROM status",
+      "expected": "expected/fixture-status.json"
+    }
+  ],
+  "public_cases": [
+    "bird.formula1.945",
+    "bird.formula1.859",
+    "bird.formula1.901"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    },
+    {
+      "name": "nationality",
+      "type": "utf8"
+    },
+    {
+      "name": "max",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    }
+  ],
+  "rows": [
+    [
+      "Michael",
+      "Schumacher",
+      "German",
+      148.0
+    ]
+  ]
+}

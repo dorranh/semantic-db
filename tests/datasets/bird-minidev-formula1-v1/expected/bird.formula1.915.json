@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "nationality",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "French"
+    ]
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "constructorref",
+      "type": "utf8"
+    },
+    {
+      "name": "url",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "mclaren",
+      "http://en.wikipedia.org/wiki/McLaren"
+    ]
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "q1",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "1:23.796"
+    ]
+  ]
+}

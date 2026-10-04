@@ -1,0 +1,6 @@
+{
+  "artifact_digest": "887735e2d5cb2416eadc82e41c7fb75f7c4d8376dc54b8968ead4135d36ce074",
+  "report": ".semantic-eval/bird-sql-v12-p34/run-244569-18db5ace4ed2c19a/report.json",
+  "report_sha256": "b6a03453ad6cae48fe3bee4eed1308461fec705ad7202108d7c22459e9a22e2a",
+  "reason": "Full-family dialect precision audit; all original questions/golds retained."
+}

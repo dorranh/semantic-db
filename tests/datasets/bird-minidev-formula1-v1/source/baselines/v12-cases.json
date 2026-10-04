@@ -1,0 +1,1831 @@
+[
+  {
+    "id": "bird.formula1.846",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Please list the reference names of the drivers who are eliminated in the first period in race number 20.",
+    "sql": "SELECT t2.driverref FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 20 ORDER BY t1.q1 DESC NULLS LAST LIMIT 5",
+    "expected": "expected/bird.formula1.846.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 846; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.847",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "What is the surname of the driver with the best lap time in race number 19 in the second qualifying period?",
+    "sql": "SELECT d.surname FROM qualifying AS q JOIN drivers AS d ON d.driverid = q.driverid WHERE q.raceid = 19 AND q.q2 IS NOT NULL ORDER BY q.q2, d.driverid LIMIT 1",
+    "expected": "expected/bird.formula1.847.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 847; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.850",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Please give the name of the race held on the circuits in Germany.",
+    "sql": "SELECT DISTINCT t2.name FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t1.country = 'Germany'",
+    "expected": "expected/bird.formula1.850.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 850; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.854",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "What is the coordinates location of the circuits for Australian grand prix?",
+    "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Australian Grand Prix'",
+    "expected": "expected/bird.formula1.854.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 854; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.857",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Give the coordinate position for Abu Dhabi Grand Prix.",
+    "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Abu Dhabi Grand Prix'",
+    "expected": "expected/bird.formula1.857.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 857; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.859",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "What's Bruno Senna's Q1 result in the qualifying race No. 354?",
+    "sql": "SELECT t1.q1 FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 354 AND t2.forename = 'Bruno' AND t2.surname = 'Senna'",
+    "expected": "expected/bird.formula1.859.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 859; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.861",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "What is his number of the driver who finished 0:01:54 in the Q3 of qualifying race No.903?",
+    "sql": "SELECT t2.number FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 903 AND t1.q3 LIKE '1:54%'",
+    "expected": "expected/bird.formula1.861.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 861; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.862",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "For the Bahrain Grand Prix in 2007, how many drivers not finished the game?",
+    "sql": "SELECT COUNT(t3.driverid) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t1.year = 2007 AND t1.name = 'Bahrain Grand Prix' AND t2.time IS NULL",
+    "expected": "expected/bird.formula1.862.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 862; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.865",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "For all the drivers who finished the game in race No. 592, who is the oldest?",
+    "sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 592 AND NOT t2.time IS NULL AND NOT t1.dob IS NULL ORDER BY t1.dob ASC NULLS FIRST LIMIT 1",
+    "expected": "expected/bird.formula1.865.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 865; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.866",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Who was the player that got the lap time of 0:01:27 in the race No. 161? Show his introduction website.",
+    "sql": "SELECT DISTINCT t2.forename, t2.surname, t2.url FROM laptimes AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 161 AND t1.time LIKE '1:27%'",
+    "expected": "expected/bird.formula1.866.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 866; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.868",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Where is Malaysian Grand Prix held? Give the location coordinates.",
+    "sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Malaysian Grand Prix'",
+    "expected": "expected/bird.formula1.868.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 868; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.869",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "For the constructor which got the highest point in the race No. 9 , what is its introduction website?",
+    "sql": "SELECT t2.url FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t2.constructorid = t1.constructorid WHERE t1.raceid = 9 ORDER BY t1.points DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.869.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 869; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.872",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "In the race No. 45, for the driver who had the Q3 time as 0:01:33, what is his abbreviated code?",
+    "sql": "SELECT t2.code FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 45 AND t1.q3 LIKE '1:33%'",
+    "expected": "expected/bird.formula1.872.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 872; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.875",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Show me the season page of year when the race No. 901 took place.",
+    "sql": "SELECT t2.url FROM races AS t1 INNER JOIN seasons AS t2 ON t2.year = t1.year WHERE t1.raceid = 901",
+    "expected": "expected/bird.formula1.875.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 875; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.877",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "For all the drivers who finished the game in race No. 872, who is the youngest?",
+    "sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 872 AND NOT t2.time IS NULL ORDER BY t1.dob DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.877.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 877; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.879",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "For the driver who set the fastest lap speed, what is his nationality?",
+    "sql": "SELECT t1.nationality FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid ORDER BY CAST(t2.fastestlapspeed AS DOUBLE PRECISION) DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.879.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 879; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.880",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Paul di Resta was in the No. 853 race, what percent faster did he finish in the 853rd race than the next race for the fastest lap speed?",
+    "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT (SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END) - SUM(CASE WHEN t2.raceid = 854 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END)) * 100 / NULLIF(SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END), 0) FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t1.forename = 'Paul' AND t1.surname = 'di Resta') AS measured(value)",
+    "expected": "expected/bird.formula1.880.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 880; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.881",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate"
+    ],
+    "question": "For the drivers who took part in the race in 1983/7/16, what's their race completion rate?",
+    "sql": "SELECT CAST(COUNT(CASE WHEN NOT t2.time IS NULL THEN t2.driverid END) AS REAL) * 100 / NULLIF(COUNT(t2.driverid), 0) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.date = '1983-07-16'",
+    "expected": "expected/bird.formula1.881.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 881; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.884",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate"
+    ],
+    "question": "List the names of all races that occurred in the earliest recorded year and month.",
+    "sql": "SELECT name FROM races WHERE TO_CHAR(CAST(date AS TIMESTAMP), 'YYYY') = (SELECT TO_CHAR(CAST(date AS TIMESTAMP), 'YYYY') FROM races ORDER BY date ASC NULLS FIRST LIMIT 1) AND TO_CHAR(CAST(date AS TIMESTAMP), 'MM') = (SELECT TO_CHAR(CAST(date AS TIMESTAMP), 'MM') FROM races ORDER BY date ASC NULLS FIRST LIMIT 1)",
+    "expected": "expected/bird.formula1.884.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 884; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.892",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "State the driver with the most points scored. Find his full name with that points.",
+    "sql": "SELECT t3.forename, t3.surname, t2.points FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid ORDER BY t2.points DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.892.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 892; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.894",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "What is the best lap time recorded? List the driver and race with such recorded lap time.",
+    "sql": "SELECT t2.milliseconds, t1.forename, t1.surname, t3.name FROM drivers AS t1 INNER JOIN laptimes AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t2.raceid = t3.raceid ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+    "expected": "expected/bird.formula1.894.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 894; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.895",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "What is the average lap time for Lewis Hamilton in the 2009 Malaysian Grand Prix?",
+    "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(t2.milliseconds) FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.year = 2009 AND t1.name = 'Malaysian Grand Prix') AS measured(value)",
+    "expected": "expected/bird.formula1.895.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 895; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.896",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Calculate the percentage whereby Hamilton was not at the 1st track of the the f1 circuit since 2010.",
+    "sql": "SELECT CAST(COUNT(CASE WHEN t2.position <> 1 THEN t2.position END) AS REAL) * 100 / NULLIF(COUNT(t2.driverstandingsid), 0) FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.surname = 'Hamilton' AND t1.year >= 2010",
+    "expected": "expected/bird.formula1.896.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 896; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.897",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Name the driver with the most winning. Mention his nationality and what is his maximum point scores.",
+    "sql": "SELECT t1.forename, t1.surname, t1.nationality, MAX(t2.points) FROM drivers AS t1 INNER JOIN driverstandings AS t2 ON t2.driverid = t1.driverid WHERE t2.wins >= 1 GROUP BY t1.forename, t1.surname, t1.nationality ORDER BY COUNT(t2.wins) DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.897.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 897; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.898",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "How old is the youngest Japanese driver? What is his name?",
+    "sql": "SELECT CAST(EXTRACT(YEAR FROM CAST('2026-10-04 00:00:00' AS TIMESTAMP)) - EXTRACT(YEAR FROM dob) AS BIGINT) AS age, forename, surname FROM drivers WHERE nationality = 'Japanese' ORDER BY dob DESC LIMIT 1",
+    "expected": "expected/bird.formula1.898.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 898; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.901",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Name the races along with its circuit name and location for f1 races hosted in September 2005.",
+    "sql": "SELECT DISTINCT t2.name, t1.name, t1.location FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.year = 2005 AND TO_CHAR(CAST(t2.date AS TIMESTAMP), 'MM') = '09'",
+    "expected": "expected/bird.formula1.901.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 901; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.902",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Which race was Alex Yoong in when he was in track number less than 20?",
+    "sql": "SELECT t1.name FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Alex' AND t3.surname = 'Yoong' AND t2.position < 20",
+    "expected": "expected/bird.formula1.902.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 902; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.904",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "State the race and year of race in which Michael Schumacher had his fastest lap.",
+    "sql": "SELECT t1.name, t1.year FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Michael' AND t3.surname = 'Schumacher' ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+    "expected": "expected/bird.formula1.904.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 904; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.906",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Which was Lewis Hamilton first race? What was his points recorded for his first race event?",
+    "sql": "SELECT r.name, s.points FROM races AS r JOIN driverstandings AS s ON s.raceid = r.raceid JOIN drivers AS d ON d.driverid = s.driverid WHERE d.forename = 'Lewis' AND d.surname = 'Hamilton' ORDER BY r.date, r.round, r.raceid LIMIT 1",
+    "expected": "expected/bird.formula1.906.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 906; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.909",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Among all European Grand Prix races, what is the percentage of the races were hosted in Germany?",
+    "sql": "SELECT CAST(COUNT(CASE WHEN t1.country = 'Germany' THEN t2.circuitid END) AS REAL) * 100 / NULLIF(COUNT(t2.circuitid), 0) FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'European Grand Prix'",
+    "expected": "expected/bird.formula1.909.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 909; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.910",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "What's the location coordinates of Silverstone Circuit?",
+    "sql": "SELECT lat, lng FROM circuits WHERE name = 'Silverstone Circuit'",
+    "expected": "expected/bird.formula1.910.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 910; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.912",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "What's the reference name of Marina Bay Street Circuit?",
+    "sql": "SELECT circuitref FROM circuits WHERE name = 'Marina Bay Street Circuit'",
+    "expected": "expected/bird.formula1.912.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 912; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.915",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "Which country is the oldest driver from?",
+    "sql": "SELECT nationality FROM drivers WHERE NOT dob IS NULL ORDER BY dob ASC NULLS FIRST LIMIT 1",
+    "expected": "expected/bird.formula1.915.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 915; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.928",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Which driver ranked the first in the Canadian Grand Prix in 2007? Please give his reference name.",
+    "sql": "SELECT d.forename, d.surname, d.driverref FROM races AS r JOIN results AS x ON x.raceid = r.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2007 AND x.positionorder = 1",
+    "expected": "expected/bird.formula1.928.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 928; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.930",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "In which Formula_1 race did Lewis Hamilton rank the highest?",
+    "sql": "SELECT name FROM races WHERE raceid IN (SELECT raceid FROM results WHERE rank = 1 AND driverid = (SELECT driverid FROM drivers WHERE forename = 'Lewis' AND surname = 'Hamilton'))",
+    "expected": "expected/bird.formula1.930.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 930; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.931",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate"
+    ],
+    "question": "What was the fastest lap speed among all drivers in the 2009 Spanish Grand Prix?",
+    "sql": "SELECT t2.fastestlapspeed FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.name = 'Spanish Grand Prix' AND t1.year = 2009 AND NOT t2.fastestlapspeed IS NULL ORDER BY t2.fastestlapspeed DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.931.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 931; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.933",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "What was Lewis Hamilton's final rank in the 2008 Chinese Grand Prix?",
+    "sql": "SELECT t2.positionorder FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.name = 'Chinese Grand Prix' AND t1.year = 2008",
+    "expected": "expected/bird.formula1.933.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 933; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.937",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "What's the finish time for the driver who ranked second in 2008's Chinese Grand Prix?",
+    "sql": "SELECT x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid WHERE r.name = 'Chinese Grand Prix' AND r.year = 2008 AND x.positionorder = 2",
+    "expected": "expected/bird.formula1.937.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 937; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.940",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate"
+    ],
+    "question": "Among the drivers that finished the race in the 2008 Chinese Grand Prix, how many of them have participated in Formula_1 races?",
+    "sql": "SELECT COUNT(*) FROM (SELECT t1.driverid FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Chinese Grand Prix' AND t2.year = 2008 AND t1.time IS NOT NULL GROUP BY t1.driverid HAVING COUNT(t2.raceid) > 0) AS subquery",
+    "expected": "expected/bird.formula1.940.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 940; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.944",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging"
+    ],
+    "question": "How much faster in percentage is the champion than the driver who finished the race last in the 2008 Australian Grand Prix?",
+    "sql": "WITH time_in_seconds AS (SELECT t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CAST(SUBSTRING(t1.time FROM 1 FOR 1) AS REAL) * 3600) + (CAST(SUBSTRING(t1.time FROM 3 FOR 2) AS REAL) * 60) + CAST(SUBSTRING(t1.time FROM 6) AS REAL) ELSE CAST(SUBSTRING(t1.time FROM 2) AS REAL) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Australian Grand Prix' AND NOT t1.time IS NULL AND t2.year = 2008), champion_time AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = 1), last_driver_incremental AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = (SELECT MAX(positionorder) FROM time_in_seconds)) SELECT (CAST((SELECT time_seconds FROM last_driver_incremental) AS REAL) * 100) / NULLIF((SELECT time_seconds + (SELECT time_seconds FROM last_driver_incremental) FROM champion_time), 0)",
+    "expected": "expected/bird.formula1.944.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 944; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.945",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "How many circuits are there in Adelaide, Australia?",
+    "sql": "SELECT COUNT(circuitid) FROM circuits WHERE location = 'Adelaide' AND country = 'Australia'",
+    "expected": "expected/bird.formula1.945.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 945; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.948",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "What are the maximum points of British constructors?",
+    "sql": "SELECT MAX(t1.points) FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t2.nationality = 'British'",
+    "expected": "expected/bird.formula1.948.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 948; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.950",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "Please list the constructor names with 0 points at race 291.",
+    "sql": "SELECT t2.name FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t1.points = 0 AND t1.raceid = 291",
+    "expected": "expected/bird.formula1.950.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 950; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.951",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple",
+      "cross_source"
+    ],
+    "question": "How many Japanese constructors have 0 points in 2 races?",
+    "sql": "SELECT COUNT(*) FROM (SELECT s.constructorid FROM constructorstandings AS s JOIN constructors AS c ON c.constructorid = s.constructorid WHERE s.points = 0 AND c.nationality = 'Japanese' GROUP BY s.constructorid HAVING COUNT(s.raceid) = 2) AS eligible",
+    "expected": "expected/bird.formula1.951.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 951; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.954",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Please calculate the race completion percentage of Japanese drivers from 2007 to 2009.",
+    "sql": "SELECT CAST(SUM(CASE WHEN NOT t1.time IS NULL THEN 1 ELSE 0 END) AS REAL) * 100 / NULLIF(COUNT(t1.raceid), 0) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN drivers AS t3 ON t1.driverid = t3.driverid WHERE t3.nationality = 'Japanese' AND t2.year BETWEEN 2007 AND 2009",
+    "expected": "expected/bird.formula1.954.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 954; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.955",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging"
+    ],
+    "question": "What is the average time in seconds of champion for each year, before year 1975?",
+    "sql": "WITH time_in_seconds AS (SELECT t2.year, t2.raceid, t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CASE WHEN SPLIT_PART(t1.time, ':', 1) <> '' AND SPLIT_PART(t1.time, ':', 2) <> '' AND SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) <> '' THEN (CAST(SPLIT_PART(t1.time, ':', 1) AS REAL) * 3600) + (CAST(SPLIT_PART(t1.time, ':', 2) AS REAL) * 60) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) AS REAL) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 2) AS REAL) / 1000 ELSE 0 END) ELSE (CASE WHEN SUBSTRING(t1.time FROM 2) <> '' THEN CAST(SUBSTRING(t1.time FROM 2) AS REAL) ELSE 0 END) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t1.time IS NOT NULL AND t1.time <> ''), champion_time AS (SELECT year, raceid, time_seconds FROM time_in_seconds WHERE positionorder = 1) SELECT year, AVG(time_seconds) FROM champion_time WHERE year < 1975 GROUP BY year HAVING AVG(time_seconds) IS NOT NULL",
+    "expected": "expected/bird.formula1.955.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 955; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.959",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "What is the fastest lap number of the champion in 2009?",
+    "sql": "SELECT t1.fastestlap FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+    "expected": "expected/bird.formula1.959.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 959; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.960",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate"
+    ],
+    "question": "What is the average of fastest lap speed in the 2009 Spanish Grand Prix race?",
+    "sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(CAST(t1.fastestlapspeed AS DECIMAL)) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t2.name = 'Spanish Grand Prix') AS measured(value)",
+    "expected": "expected/bird.formula1.960.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 960; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.962",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "From 2000 to 2005, what percentage of drivers who were born before 1985 and the lap numbers were over 50?",
+    "sql": "SELECT CAST(SUM(CASE WHEN TO_CHAR(CAST(t3.dob AS TIMESTAMP), 'YYYY') < '1985' AND t1.laps > 50 THEN 1 ELSE 0 END) AS REAL) * 100 / NULLIF(COUNT(*), 0) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN drivers AS t3 ON t1.driverid = t3.driverid WHERE t2.year BETWEEN 2000 AND 2005",
+    "expected": "expected/bird.formula1.962.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 962; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.963",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "How many French drivers who obtain the laptime less than 02:00.00?",
+    "sql": "SELECT COUNT(DISTINCT d.driverid) FROM drivers AS d JOIN laptimes AS l ON l.driverid = d.driverid WHERE d.nationality = 'French' AND (CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) < 120",
+    "expected": "expected/bird.formula1.963.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 963; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.964",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "List out the code for drivers who have nationality in America.",
+    "sql": "SELECT code FROM drivers WHERE nationality = 'American'",
+    "expected": "expected/bird.formula1.964.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 964; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.967",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "State code numbers of top 3 yougest drivers. How many Netherlandic drivers among them?",
+    "sql": "WITH ranked AS (SELECT code, nationality, ROW_NUMBER() OVER (ORDER BY dob DESC, driverid) AS n FROM drivers WHERE dob IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE n <= 3) SELECT MAX(CASE WHEN n = 1 THEN code END) AS code1, MAX(CASE WHEN n = 2 THEN code END) AS code2, MAX(CASE WHEN n = 3 THEN code END) AS code3, SUM(CASE WHEN nationality = 'Dutch' THEN 1 ELSE 0 END) AS dutch_count FROM top3",
+    "expected": "expected/bird.formula1.967.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 967; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.971",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "Please state the reference name of the oldest German driver.",
+    "sql": "SELECT driverref FROM drivers WHERE nationality = 'German' ORDER BY dob ASC LIMIT 1",
+    "expected": "expected/bird.formula1.971.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 971; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.972",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Which drivers who were born in 1971 and has the fastest lap time on the race? Give id and code of these drivers.",
+    "sql": "SELECT DISTINCT d.driverid, d.code FROM results AS x JOIN drivers AS d ON d.driverid = x.driverid WHERE EXTRACT(YEAR FROM d.dob) = 1971 AND x.fastestlaptime IS NOT NULL",
+    "expected": "expected/bird.formula1.972.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 972; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.977",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "From race no. 50 to 100, how many finishers have been disqualified?",
+    "sql": "SELECT SUM(CASE WHEN NOT time IS NULL THEN 1 ELSE 0 END) FROM results WHERE statusid = 2 AND raceid < 100 AND raceid > 50",
+    "expected": "expected/bird.formula1.977.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 977; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.978",
+    "primary_group": "simple",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "simple"
+    ],
+    "question": "How many times the circuits were held in Austria? Please give their location and coordinates.",
+    "sql": "WITH venues AS (SELECT DISTINCT location, lat, lng FROM circuits WHERE country = 'Austria') SELECT COUNT(*) OVER () AS venue_count, location, lat, lng FROM venues ORDER BY location, lat, lng",
+    "expected": "expected/bird.formula1.978.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 978; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.981",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "On what year did the youngest driver had his first qualifying race? Also state the name, date and time of the race.",
+    "sql": "SELECT t3.year, t3.name, t3.date, t3.time FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE t1.driverid = (SELECT driverid FROM drivers ORDER BY dob DESC NULLS LAST LIMIT 1) ORDER BY t3.date ASC NULLS FIRST LIMIT 1",
+    "expected": "expected/bird.formula1.981.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 981; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.988",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "List down top 3 German drivers who has the shortest average pit stop duration and were born between 1980-1985.",
+    "sql": "SELECT d.forename, d.surname FROM pitstops AS p JOIN drivers AS d ON d.driverid = p.driverid WHERE d.nationality = 'German' AND EXTRACT(YEAR FROM d.dob) BETWEEN 1980 AND 1985 GROUP BY d.driverid, d.forename, d.surname ORDER BY AVG(CASE WHEN SPLIT_PART(p.duration, ':', 3) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(p.duration, ':', 2) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) ELSE CAST(p.duration AS DOUBLE PRECISION) END), d.driverid LIMIT 3",
+    "expected": "expected/bird.formula1.988.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 988; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.989",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "Who is the champion of the Canadian Grand Prix in 2008? Indicate his finish time.",
+    "sql": "SELECT d.forename, d.surname, x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2008 AND x.positionorder = 1",
+    "expected": "expected/bird.formula1.989.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 989; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.990",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "What is the constructor reference name of the champion in the 2009 Singapore Grand Prix? Please give its website.",
+    "sql": "SELECT t3.constructorref, t3.url FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN constructors AS t3 ON t1.constructorid = t3.constructorid WHERE t2.name = 'Singapore Grand Prix' AND t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+    "expected": "expected/bird.formula1.990.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 990; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.994",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Which constructor scored most points from Monaco Grand Prix between 1980 and 2010? List the score, name and nationality of this team.",
+    "sql": "SELECT SUM(t1.points), t2.name, t2.nationality FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid INNER JOIN races AS t3 ON t3.raceid = t1.raceid WHERE t3.name = 'Monaco Grand Prix' AND t3.year BETWEEN 1980 AND 2010 GROUP BY t2.name, t2.nationality ORDER BY SUM(t1.points) DESC LIMIT 1",
+    "expected": "expected/bird.formula1.994.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 994; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.1001",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "What is full name of the racer who ranked 1st in the 3rd qualifying race held in the Marina Bay Street Circuit in 2008?",
+    "sql": "SELECT t2.forename, t2.surname FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE q3 IS NOT NULL AND t3.year = 2008 AND t3.circuitid IN (SELECT circuitid FROM circuits WHERE name = 'Marina Bay Street Circuit') ORDER BY CAST(SPLIT_PART(q3, ':', 1) AS INT) * 60 + CAST(SPLIT_PART(SPLIT_PART(q3, ':', 2), '.', 1) AS REAL) + CAST(SPLIT_PART(q3, '.', 2) AS REAL) / 1000 ASC LIMIT 1",
+    "expected": "expected/bird.formula1.1001.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 1001; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.1002",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "As of the present, what is the full name of the youngest racer? Indicate her nationality and the name of the race to which he/she first joined.",
+    "sql": "WITH youngest AS (SELECT driverid, forename, surname, nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob DESC, driverid LIMIT 1) SELECT d.forename, d.surname, d.nationality, r.name FROM youngest AS d JOIN driverstandings AS s ON s.driverid = d.driverid JOIN races AS r ON r.raceid = s.raceid ORDER BY r.date, r.round, r.raceid LIMIT 1",
+    "expected": "expected/bird.formula1.1002.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 1002; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.1003",
+    "primary_group": "moderate",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "moderate",
+      "cross_source"
+    ],
+    "question": "How many accidents did the driver who had the highest number accidents in the Canadian Grand Prix have?",
+    "sql": "SELECT COUNT(t1.driverid) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN status AS t3 ON t1.statusid = t3.statusid WHERE t3.statusid = 3 AND t2.name = 'Canadian Grand Prix' GROUP BY t1.driverid ORDER BY COUNT(t1.driverid) DESC NULLS LAST LIMIT 1",
+    "expected": "expected/bird.formula1.1003.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 1003; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.1011",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Which top 20 driver created the shortest lap time ever record in a Formula_1 race? Please give them full names.",
+    "sql": "WITH minimums AS (SELECT l.driverid, MIN(CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) AS seconds FROM laptimes AS l GROUP BY l.driverid) SELECT d.forename, d.surname FROM minimums AS m JOIN drivers AS d ON d.driverid = m.driverid ORDER BY m.seconds, d.driverid LIMIT 20",
+    "expected": "expected/bird.formula1.1011.json",
+    "comparison": {
+      "ordered": true,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 1011; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  },
+  {
+    "id": "bird.formula1.1014",
+    "primary_group": "challenging",
+    "tags": [
+      "external",
+      "bird",
+      "formula1",
+      "challenging",
+      "cross_source"
+    ],
+    "question": "Please list the lap records for the circuits in Italy.",
+    "sql": "WITH ranked AS (SELECT c.circuitid, c.name, x.fastestlaptime, ROW_NUMBER() OVER (PARTITION BY c.circuitid ORDER BY (CASE WHEN SPLIT_PART(x.fastestlaptime, ':', 3) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(x.fastestlaptime, ':', 2) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) ELSE CAST(x.fastestlaptime AS DOUBLE PRECISION) END), r.date, r.raceid, x.resultid) AS n FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN circuits AS c ON c.circuitid = r.circuitid WHERE c.country = 'Italy' AND x.fastestlaptime IS NOT NULL) SELECT circuitid, name, fastestlaptime AS lap_record FROM ranked WHERE n = 1 ORDER BY circuitid",
+    "expected": "expected/bird.formula1.1014.json",
+    "comparison": {
+      "ordered": false,
+      "assert_names": false,
+      "assert_physical_types": false
+    },
+    "requirements": [
+      "Complete family selection: original question_id 1014; no SQL feature exclusions.",
+      "Original question/evidence/PostgreSQL SQL/SQLite SQL retained in source/selected_original.json.",
+      "Result oracle executes original SQLite SQL and independent PostgreSQL reference; any dialect discrepancy is explicitly adjudicated in source/oracle-review.json."
+    ],
+    "oracle_reasoning": "Original database reference execution; never product output.",
+    "distinguishing_rows": [
+      "All original 493257 database rows retained. Source snapshot and query ID identify independently auditable upstream counterexamples."
+    ]
+  }
+]

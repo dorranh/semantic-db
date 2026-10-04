@@ -8,3 +8,5 @@
 /docs/site/.astro/
 scratch
 /.semantic-eval/
+# Bytecode from dataset authoring tools.
+/tests/datasets/**/__pycache__/

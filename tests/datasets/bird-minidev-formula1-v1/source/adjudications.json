@@ -1,0 +1,464 @@
+[
+  {
+    "question_id": 846,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.driverRef FROM qualifying AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 20 ORDER BY T1.q1 DESC LIMIT 5",
+    "adapted_postgresql_sql": "SELECT t2.driverref FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 20 ORDER BY t1.q1 DESC NULLS LAST LIMIT 5",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 847,
+    "reason": "Missing q2 is unknown, not the best observed lap; stable driver identity breaks equal observed durations.",
+    "corrected_sqlite_sql": "SELECT d.surname FROM qualifying q JOIN drivers d ON d.driverid=q.driverid WHERE q.raceid=19 AND q.q2 IS NOT NULL ORDER BY q.q2,d.driverid LIMIT 1",
+    "adapted_postgresql_sql": "SELECT d.surname FROM qualifying AS q JOIN drivers AS d ON d.driverid = q.driverid WHERE q.raceid = 19 AND q.q2 IS NOT NULL ORDER BY q.q2, d.driverid LIMIT 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 850,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT DISTINCT T2.name FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T1.country = 'Germany'",
+    "adapted_postgresql_sql": "SELECT DISTINCT t2.name FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t1.country = 'Germany'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 854,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT DISTINCT T1.lat, T1.lng FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T2.name = 'Australian Grand Prix'",
+    "adapted_postgresql_sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Australian Grand Prix'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 857,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT DISTINCT T1.lat, T1.lng FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T2.name = 'Abu Dhabi Grand Prix'",
+    "adapted_postgresql_sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Abu Dhabi Grand Prix'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 859,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.q1 FROM qualifying AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 354 AND T2.forename = 'Bruno' AND T2.surname = 'Senna'",
+    "adapted_postgresql_sql": "SELECT t1.q1 FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 354 AND t2.forename = 'Bruno' AND t2.surname = 'Senna'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 861,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.number FROM qualifying AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 903 AND T1.q3 LIKE '1:54%'",
+    "adapted_postgresql_sql": "SELECT t2.number FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 903 AND t1.q3 LIKE '1:54%'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 862,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT COUNT(T3.driverId) FROM races AS T1 INNER JOIN results AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T1.year = 2007 AND T1.name = 'Bahrain Grand Prix' AND T2.time IS NULL",
+    "adapted_postgresql_sql": "SELECT COUNT(t3.driverid) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t1.year = 2007 AND t1.name = 'Bahrain Grand Prix' AND t2.time IS NULL",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 865,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.forename, T1.surname FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId WHERE T2.raceId = 592 AND T2.time IS NOT NULL AND T1.dob IS NOT NULL ORDER BY T1.dob ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 592 AND NOT t2.time IS NULL AND NOT t1.dob IS NULL ORDER BY t1.dob ASC NULLS FIRST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 866,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT DISTINCT T2.forename, T2.surname, T2.url FROM lapTimes AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 161 AND T1.time LIKE '1:27%'",
+    "adapted_postgresql_sql": "SELECT DISTINCT t2.forename, t2.surname, t2.url FROM laptimes AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 161 AND t1.time LIKE '1:27%'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 868,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT DISTINCT T1.lat, T1.lng FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T2.name = 'Malaysian Grand Prix'",
+    "adapted_postgresql_sql": "SELECT DISTINCT t1.lat, t1.lng FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'Malaysian Grand Prix'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 869,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.url FROM constructorResults AS T1 INNER JOIN constructors AS T2 ON T2.constructorId = T1.constructorId WHERE T1.raceId = 9 ORDER BY T1.points DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t2.url FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t2.constructorid = t1.constructorid WHERE t1.raceid = 9 ORDER BY t1.points DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 872,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.code FROM qualifying AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 45 AND T1.q3 LIKE '1:33%'",
+    "adapted_postgresql_sql": "SELECT t2.code FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t2.driverid = t1.driverid WHERE t1.raceid = 45 AND t1.q3 LIKE '1:33%'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 875,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.url FROM races AS T1 INNER JOIN seasons AS T2 ON T2.year = T1.year WHERE T1.raceId = 901",
+    "adapted_postgresql_sql": "SELECT t2.url FROM races AS t1 INNER JOIN seasons AS t2 ON t2.year = t1.year WHERE t1.raceid = 901",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 877,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.forename, T1.surname FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId WHERE T2.raceId = 872 AND T2.time IS NOT NULL ORDER BY T1.dob DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t1.forename, t1.surname FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t2.raceid = 872 AND NOT t2.time IS NULL ORDER BY t1.dob DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 879,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.nationality FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId ORDER BY CAST(T2.fastestLapSpeed AS DOUBLE PRECISION) DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t1.nationality FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid ORDER BY CAST(t2.fastestlapspeed AS DOUBLE PRECISION) DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 880,
+    "reason": "Measurement numeric output is explicitly Float64; arithmetic/reference meaning retained.",
+    "corrected_sqlite_sql": "SELECT (SUM(IIF(T2.raceId = 853, T2.fastestLapSpeed, 0)) - SUM(IIF(T2.raceId = 854, T2.fastestLapSpeed, 0))) * 100 / SUM(IIF(T2.raceId = 853, T2.fastestLapSpeed, 0)) FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId WHERE T1.forename = 'Paul' AND T1.surname = 'di Resta'",
+    "adapted_postgresql_sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT (SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END) - SUM(CASE WHEN t2.raceid = 854 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END)) * 100 / NULLIF(SUM(CASE WHEN t2.raceid = 853 THEN CAST(t2.fastestlapspeed AS DECIMAL) ELSE 0 END), 0) FROM drivers AS t1 INNER JOIN results AS t2 ON t2.driverid = t1.driverid WHERE t1.forename = 'Paul' AND t1.surname = 'di Resta') AS measured(value)",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 881,
+    "reason": "Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.",
+    "corrected_sqlite_sql": "SELECT CAST(COUNT(CASE WHEN T2.time IS NOT NULL THEN T2.driverId END) AS DOUBLE PRECISION) * 100 / COUNT(T2.driverId) FROM races AS T1 INNER JOIN results AS T2 ON T2.raceId = T1.raceId WHERE T1.date = '1983-07-16'",
+    "adapted_postgresql_sql": "SELECT CAST(COUNT(CASE WHEN NOT t2.time IS NULL THEN t2.driverid END) AS DOUBLE PRECISION) * 100 / NULLIF(COUNT(t2.driverid), 0) FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.date = '1983-07-16'",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 884,
+    "reason": "Portable Gregorian EXTRACT year/month compare earliest source date, preserving ascending NULLS FIRST policy and original golds.",
+    "corrected_sqlite_sql": "SELECT name FROM races WHERE CAST(STRFTIME('%Y',date) AS INTEGER)=(SELECT CAST(STRFTIME('%Y',date) AS INTEGER) FROM races ORDER BY date ASC NULLS FIRST LIMIT 1) AND CAST(STRFTIME('%m',date) AS INTEGER)=(SELECT CAST(STRFTIME('%m',date) AS INTEGER) FROM races ORDER BY date ASC NULLS FIRST LIMIT 1)",
+    "adapted_postgresql_sql": "SELECT name FROM races WHERE EXTRACT(YEAR FROM date) = (SELECT EXTRACT(YEAR FROM date) FROM races ORDER BY date ASC NULLS FIRST LIMIT 1) AND EXTRACT(MONTH FROM date) = (SELECT EXTRACT(MONTH FROM date) FROM races ORDER BY date ASC NULLS FIRST LIMIT 1)",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 892,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T3.forename, T3.surname, T2.points FROM races AS T1 INNER JOIN driverStandings AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId ORDER BY T2.points DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t3.forename, t3.surname, t2.points FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid ORDER BY t2.points DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 894,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.milliseconds, T1.forename, T1.surname, T3.name FROM drivers AS T1 INNER JOIN lapTimes AS T2 ON T1.driverId = T2.driverId INNER JOIN races AS T3 ON T2.raceId = T3.raceId ORDER BY T2.milliseconds ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t2.milliseconds, t1.forename, t1.surname, t3.name FROM drivers AS t1 INNER JOIN laptimes AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t2.raceid = t3.raceid ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 895,
+    "reason": "Average millisecond measurement output is explicitly Float64; arithmetic/reference meaning retained.",
+    "corrected_sqlite_sql": "SELECT AVG(T2.milliseconds) FROM races AS T1 INNER JOIN lapTimes AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T3.forename = 'Lewis' AND T3.surname = 'Hamilton' AND T1.year = 2009 AND T1.name = 'Malaysian Grand Prix'",
+    "adapted_postgresql_sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(t2.milliseconds) FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.year = 2009 AND t1.name = 'Malaysian Grand Prix') AS measured(value)",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 896,
+    "reason": "Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.",
+    "corrected_sqlite_sql": "SELECT CAST(COUNT(CASE WHEN T2.position <> 1 THEN T2.position END) AS DOUBLE PRECISION) * 100 / COUNT(T2.driverStandingsId) FROM races AS T1 INNER JOIN driverStandings AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T3.surname = 'Hamilton' AND T1.year >= 2010",
+    "adapted_postgresql_sql": "SELECT CAST(COUNT(CASE WHEN t2.position <> 1 THEN t2.position END) AS DOUBLE PRECISION) * 100 / NULLIF(COUNT(t2.driverstandingsid), 0) FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.surname = 'Hamilton' AND t1.year >= 2010",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 897,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.forename, T1.surname, T1.nationality, MAX(T2.points) FROM drivers AS T1 INNER JOIN driverStandings AS T2 ON T2.driverId = T1.driverId WHERE T2.wins >= 1 GROUP BY T1.forename, T1.surname, T1.nationality ORDER BY COUNT(T2.wins) DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t1.forename, t1.surname, t1.nationality, MAX(t2.points) FROM drivers AS t1 INNER JOIN driverstandings AS t2 ON t2.driverid = t1.driverid WHERE t2.wins >= 1 GROUP BY t1.forename, t1.surname, t1.nationality ORDER BY COUNT(t2.wins) DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 898,
+    "reason": "Fixed request clock and officially evidenced year-difference age; integral age transported as Int64.",
+    "corrected_sqlite_sql": "SELECT STRFTIME('%Y', CURRENT_TIMESTAMP) - STRFTIME('%Y', dob), forename , surname FROM drivers WHERE nationality = 'Japanese' ORDER BY dob DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT CAST(EXTRACT(YEAR FROM CAST('2026-10-04 00:00:00' AS TIMESTAMP)) - EXTRACT(YEAR FROM dob) AS BIGINT) AS age, forename, surname FROM drivers WHERE nationality = 'Japanese' ORDER BY dob DESC LIMIT 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 901,
+    "reason": "Portable Gregorian EXTRACT year/month predicates replace PostgreSQL TO_CHAR format tokens, whose meanings differ from Chrono. Original questions and golds retained.",
+    "corrected_sqlite_sql": "SELECT DISTINCT r.name,c.name,c.location FROM circuits c JOIN races r ON r.circuitid=c.circuitid WHERE CAST(STRFTIME('%Y',r.date) AS INTEGER)=2005 AND CAST(STRFTIME('%m',r.date) AS INTEGER)=9",
+    "adapted_postgresql_sql": "SELECT DISTINCT r.name, c.name, c.location FROM circuits AS c JOIN races AS r ON r.circuitid = c.circuitid WHERE EXTRACT(YEAR FROM r.date) = 2005 AND EXTRACT(MONTH FROM r.date) = 9",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 902,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.name FROM races AS T1 INNER JOIN driverStandings AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T3.forename = 'Alex' AND T3.surname = 'Yoong' AND T2.position < 20",
+    "adapted_postgresql_sql": "SELECT t1.name FROM races AS t1 INNER JOIN driverstandings AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Alex' AND t3.surname = 'Yoong' AND t2.position < 20",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 904,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.name, T1.year FROM races AS T1 INNER JOIN lapTimes AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T3.forename = 'Michael' AND T3.surname = 'Schumacher' ORDER BY T2.milliseconds ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t1.name, t1.year FROM races AS t1 INNER JOIN laptimes AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Michael' AND t3.surname = 'Schumacher' ORDER BY t2.milliseconds ASC NULLS FIRST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 906,
+    "reason": "First available race is chronological date/round/raceId; reviewed interpretation preserves the original reference metric cumulative driverStandings.points; evidence itself does not specify this metric.",
+    "corrected_sqlite_sql": "SELECT r.name,s.points FROM races r JOIN driverstandings s ON s.raceid=r.raceid JOIN drivers d ON d.driverid=s.driverid WHERE d.forename='Lewis' AND d.surname='Hamilton' ORDER BY r.date,r.round,r.raceid LIMIT 1",
+    "adapted_postgresql_sql": "SELECT r.name, s.points FROM races AS r JOIN driverstandings AS s ON s.raceid = r.raceid JOIN drivers AS d ON d.driverid = s.driverid WHERE d.forename = 'Lewis' AND d.surname = 'Hamilton' ORDER BY r.date, r.round, r.raceid LIMIT 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 909,
+    "reason": "Explicit DOUBLE PRECISION measurement intermediates preserve the Float64 percentage contract; deliberate coercion adaptation avoids engine-specific REAL intermediate narrowing.",
+    "corrected_sqlite_sql": "SELECT CAST(COUNT(CASE WHEN T1.country = 'Germany' THEN T2.circuitID END) AS DOUBLE PRECISION) * 100 / COUNT(T2.circuitId) FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T2.name = 'European Grand Prix'",
+    "adapted_postgresql_sql": "SELECT CAST(COUNT(CASE WHEN t1.country = 'Germany' THEN t2.circuitid END) AS DOUBLE PRECISION) * 100 / NULLIF(COUNT(t2.circuitid), 0) FROM circuits AS t1 INNER JOIN races AS t2 ON t2.circuitid = t1.circuitid WHERE t2.name = 'European Grand Prix'",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 910,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT lat, lng FROM circuits WHERE name = 'Silverstone Circuit'",
+    "adapted_postgresql_sql": "SELECT lat, lng FROM circuits WHERE name = 'Silverstone Circuit'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 912,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT circuitRef FROM circuits WHERE name = 'Marina Bay Street Circuit'",
+    "adapted_postgresql_sql": "SELECT circuitref FROM circuits WHERE name = 'Marina Bay Street Circuit'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 915,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT nationality FROM drivers WHERE NOT dob IS NULL ORDER BY dob ASC NULLS FIRST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 928,
+    "reason": "Race winner means finishing positionOrder, not fastest-lap rank.",
+    "corrected_sqlite_sql": "SELECT d.forename,d.surname,d.driverref FROM races r JOIN results x ON x.raceid=r.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.name='Canadian Grand Prix' AND r.year=2007 AND x.positionorder=1",
+    "adapted_postgresql_sql": "SELECT d.forename, d.surname, d.driverref FROM races AS r JOIN results AS x ON x.raceid = r.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2007 AND x.positionorder = 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 930,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT name FROM races WHERE raceId IN ( SELECT raceId FROM results WHERE rank = 1 AND driverId = ( SELECT driverId FROM drivers WHERE forename = 'Lewis' AND surname = 'Hamilton' ) )",
+    "adapted_postgresql_sql": "SELECT name FROM races WHERE raceid IN (SELECT raceid FROM results WHERE rank = 1 AND driverid = (SELECT driverid FROM drivers WHERE forename = 'Lewis' AND surname = 'Hamilton'))",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 931,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.fastestLapSpeed FROM races AS T1 INNER JOIN results AS T2 ON T2.raceId = T1.raceId WHERE T1.name = 'Spanish Grand Prix' AND T1.year = 2009 AND T2.fastestLapSpeed IS NOT NULL ORDER BY T2.fastestLapSpeed DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t2.fastestlapspeed FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid WHERE t1.name = 'Spanish Grand Prix' AND t1.year = 2009 AND NOT t2.fastestlapspeed IS NULL ORDER BY t2.fastestlapspeed DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 933,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.positionOrder FROM races AS T1 INNER JOIN results AS T2 ON T2.raceId = T1.raceId INNER JOIN drivers AS T3 ON T3.driverId = T2.driverId WHERE T3.forename = 'Lewis' AND T3.surname = 'Hamilton' AND T1.name = 'Chinese Grand Prix' AND T1.year = 2008",
+    "adapted_postgresql_sql": "SELECT t2.positionorder FROM races AS t1 INNER JOIN results AS t2 ON t2.raceid = t1.raceid INNER JOIN drivers AS t3 ON t3.driverid = t2.driverid WHERE t3.forename = 'Lewis' AND t3.surname = 'Hamilton' AND t1.name = 'Chinese Grand Prix' AND t1.year = 2008",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 937,
+    "reason": "Second finishing driver means positionOrder=2, not fastest-lap rank.",
+    "corrected_sqlite_sql": "SELECT x.time FROM results x JOIN races r ON r.raceid=x.raceid WHERE r.name='Chinese Grand Prix' AND r.year=2008 AND x.positionorder=2",
+    "adapted_postgresql_sql": "SELECT x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid WHERE r.name = 'Chinese Grand Prix' AND r.year = 2008 AND x.positionorder = 2",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 940,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT COUNT(*) FROM ( SELECT T1.driverId FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId WHERE T2.name = 'Chinese Grand Prix' AND T2.year = 2008 AND T1.time IS NOT NULL GROUP BY T1.driverId HAVING COUNT(T2.raceId) > 0 )",
+    "adapted_postgresql_sql": "SELECT COUNT(*) FROM (SELECT t1.driverid FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Chinese Grand Prix' AND t2.year = 2008 AND t1.time IS NOT NULL GROUP BY t1.driverid HAVING COUNT(t2.raceid) > 0) AS subquery",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 944,
+    "reason": "Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.",
+    "corrected_sqlite_sql": "WITH time_in_seconds AS ( SELECT T1.positionOrder, CASE WHEN T1.positionOrder = 1 THEN (CAST(SUBSTR(T1.time, 1, 1) AS DOUBLE PRECISION) * 3600) + (CAST(SUBSTR(T1.time, 3, 2) AS DOUBLE PRECISION) * 60) + CAST(SUBSTR(T1.time, 6) AS DOUBLE PRECISION) ELSE CAST(SUBSTR(T1.time, 2) AS DOUBLE PRECISION) END AS time_seconds FROM results AS T1 INNER JOIN races AS T2 ON T1.raceId = T2.raceId WHERE T2.name = 'Australian Grand Prix' AND T1.time IS NOT NULL AND T2.year = 2008 ), champion_time AS ( SELECT time_seconds FROM time_in_seconds WHERE positionOrder = 1), last_driver_incremental AS ( SELECT time_seconds FROM time_in_seconds WHERE positionOrder = (SELECT MAX(positionOrder) FROM time_in_seconds) ) SELECT (CAST((SELECT time_seconds FROM last_driver_incremental) AS DOUBLE PRECISION) * 100) / (SELECT time_seconds + (SELECT time_seconds FROM last_driver_incremental) FROM champion_time)",
+    "adapted_postgresql_sql": "WITH time_in_seconds AS (SELECT t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CAST(SUBSTRING(t1.time FROM 1 FOR 1) AS DOUBLE PRECISION) * 3600) + (CAST(SUBSTRING(t1.time FROM 3 FOR 2) AS DOUBLE PRECISION) * 60) + CAST(SUBSTRING(t1.time FROM 6) AS DOUBLE PRECISION) ELSE CAST(SUBSTRING(t1.time FROM 2) AS DOUBLE PRECISION) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.name = 'Australian Grand Prix' AND NOT t1.time IS NULL AND t2.year = 2008), champion_time AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = 1), last_driver_incremental AS (SELECT time_seconds FROM time_in_seconds WHERE positionorder = (SELECT MAX(positionorder) FROM time_in_seconds)) SELECT (CAST((SELECT time_seconds FROM last_driver_incremental) AS DOUBLE PRECISION) * 100) / NULLIF((SELECT time_seconds + (SELECT time_seconds FROM last_driver_incremental) FROM champion_time), 0)",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 945,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT COUNT(circuitId) FROM circuits WHERE location = 'Adelaide' AND country = 'Australia'",
+    "adapted_postgresql_sql": "SELECT COUNT(circuitid) FROM circuits WHERE location = 'Adelaide' AND country = 'Australia'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 948,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT MAX(T1.points) FROM constructorStandings AS T1 INNER JOIN constructors AS T2 on T1.constructorId = T2.constructorId WHERE T2.nationality = 'British'",
+    "adapted_postgresql_sql": "SELECT MAX(t1.points) FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t2.nationality = 'British'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 950,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T2.name FROM constructorStandings AS T1 INNER JOIN constructors AS T2 on T1.constructorId = T2.constructorId WHERE T1.points = 0 AND T1.raceId = 291",
+    "adapted_postgresql_sql": "SELECT t2.name FROM constructorstandings AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid WHERE t1.points = 0 AND t1.raceid = 291",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 951,
+    "reason": "Requested number of constructors requires counting qualifying constructor groups.",
+    "corrected_sqlite_sql": "SELECT COUNT(*) FROM (SELECT s.constructorid FROM constructorstandings s JOIN constructors c ON c.constructorid=s.constructorid WHERE s.points=0 AND c.nationality='Japanese' GROUP BY s.constructorid HAVING COUNT(s.raceid)=2) eligible",
+    "adapted_postgresql_sql": "SELECT COUNT(*) FROM (SELECT s.constructorid FROM constructorstandings AS s JOIN constructors AS c ON c.constructorid = s.constructorid WHERE s.points = 0 AND c.nationality = 'Japanese' GROUP BY s.constructorid HAVING COUNT(s.raceid) = 2) AS eligible",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 954,
+    "reason": "Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.",
+    "corrected_sqlite_sql": "SELECT CAST(SUM(IIF(T1.time IS NOT NULL, 1, 0)) AS DOUBLE PRECISION) * 100 / COUNT(T1.raceId) FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId INNER JOIN drivers AS T3 on T1.driverId = T3.driverId WHERE T3.nationality = 'Japanese' AND T2.year BETWEEN 2007 AND 2009",
+    "adapted_postgresql_sql": "SELECT CAST(SUM(CASE WHEN NOT t1.time IS NULL THEN 1 ELSE 0 END) AS DOUBLE PRECISION) * 100 / NULLIF(COUNT(t1.raceid), 0) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN drivers AS t3 ON t1.driverid = t3.driverid WHERE t3.nationality = 'Japanese' AND t2.year BETWEEN 2007 AND 2009",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 955,
+    "reason": "Explicit DOUBLE PRECISION throughout duration arithmetic preserves the Float64 mean measurement contract; original timing meaning and golds retained.",
+    "corrected_sqlite_sql": "WITH time_in_seconds AS ( SELECT T2.year, T2.raceId, T1.positionOrder, CASE WHEN T1.positionOrder = 1 THEN (CAST(SUBSTR(T1.time, 1, 1) AS DOUBLE PRECISION) * 3600) + (CAST(SUBSTR(T1.time, 3, 2) AS DOUBLE PRECISION) * 60) + CAST(SUBSTR(T1.time, 6,2) AS DOUBLE PRECISION )   + CAST(SUBSTR(T1.time, 9) AS DOUBLE PRECISION)/1000 ELSE 0 END AS time_seconds FROM results AS T1 INNER JOIN races AS T2 ON T1.raceId = T2.raceId WHERE T1.time IS NOT NULL ), champion_time AS ( SELECT year, raceId, time_seconds FROM time_in_seconds WHERE positionOrder = 1 ) SELECT year, AVG(time_seconds) FROM champion_time WHERE year < 1975 GROUP BY year HAVING AVG(time_seconds) IS NOT NULL",
+    "adapted_postgresql_sql": "WITH time_in_seconds AS (SELECT t2.year, t2.raceid, t1.positionorder, CASE WHEN t1.positionorder = 1 THEN (CASE WHEN SPLIT_PART(t1.time, ':', 1) <> '' AND SPLIT_PART(t1.time, ':', 2) <> '' AND SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) <> '' THEN (CAST(SPLIT_PART(t1.time, ':', 1) AS DOUBLE PRECISION) * 3600) + (CAST(SPLIT_PART(t1.time, ':', 2) AS DOUBLE PRECISION) * 60) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 1) AS DOUBLE PRECISION) + CAST(SPLIT_PART(SPLIT_PART(t1.time, ':', 3), '.', 2) AS DOUBLE PRECISION) / 1000 ELSE 0 END) ELSE (CASE WHEN SUBSTRING(t1.time FROM 2) <> '' THEN CAST(SUBSTRING(t1.time FROM 2) AS DOUBLE PRECISION) ELSE 0 END) END AS time_seconds FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t1.time IS NOT NULL AND t1.time <> ''), champion_time AS (SELECT year, raceid, time_seconds FROM time_in_seconds WHERE positionorder = 1) SELECT year, AVG(time_seconds) FROM champion_time WHERE year < 1975 GROUP BY year HAVING AVG(time_seconds) IS NOT NULL",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 959,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T1.fastestLap FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId WHERE T2.year = 2009 AND T1.time LIKE '_:%:__.___'",
+    "adapted_postgresql_sql": "SELECT t1.fastestlap FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 960,
+    "reason": "Average speed measurement output is explicitly Float64; arithmetic/reference meaning retained.",
+    "corrected_sqlite_sql": "SELECT AVG(T1.fastestLapSpeed) FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId WHERE T2.year = 2009 AND T2.name = 'Spanish Grand Prix'",
+    "adapted_postgresql_sql": "SELECT CAST(value AS DOUBLE PRECISION) AS value FROM (SELECT AVG(CAST(t1.fastestlapspeed AS DECIMAL)) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid WHERE t2.year = 2009 AND t2.name = 'Spanish Grand Prix') AS measured(value)",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 962,
+    "reason": "Portable Gregorian EXTRACT birth year replaces PostgreSQL TO_CHAR tokens; full-family measurement arithmetic explicitly DOUBLE PRECISION. Birth-year/lap/race-year predicates and existing gold remain unchanged.",
+    "corrected_sqlite_sql": "SELECT CAST(SUM(CASE WHEN CAST(STRFTIME('%Y',d.dob) AS INTEGER)<1985 AND x.laps>50 THEN 1 ELSE 0 END) AS DOUBLE PRECISION)*100/NULLIF(COUNT(*),0) FROM results x JOIN races r ON r.raceid=x.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.year BETWEEN 2000 AND 2005",
+    "adapted_postgresql_sql": "SELECT CAST(SUM(CASE WHEN EXTRACT(YEAR FROM d.dob) < 1985 AND x.laps > 50 THEN 1 ELSE 0 END) AS DOUBLE PRECISION) * 100 / NULLIF(COUNT(*), 0) FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.year BETWEEN 2000 AND 2005",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 963,
+    "reason": "Requested drivers are distinct driver identities; parse all duration components.",
+    "corrected_sqlite_sql": "SELECT COUNT(DISTINCT d.driverid) FROM drivers d JOIN laptimes l ON l.driverid=d.driverid WHERE d.nationality='French' AND (CASE WHEN INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')>0 THEN CAST(SUBSTR(l.time,1,INSTR(l.time,':')-1) AS DOUBLE PRECISION)*3600+CAST(SUBSTR(SUBSTR(l.time,INSTR(l.time,':')+1),1,INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(SUBSTR(l.time,INSTR(l.time,':')+1),INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')+1) AS DOUBLE PRECISION) WHEN INSTR(l.time,':')>0 THEN CAST(SUBSTR(l.time,1,INSTR(l.time,':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(l.time,INSTR(l.time,':')+1) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END)<120",
+    "adapted_postgresql_sql": "SELECT COUNT(DISTINCT d.driverid) FROM drivers AS d JOIN laptimes AS l ON l.driverid = d.driverid WHERE d.nationality = 'French' AND (CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) < 120",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 964,
+    "reason": "Official PostgreSQL evidence nationality America is corrected to American using original SQLite evidence and actual declared nationality values; SQL meaning retained.",
+    "corrected_sqlite_sql": "SELECT code FROM drivers WHERE Nationality = 'American'",
+    "adapted_postgresql_sql": "SELECT code FROM drivers WHERE nationality = 'American'",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 967,
+    "reason": "Return all three requested codes and count Dutch drivers among exactly those three; four scalar columns.",
+    "corrected_sqlite_sql": "WITH ranked AS (SELECT code,nationality,ROW_NUMBER() OVER (ORDER BY dob DESC,driverid) n FROM drivers WHERE dob IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE n<=3) SELECT MAX(CASE WHEN n=1 THEN code END) code1,MAX(CASE WHEN n=2 THEN code END) code2,MAX(CASE WHEN n=3 THEN code END) code3,SUM(CASE WHEN nationality='Dutch' THEN 1 ELSE 0 END) dutch_count FROM top3",
+    "adapted_postgresql_sql": "WITH ranked AS (SELECT code, nationality, ROW_NUMBER() OVER (ORDER BY dob DESC, driverid) AS n FROM drivers WHERE dob IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE n <= 3) SELECT MAX(CASE WHEN n = 1 THEN code END) AS code1, MAX(CASE WHEN n = 2 THEN code END) AS code2, MAX(CASE WHEN n = 3 THEN code END) AS code3, SUM(CASE WHEN nationality = 'Dutch' THEN 1 ELSE 0 END) AS dutch_count FROM top3",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 971,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT driverRef FROM drivers WHERE nationality = 'German' ORDER BY JULIANDAY(dob) ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT driverref FROM drivers WHERE nationality = 'German' ORDER BY dob ASC LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 972,
+    "reason": "Requested driver identities, not repeated race-result rows.",
+    "corrected_sqlite_sql": "SELECT DISTINCT d.driverid,d.code FROM results x JOIN drivers d ON d.driverid=x.driverid WHERE CAST(STRFTIME('%Y',d.dob) AS INTEGER)=1971 AND x.fastestlaptime IS NOT NULL",
+    "adapted_postgresql_sql": "SELECT DISTINCT d.driverid, d.code FROM results AS x JOIN drivers AS d ON d.driverid = x.driverid WHERE EXTRACT(YEAR FROM d.dob) = 1971 AND x.fastestlaptime IS NOT NULL",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 977,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT SUM(IIF(time IS NOT NULL, 1, 0)) FROM results WHERE statusId = 2 AND raceID < 100 AND raceId > 50",
+    "adapted_postgresql_sql": "SELECT SUM(CASE WHEN NOT time IS NULL THEN 1 ELSE 0 END) FROM results WHERE statusid = 2 AND raceid < 100 AND raceid > 50",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 978,
+    "reason": "Reviewed geographic-grain interpretation preserves original DISTINCT(location,lat,lng), counting Austrian geographic venues rather than circuit IDs or race occurrences; return total count alongside each requested location and coordinate.",
+    "corrected_sqlite_sql": "WITH venues AS (SELECT DISTINCT location,lat,lng FROM circuits WHERE country='Austria') SELECT COUNT(*) OVER () venue_count,location,lat,lng FROM venues ORDER BY location,lat,lng",
+    "adapted_postgresql_sql": "WITH venues AS (SELECT DISTINCT location, lat, lng FROM circuits WHERE country = 'Austria') SELECT COUNT(*) OVER () AS venue_count, location, lat, lng FROM venues ORDER BY location, lat, lng",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 981,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T3.year, T3.name, T3.date, T3.time FROM qualifying AS T1 INNER JOIN drivers AS T2 on T1.driverId = T2.driverId INNER JOIN races AS T3 on T1.raceId = T3.raceId WHERE T1.driverId = ( SELECT driverId FROM drivers ORDER BY dob DESC LIMIT 1 ) ORDER BY T3.date ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t3.year, t3.name, t3.date, t3.time FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE t1.driverid = (SELECT driverid FROM drivers ORDER BY dob DESC NULLS LAST LIMIT 1) ORDER BY t3.date ASC NULLS FIRST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 988,
+    "reason": "Inclusive birth years are corroborated by official SQLite evidence; parse seconds and minute/hour duration formats faithfully.",
+    "corrected_sqlite_sql": "SELECT d.forename,d.surname FROM pitstops p JOIN drivers d ON d.driverid=p.driverid WHERE d.nationality='German' AND CAST(STRFTIME('%Y',d.dob) AS INTEGER) BETWEEN 1980 AND 1985 GROUP BY d.driverid,d.forename,d.surname ORDER BY AVG(CASE WHEN INSTR(SUBSTR(p.duration,INSTR(p.duration,':')+1),':')>0 THEN CAST(SUBSTR(p.duration,1,INSTR(p.duration,':')-1) AS DOUBLE PRECISION)*3600+CAST(SUBSTR(SUBSTR(p.duration,INSTR(p.duration,':')+1),1,INSTR(SUBSTR(p.duration,INSTR(p.duration,':')+1),':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(SUBSTR(p.duration,INSTR(p.duration,':')+1),INSTR(SUBSTR(p.duration,INSTR(p.duration,':')+1),':')+1) AS DOUBLE PRECISION) WHEN INSTR(p.duration,':')>0 THEN CAST(SUBSTR(p.duration,1,INSTR(p.duration,':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(p.duration,INSTR(p.duration,':')+1) AS DOUBLE PRECISION) ELSE CAST(p.duration AS DOUBLE PRECISION) END),d.driverid LIMIT 3",
+    "adapted_postgresql_sql": "SELECT d.forename, d.surname FROM pitstops AS p JOIN drivers AS d ON d.driverid = p.driverid WHERE d.nationality = 'German' AND EXTRACT(YEAR FROM d.dob) BETWEEN 1980 AND 1985 GROUP BY d.driverid, d.forename, d.surname ORDER BY AVG(CASE WHEN SPLIT_PART(p.duration, ':', 3) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(p.duration, ':', 2) <> '' THEN CAST(SPLIT_PART(p.duration, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(p.duration, ':', 2) AS DOUBLE PRECISION) ELSE CAST(p.duration AS DOUBLE PRECISION) END), d.driverid LIMIT 3",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 989,
+    "reason": "Return the requested champion full name as well as finish time; finishing positionOrder identifies champion.",
+    "corrected_sqlite_sql": "SELECT d.forename,d.surname,x.time FROM results x JOIN races r ON r.raceid=x.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.name='Canadian Grand Prix' AND r.year=2008 AND x.positionorder=1",
+    "adapted_postgresql_sql": "SELECT d.forename, d.surname, x.time FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN drivers AS d ON d.driverid = x.driverid WHERE r.name = 'Canadian Grand Prix' AND r.year = 2008 AND x.positionorder = 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 990,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT T3.constructorRef, T3.url FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId INNER JOIN constructors AS T3 on T1.constructorId = T3.constructorId WHERE T2.name = 'Singapore Grand Prix' AND T2.year = 2009 AND T1.time LIKE '_:%:__.___'",
+    "adapted_postgresql_sql": "SELECT t3.constructorref, t3.url FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN constructors AS t3 ON t1.constructorid = t3.constructorid WHERE t2.name = 'Singapore Grand Prix' AND t2.year = 2009 AND t1.time LIKE '_:%:__.___'",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 994,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT SUM(T1.points), T2.name, T2.nationality FROM constructorResults AS T1 INNER JOIN constructors AS T2 ON T1.constructorId = T2.constructorId INNER JOIN races AS T3 ON T3.raceid = T1.raceid WHERE T3.name = 'Monaco Grand Prix' AND T3.year BETWEEN 1980 AND 2010 GROUP BY T2.name ORDER BY SUM(T1.points) DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT SUM(t1.points), t2.name, t2.nationality FROM constructorresults AS t1 INNER JOIN constructors AS t2 ON t1.constructorid = t2.constructorid INNER JOIN races AS t3 ON t3.raceid = t1.raceid WHERE t3.name = 'Monaco Grand Prix' AND t3.year BETWEEN 1980 AND 2010 GROUP BY t2.name, t2.nationality ORDER BY SUM(t1.points) DESC LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 1001,
+    "reason": "Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.",
+    "corrected_sqlite_sql": "SELECT T2.forename, T2.surname FROM qualifying AS T1 INNER JOIN drivers AS T2 on T1.driverId = T2.driverId INNER JOIN races AS T3 ON T1.raceid = T3.raceid WHERE q3 IS NOT NULL AND T3.year = 2008 AND T3.circuitId IN ( SELECT circuitId FROM circuits WHERE name = 'Marina Bay Street Circuit' ) ORDER BY CAST(SUBSTR(q3, 1, INSTR(q3, ':') - 1) AS INTEGER) * 60 + CAST(SUBSTR(q3, INSTR(q3, ':') + 1, INSTR(q3, '.') - INSTR(q3, ':') - 1) AS DOUBLE PRECISION) + CAST(SUBSTR(q3, INSTR(q3, '.') + 1) AS DOUBLE PRECISION) / 1000 ASC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT t2.forename, t2.surname FROM qualifying AS t1 INNER JOIN drivers AS t2 ON t1.driverid = t2.driverid INNER JOIN races AS t3 ON t1.raceid = t3.raceid WHERE q3 IS NOT NULL AND t3.year = 2008 AND t3.circuitid IN (SELECT circuitid FROM circuits WHERE name = 'Marina Bay Street Circuit') ORDER BY CAST(SPLIT_PART(q3, ':', 1) AS INT) * 60 + CAST(SPLIT_PART(SPLIT_PART(q3, ':', 2), '.', 1) AS DOUBLE PRECISION) + CAST(SPLIT_PART(q3, '.', 2) AS DOUBLE PRECISION) / 1000 ASC LIMIT 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 1002,
+    "reason": "Youngest known DOB first, then earliest available participation race by date/round/raceId; driver identity breaks DOB ties.",
+    "corrected_sqlite_sql": "WITH youngest AS (SELECT driverid,forename,surname,nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob DESC,driverid LIMIT 1) SELECT d.forename,d.surname,d.nationality,r.name FROM youngest d JOIN driverstandings s ON s.driverid=d.driverid JOIN races r ON r.raceid=s.raceid ORDER BY r.date,r.round,r.raceid LIMIT 1",
+    "adapted_postgresql_sql": "WITH youngest AS (SELECT driverid, forename, surname, nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob DESC, driverid LIMIT 1) SELECT d.forename, d.surname, d.nationality, r.name FROM youngest AS d JOIN driverstandings AS s ON s.driverid = d.driverid JOIN races AS r ON r.raceid = s.raceid ORDER BY r.date, r.round, r.raceid LIMIT 1",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 1003,
+    "reason": "Mechanical identifier/clock normalization; upstream semantics preserved.",
+    "corrected_sqlite_sql": "SELECT COUNT(T1.driverId) FROM results AS T1 INNER JOIN races AS T2 on T1.raceId = T2.raceId INNER JOIN status AS T3 on T1.statusId = T3.statusId WHERE T3.statusId = 3 AND T2.name = 'Canadian Grand Prix' GROUP BY T1.driverId ORDER BY COUNT(T1.driverId) DESC LIMIT 1",
+    "adapted_postgresql_sql": "SELECT COUNT(t1.driverid) FROM results AS t1 INNER JOIN races AS t2 ON t1.raceid = t2.raceid INNER JOIN status AS t3 ON t1.statusid = t3.statusid WHERE t3.statusid = 3 AND t2.name = 'Canadian Grand Prix' GROUP BY t1.driverid ORDER BY COUNT(t1.driverid) DESC NULLS LAST LIMIT 1",
+    "review_disposition": "Unchanged reference task"
+  },
+  {
+    "question_id": 1011,
+    "reason": "Parse every duration component; rank each driver minimum observed duration, identity breaks ties; project requested full names.",
+    "corrected_sqlite_sql": "WITH minimums AS (SELECT l.driverid,MIN(CASE WHEN INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')>0 THEN CAST(SUBSTR(l.time,1,INSTR(l.time,':')-1) AS DOUBLE PRECISION)*3600+CAST(SUBSTR(SUBSTR(l.time,INSTR(l.time,':')+1),1,INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(SUBSTR(l.time,INSTR(l.time,':')+1),INSTR(SUBSTR(l.time,INSTR(l.time,':')+1),':')+1) AS DOUBLE PRECISION) WHEN INSTR(l.time,':')>0 THEN CAST(SUBSTR(l.time,1,INSTR(l.time,':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(l.time,INSTR(l.time,':')+1) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) seconds FROM laptimes l GROUP BY l.driverid) SELECT d.forename,d.surname FROM minimums m JOIN drivers d ON d.driverid=m.driverid ORDER BY m.seconds,d.driverid LIMIT 20",
+    "adapted_postgresql_sql": "WITH minimums AS (SELECT l.driverid, MIN(CASE WHEN SPLIT_PART(l.time, ':', 3) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(l.time, ':', 2) <> '' THEN CAST(SPLIT_PART(l.time, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(l.time, ':', 2) AS DOUBLE PRECISION) ELSE CAST(l.time AS DOUBLE PRECISION) END) AS seconds FROM laptimes AS l GROUP BY l.driverid) SELECT d.forename, d.surname FROM minimums AS m JOIN drivers AS d ON d.driverid = m.driverid ORDER BY m.seconds, d.driverid LIMIT 20",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  },
+  {
+    "question_id": 1014,
+    "reason": "Plural Italian circuits requires one minimum observed nonnull lap record per circuit with circuit identity/name; race/result identity breaks equal-duration ties.",
+    "corrected_sqlite_sql": "WITH ranked AS (SELECT c.circuitid,c.name,x.fastestlaptime,ROW_NUMBER() OVER (PARTITION BY c.circuitid ORDER BY (CASE WHEN INSTR(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1),':')>0 THEN CAST(SUBSTR(x.fastestlaptime,1,INSTR(x.fastestlaptime,':')-1) AS DOUBLE PRECISION)*3600+CAST(SUBSTR(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1),1,INSTR(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1),':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1),INSTR(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1),':')+1) AS DOUBLE PRECISION) WHEN INSTR(x.fastestlaptime,':')>0 THEN CAST(SUBSTR(x.fastestlaptime,1,INSTR(x.fastestlaptime,':')-1) AS DOUBLE PRECISION)*60+CAST(SUBSTR(x.fastestlaptime,INSTR(x.fastestlaptime,':')+1) AS DOUBLE PRECISION) ELSE CAST(x.fastestlaptime AS DOUBLE PRECISION) END),r.date,r.raceid,x.resultid) n FROM results x JOIN races r ON r.raceid=x.raceid JOIN circuits c ON c.circuitid=r.circuitid WHERE c.country='Italy' AND x.fastestlaptime IS NOT NULL) SELECT circuitid,name,fastestlaptime lap_record FROM ranked WHERE n=1 ORDER BY circuitid",
+    "adapted_postgresql_sql": "WITH ranked AS (SELECT c.circuitid, c.name, x.fastestlaptime, ROW_NUMBER() OVER (PARTITION BY c.circuitid ORDER BY (CASE WHEN SPLIT_PART(x.fastestlaptime, ':', 3) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 3600 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 3) AS DOUBLE PRECISION) WHEN SPLIT_PART(x.fastestlaptime, ':', 2) <> '' THEN CAST(SPLIT_PART(x.fastestlaptime, ':', 1) AS DOUBLE PRECISION) * 60 + CAST(SPLIT_PART(x.fastestlaptime, ':', 2) AS DOUBLE PRECISION) ELSE CAST(x.fastestlaptime AS DOUBLE PRECISION) END), r.date, r.raceid, x.resultid) AS n FROM results AS x JOIN races AS r ON r.raceid = x.raceid JOIN circuits AS c ON c.circuitid = r.circuitid WHERE c.country = 'Italy' AND x.fastestlaptime IS NOT NULL) SELECT circuitid, name, fastestlaptime AS lap_record FROM ranked WHERE n = 1 ORDER BY circuitid",
+    "review_disposition": "Independent reviewer accepted task resolution"
+  }
+]

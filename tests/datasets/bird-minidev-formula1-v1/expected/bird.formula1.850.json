@@ -1,0 +1,20 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "European Grand Prix"
+    ],
+    [
+      "German Grand Prix"
+    ],
+    [
+      "Luxembourg Grand Prix"
+    ]
+  ]
+}

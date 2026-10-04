@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "year",
+      "type": "int64"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    },
+    {
+      "name": "date",
+      "type": "date32"
+    },
+    {
+      "name": "time",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "2017",
+      "Chinese Grand Prix",
+      "2017-04-09",
+      "06:00:00"
+    ]
+  ]
+}

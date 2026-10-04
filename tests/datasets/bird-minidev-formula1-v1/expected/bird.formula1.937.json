@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "time",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "+14.925"
+    ]
+  ]
+}

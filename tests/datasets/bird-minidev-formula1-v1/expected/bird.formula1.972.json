@@ -1,0 +1,31 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "driverid",
+      "type": "int64"
+    },
+    {
+      "name": "code",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "14",
+      "COU"
+    ],
+    [
+      "35",
+      "VIL"
+    ],
+    [
+      "37",
+      "DLR"
+    ],
+    [
+      "69",
+      "BAD"
+    ]
+  ]
+}

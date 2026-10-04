@@ -1,0 +1,24 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "age",
+      "type": "int64"
+    },
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "40",
+      "Kamui",
+      "Kobayashi"
+    ]
+  ]
+}

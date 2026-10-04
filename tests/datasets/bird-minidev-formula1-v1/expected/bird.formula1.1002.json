@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "forename",
+      "type": "utf8"
+    },
+    {
+      "name": "surname",
+      "type": "utf8"
+    },
+    {
+      "name": "nationality",
+      "type": "utf8"
+    },
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "Lance",
+      "Stroll",
+      "Canadian",
+      "Chinese Grand Prix"
+    ]
+  ]
+}

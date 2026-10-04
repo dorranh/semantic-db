@@ -1,0 +1,29 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "name",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "Ligier"
+    ],
+    [
+      "Jordan"
+    ],
+    [
+      "Larrousse"
+    ],
+    [
+      "Brabham"
+    ],
+    [
+      "Dallara"
+    ],
+    [
+      "Minardi"
+    ]
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "rows_checked": 400524,
+  "invalid_components": [],
+  "milliseconds_disagreements": [],
+  "method": "Decimal base60 parse of every original time; minute/second ranges checked; exact comparison to independent source milliseconds"
+}

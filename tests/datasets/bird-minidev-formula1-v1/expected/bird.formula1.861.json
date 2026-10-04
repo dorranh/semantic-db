@@ -1,0 +1,17 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "number",
+      "type": "int64"
+    }
+  ],
+  "rows": [
+    [
+      "3"
+    ],
+    [
+      "5"
+    ]
+  ]
+}

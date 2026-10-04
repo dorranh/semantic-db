@@ -1,0 +1,687 @@
+{
+  "circuits": {
+    "source": "csv",
+    "row_count": 72,
+    "primary_key": [
+      "circuitid"
+    ],
+    "columns": [
+      {
+        "name": "circuitid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "circuitref",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "name",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "location",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "country",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "lat",
+        "type": "float64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "lng",
+        "type": "float64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "alt",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "url",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "constructorresults": {
+    "source": "postgres",
+    "row_count": 11082,
+    "primary_key": [
+      "constructorresultsid"
+    ],
+    "columns": [
+      {
+        "name": "constructorresultsid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "constructorid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "points",
+        "type": "float64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "status",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      }
+    ]
+  },
+  "constructorstandings": {
+    "source": "postgres",
+    "row_count": 11836,
+    "primary_key": [
+      "constructorstandingsid"
+    ],
+    "columns": [
+      {
+        "name": "constructorstandingsid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "constructorid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "points",
+        "type": "float64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "position",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "positiontext",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "wins",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "constructors": {
+    "source": "csv",
+    "row_count": 208,
+    "primary_key": [
+      "constructorid"
+    ],
+    "columns": [
+      {
+        "name": "constructorid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "constructorref",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "name",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "nationality",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "url",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "driverstandings": {
+    "source": "postgres",
+    "row_count": 31578,
+    "primary_key": [
+      "driverstandingsid"
+    ],
+    "columns": [
+      {
+        "name": "driverstandingsid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "points",
+        "type": "float64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "position",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "positiontext",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "wins",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "drivers": {
+    "source": "csv",
+    "row_count": 840,
+    "primary_key": [
+      "driverid"
+    ],
+    "columns": [
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverref",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "number",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "code",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "forename",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "surname",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "dob",
+        "type": "date32",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "nationality",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "url",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "laptimes": {
+    "source": "postgres",
+    "row_count": 400524,
+    "primary_key": [
+      "raceid",
+      "driverid",
+      "lap"
+    ],
+    "columns": [
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "lap",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "position",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "time",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "milliseconds",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      }
+    ]
+  },
+  "pitstops": {
+    "source": "postgres",
+    "row_count": 5815,
+    "primary_key": [
+      "raceid",
+      "driverid",
+      "stop"
+    ],
+    "columns": [
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "stop",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "lap",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "time",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "duration",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "milliseconds",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      }
+    ]
+  },
+  "qualifying": {
+    "source": "postgres",
+    "row_count": 6967,
+    "primary_key": [
+      "qualifyid"
+    ],
+    "columns": [
+      {
+        "name": "qualifyid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "constructorid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "number",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "position",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "q1",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "q2",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "q3",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      }
+    ]
+  },
+  "races": {
+    "source": "postgres",
+    "row_count": 954,
+    "primary_key": [
+      "raceid"
+    ],
+    "columns": [
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "year",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "round",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "circuitid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "name",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "date",
+        "type": "date32",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "time",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "url",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      }
+    ]
+  },
+  "results": {
+    "source": "postgres",
+    "row_count": 23179,
+    "primary_key": [
+      "resultid"
+    ],
+    "columns": [
+      {
+        "name": "resultid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "raceid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "driverid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "constructorid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "number",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "grid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "position",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "positiontext",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "positionorder",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "points",
+        "type": "float64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "laps",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "time",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "milliseconds",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "fastestlap",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "rank",
+        "type": "int64",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "fastestlaptime",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "fastestlapspeed",
+        "type": "utf8",
+        "nullable": true,
+        "physical_nullable": true
+      },
+      {
+        "name": "statusid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "seasons": {
+    "source": "csv",
+    "row_count": 68,
+    "primary_key": [
+      "year"
+    ],
+    "columns": [
+      {
+        "name": "year",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "url",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  },
+  "status": {
+    "source": "csv",
+    "row_count": 134,
+    "primary_key": [
+      "statusid"
+    ],
+    "columns": [
+      {
+        "name": "statusid",
+        "type": "int64",
+        "nullable": false,
+        "physical_nullable": false
+      },
+      {
+        "name": "status",
+        "type": "utf8",
+        "nullable": false,
+        "physical_nullable": false
+      }
+    ]
+  }
+}

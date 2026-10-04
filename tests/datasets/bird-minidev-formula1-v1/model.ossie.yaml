@@ -1,0 +1,2258 @@
+{
+  "version": "0.2.0.dev0",
+  "semantic_model": [
+    {
+      "name": "bird_formula1",
+      "description": "Complete external BIRD Mini-Dev Formula 1 family, independent evaluation suite. Original questions and data unchanged.",
+      "ai_context": {
+        "instructions": "This benchmark uses the full historic Formula1 source snapshot, and fixed request clock 2026-10-04T00:00:00Z. Reference names are driverRef/circuitRef/constructorRef. Rank, position, positionOrder, championship standings, and qualifying position are distinct; use the question and provided official knowledge. Preserve table grain and row multiplicity; do not default to DISTINCT. Race ranked first/second and champion refer to finishing positionOrder unless fastest-lap rank is explicitly requested. First participation means earliest available race date, then round/raceId; youngest means latest known DOB with driverId tie break. Best observed timing excludes missing timings. Driver counts/lists use driver identity rather than repeated laps or results. Geographic venue identity is (location,lat,lng), which can have multiple historical circuitIDs. Per-circuit lap records use minimum observed nonnull duration, retaining circuit identity; missing observations do not establish a record. Original timing fields are strings in seconds, minutes:seconds or hours:minutes:seconds and all components must be parsed explicitly when requested; seconds and subordinate minutes are in [0,60). Rank minimum durations with driverId tie breaks. These are authored task interpretation policies, not expected results. Here is official benchmark knowledge (not reference SQL or expected answers):\n2 races refers to COUNT(raceID) = 2; Japanese refers to constructors.nationality = 'Japanese';\nAlex Yoong refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname;track number less than 10 refers to position < 20\nAustralia is the country; Melbourne is the location of circuit;\nBahrain Grand Prix refers to races.name = 'Bahrain Grand Prix'; drivers who finished the race refers to time is not empty (i.e. time IS NOT NULL);\nCOUNT(raceID) > 0 reveals that this driver participated in races; drivers who finished the race refers to time has value.\nDIVIDE(COUNT(driverid when time has value ), (COUNT(driverid )) as percentage; in 1983/7/16 refers to when date = '1983-07-16'\nEuropean Grand Prix races refers to races.name = 'European Grand Prix';percentage = divide(COUNT(races where country = Germany and name = 'Europearn Grand Prix'),COUNT(races where name = 'Europearn Grand Prix'))*100\nFull name of the driver refers to drivers.forename and drivers.surname; born between 1980-1985 refers to 1980<= year(dob) <=1985; Average pitstop duration refers to Divide(SUM(duration),COUNT(duration)); shortest average refers to Min(avg(duration));\nFull name of the driver refers to drivers.forename and drivers.surname; the most winning refers to MAX(COUNT(wins)); average point scores refers to MAX(points);\nGermany is a name of country;\nLewis Hamilton refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname; final rank refers to positionOrder; Chinese Grand Prix refers to races.name = 'Chinese Grand Prix';\nMonaco Grand Priz refers to the race; race in year between 1980 and 2010\nOnly the time of the champion shows in the format of \"hour: minutes: seconds.millionsecond\";\nPaul di Resta refers to the full name of the driver; Full name of the driver refers to drivers.forename ='Paul' and drivers.surname = 'di Resta'; race number refers to raceId; percentage = DIVIDE(SUBTRACT(fastestLapSpeed(raceId = 853), (fastestLapSpeed (raceId = 854)) * 100 , (fastestLapSpeed(raceId = 853))\nRanked 1st in the 3rd qualifying race refer to MIN(q3); 2008 is the year of race; full name of racer = forename, surname\nSpanish Grand Prix is the name of race refers to name = 'Spanish Grand Prix'; average fastest lap speed refers to avg(fastestLapSpeed);\naverage lap time = AVG(milliseconds); 'Lewis Hamilton' refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname; 'Malaysian Grand Prix' refers to races.name = 'Malaysian Grand Prix'\nborn before 1985 refers to year(dob)<1985; in 2000 to 2005 refers to year between 2000 and 2005; percentage = Divide(COUNT(driverId where year (dob) <1985 and laps >50),COUNT(DriverID where year between 2000 and 2005) *100;\nborn in 1971 refers to year(dob) = 1971; has the fastest lap time refers to fastestLapTime has values\ncoordinate position/location refers to lat, lng; Abu Dhabi Grand Prix refers to races.name = 'Abu Dhabi Grand Prix'\ncoordinate position/location refers to lat, lng; circuits for Australian grand prix refers to races.name = 'Australian Grand Prix'\ndate of birth refers to drivers.dob; The larger the birthday value, the younger the person is, and vice versa;\ndate of birth refers to drivers.dob; The larger the birthday value, the younger the person is, and vice versa; Japanese refers to nationality = 'Japanese'; age = YEAR(CURRENT_TIMESTAMP) - YEAR(dob);\ndate of birth refers to drivers.dob; The larger the birthday value, the younger the person is, and vice versa; first qualifying race refers to MIN(races.date);\ndisqualified refers to statusID = 2, finisher refers to time! = null; race no. refers to raceId; raceId > 50 and raceId < 100;\ndriver reference name refers to driverRef; first qualifying period refers to q1; drivers who are eliminated in the first qualifying period refers to 5 drivers with MAX(q1); race number refers to raceId;\ndrivers who finished the race refers to time is not empty (i.e. time IS NOT NULL); race number refers to raceId; date of birth refers to drivers.dob; The larger the birthday value, the younger the person is, and vice versa;\nearliest recorded year and month refers to year = year(min(date)) and month = month(min(date));\nfastest lap refers to min(milliseconds); Alex Yoong refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname;\nfinish time refers to time; Chinese Grand Prix refers to races.name = 'Chinese Grand Prix';\nfirst race refers to min(Year); Lewis Hamiltonrefers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname;\nfrom 2007 to 2009 refers to year between 2007 and 2009; race completion refers to time is not null; percentage = Divide(COUNT(DriverID where time is not null and year between 2007 and 2009),Count (DriverID where year between 2007 and 2009))*100; \nfull name refers to forename+surname; Youngest racer = MAX(dob)\nhow much faster in percentage = divide(subtract(incremental time, champion time), last_driver time) * 100; last driver finished time = incremental time + champion time; only champion's finished time is represented by 'HH:MM:SS.mmm'; finished the game refers to time is not null\nin 2009 refers to year = 2009; Only the time of the champion shows in the format of \"hour: minutes: seconds.millionsecond\"\nin September 2005 refers to MONTH(date) = 9 and YEAR(date) = 2005\nlap record means the fastest time recorded which refers to time\nlap time less than 02:00.00 refers to seconds < 120;\nlocation coordinates refers to (lat, lng); Malaysian Grand Prix refers to races.name = 'Malaysian Grand Prix'\nlocation coordinates refers to (lat, lng); Silverstone Circuit refers to circuits.name = 'Silverstone Circuit'\nlocation coordinates refers to (lat,lng); Austria refers to country = 'Austria';\nmaximum points = MAX(points); British is a nationality\nnationality = 'American'\nnumber of accidents refers to the number where statusid = 3; Canadian Grand Prix refers to the race of name\n\noldest refers to MIN(year(dob)); reference names appear in drverRef.\nonly champion's finished time is represented by 'HH:MM:SS.mmm'; finished the game refers to time is not null; before year 1975 refers to year < 1975;\npercentage = DIVIDE(COUNT(raceId) where surname = 'Hamilton' and position>1), (COUNT(raceId) where surname = 'Hamilton'); since 2010 refers to year >= 2010\nplayer and driver are synonyms; the lap time of 0:0M:SS refers to lapTime.time LIKE 'M:SS%';race number refers to raceId; introduction website of the drivers refers to url;\nrace at 291 refers to raceID = 291;\nrace number refers to raceId; Bruno Senna refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname;\nrace number refers to raceId; constructor which got the highest point refers to MAX(constructorResults.points); introduction website of the constructor refers to url;\nrace number refers to raceId; drivers who finished the race refers to time has value; the youngest is a driver where MAX(dob);\nrace number refers to raceId; finished 0:0M:SS in the Q3 refers to q3 LIKE 'M:SS%'\nrace number refers to raceId; had the Q3 time as 0:0M:SS refers to q3 LIKE 'M:SS%'\nrace number refers to raceId; second qualifying period refers to q2; best lap time refers to MIN(q2);\nrank the highest refers to min(rank); Lewis Hamilton refers to the full name of the driver; Full name of the driver refers to drivers.forename and drivers.surname;\nreference name refers to circuitRef; Marina Bay Street Circuit refers to circuits.name = 'Marina Bay Street Circuit'\nreference name refers to driverRef; Canadian Grand Prix refers to races.name = 'Canadian Grand Prix';\nshortest lap time refers to MIN(time); the time format for the shortest lap time is 'MM:SS.mmm' or 'M:SS.mmm'; full name of the driver refers to forename, surname\nthe best lap time refers to min(milliseconds); List the driver refers to drivers.forename and drivers.surname; List the race refers to races.name\nthe fastest lap speed among all refers to max(fastestLapSpeed); Spanish Grand Prix refers to races.name = 'Spanish Grand Prix';\nthe fastest lap speed refers to (MAX) fastestLapSpeed;\nthe most points scored refers to max(points); Full name of the driver refers to drivers.forename and drivers.surname;\nthe season page refers to url; race number refers to raceId;\nthe time of the champion shows in the format of \"minutes: seconds.millionsecond\" in which Max(time); constructor reference name refers to constructorRef; website refers to url\nyoungest driver refers to Max (year(dob)); Netherlandic and Dutch refer to the same country"
+      },
+      "datasets": [
+        {
+          "name": "circuits",
+          "source": "csv.circuits",
+          "primary_key": [
+            "circuitid"
+          ],
+          "description": "Complete original BIRD Formula 1 table circuits; 72 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "circuits"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "circuitid",
+              "datatype": "Integer",
+              "description": "circuitId; circuit Id ; unique identification number of the circuit ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "circuitId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "circuitid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "circuitref",
+              "datatype": "String",
+              "description": "circuitRef; circuit reference name ; circuit reference name ; text",
+              "ai_context": {
+                "synonyms": [
+                  "circuitRef"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "circuitref"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "name",
+              "datatype": "String",
+              "description": "name ; full name of circuit ; text",
+              "ai_context": {
+                "synonyms": [
+                  "name"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "name"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "location",
+              "datatype": "String",
+              "description": "location  ; location of circuit ; text",
+              "ai_context": {
+                "synonyms": [
+                  "location"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "location"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "country",
+              "datatype": "String",
+              "description": "country ; country of circuit ; text",
+              "ai_context": {
+                "synonyms": [
+                  "country"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "country"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "lat",
+              "datatype": "Float",
+              "description": "lat ; latitude  ; latitude of location of circuit ; real",
+              "ai_context": {
+                "synonyms": [
+                  "lat"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "lat"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "lng",
+              "datatype": "Float",
+              "description": "lng ; longitude  ; longitude of location of circuit ; real; commonsense evidence: Location coordinates: (lat, lng)",
+              "ai_context": {
+                "synonyms": [
+                  "lng"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "lng"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "alt",
+              "datatype": "Integer",
+              "description": "alt ; integer ; not useful ",
+              "ai_context": {
+                "synonyms": [
+                  "alt"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "alt"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "url",
+              "datatype": "String",
+              "description": "url ; url ; text",
+              "ai_context": {
+                "synonyms": [
+                  "url"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "url"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "constructorresults",
+          "source": "facts.constructorresults",
+          "primary_key": [
+            "constructorresultsid"
+          ],
+          "description": "Complete original BIRD Formula 1 table constructorResults; 11082 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "constructorResults"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "constructorresultsid",
+              "datatype": "Integer",
+              "description": "constructorResultsId; constructor Results Id; constructor Results Id; integer",
+              "ai_context": {
+                "synonyms": [
+                  "constructorResultsId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorresultsid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId; race Id; race id; integer",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "constructorid",
+              "datatype": "Integer",
+              "description": "constructorId; constructor Id; constructor id; integer",
+              "ai_context": {
+                "synonyms": [
+                  "constructorId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "points",
+              "datatype": "Float",
+              "description": "points; points; real",
+              "ai_context": {
+                "synonyms": [
+                  "points"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "points"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "status",
+              "datatype": "String",
+              "description": "status; status; text",
+              "ai_context": {
+                "synonyms": [
+                  "status"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "status"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "constructorstandings",
+          "source": "facts.constructorstandings",
+          "primary_key": [
+            "constructorstandingsid"
+          ],
+          "description": "Complete original BIRD Formula 1 table constructorStandings; 11836 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "constructorStandings"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "constructorstandingsid",
+              "datatype": "Integer",
+              "description": "constructorStandingsId ; constructor Standings Id ; unique identification of the constructor standing records ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "constructorStandingsId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorstandingsid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; race id ; id number identifying which races ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "constructorid",
+              "datatype": "Integer",
+              "description": "constructorId ; constructor id ; id number identifying which id ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "constructorId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "points",
+              "datatype": "Float",
+              "description": "points; how many points acquired in each race ",
+              "ai_context": {
+                "synonyms": [
+                  "points"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "points"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "position",
+              "datatype": "Integer",
+              "description": "position ; position or track of circuits ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "position"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "position"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "positiontext",
+              "datatype": "String",
+              "description": "positionText ; position text ; text; same with position, not quite useful ",
+              "ai_context": {
+                "synonyms": [
+                  "positionText"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "positiontext"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "wins",
+              "datatype": "Integer",
+              "description": "wins ; wins ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "wins"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "wins"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "constructors",
+          "source": "csv.constructors",
+          "primary_key": [
+            "constructorid"
+          ],
+          "description": "Complete original BIRD Formula 1 table constructors; 208 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "constructors"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "constructorid",
+              "datatype": "Integer",
+              "description": "constructorId ; constructor Id ; the unique identification number identifying constructors ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "constructorId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "constructorref",
+              "datatype": "String",
+              "description": "constructorRef ; Constructor Reference name ; Constructor Reference name ; text",
+              "ai_context": {
+                "synonyms": [
+                  "constructorRef"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorref"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "name",
+              "datatype": "String",
+              "description": "name ; full name of the constructor ; text",
+              "ai_context": {
+                "synonyms": [
+                  "name"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "name"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "nationality",
+              "datatype": "String",
+              "description": "nationality ; nationality of the constructor ; text",
+              "ai_context": {
+                "synonyms": [
+                  "nationality"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "nationality"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "url",
+              "datatype": "String",
+              "description": "url ; the introduction website of the constructor ; text; commonsense evidence: How to find out the detailed introduction of the constructor: through its url",
+              "ai_context": {
+                "synonyms": [
+                  "url"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "url"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "driverstandings",
+          "source": "facts.driverstandings",
+          "primary_key": [
+            "driverstandingsid"
+          ],
+          "description": "Complete original BIRD Formula 1 table driverStandings; 31578 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "driverStandings"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "driverstandingsid",
+              "datatype": "Integer",
+              "description": "driverStandingsId ; driver Standings Id ; the unique identification number identifying driver standing records ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "driverStandingsId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverstandingsid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; constructor Reference name ; id number identifying which races ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; id number identifying which drivers ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "points",
+              "datatype": "Float",
+              "description": "points ; how many points acquired in each race ; real",
+              "ai_context": {
+                "synonyms": [
+                  "points"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "points"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "position",
+              "datatype": "Integer",
+              "description": "position ; position or track of circuits ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "position"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "position"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "positiontext",
+              "datatype": "String",
+              "description": "positionText ; position text ; text; same with position, not quite useful ",
+              "ai_context": {
+                "synonyms": [
+                  "positionText"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "positiontext"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "wins",
+              "datatype": "Integer",
+              "description": "wins ; wins ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "wins"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "wins"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "drivers",
+          "source": "csv.drivers",
+          "primary_key": [
+            "driverid"
+          ],
+          "description": "Complete original BIRD Formula 1 table drivers; 840 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "drivers"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; driver ID ; the unique identification number identifying each driver; integer",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverref",
+              "datatype": "String",
+              "description": "driverRef ; driver reference name ; driver reference name ; text",
+              "ai_context": {
+                "synonyms": [
+                  "driverRef"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverref"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "number",
+              "datatype": "Integer",
+              "description": "number ; number ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "number"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "number"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "code",
+              "datatype": "String",
+              "description": "code ; abbreviated code for drivers ; text; if \"null\" or empty, it means it doesn't have code ",
+              "ai_context": {
+                "synonyms": [
+                  "code"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "code"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "forename",
+              "datatype": "String",
+              "description": "forename ; forename ; text",
+              "ai_context": {
+                "synonyms": [
+                  "forename"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "forename"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "surname",
+              "datatype": "String",
+              "description": "surname ; surname ; text",
+              "ai_context": {
+                "synonyms": [
+                  "surname"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "surname"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "dob",
+              "datatype": "Date",
+              "description": "dob ; date of birth ; date of birth ; date",
+              "ai_context": {
+                "synonyms": [
+                  "dob"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "dob"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "nationality",
+              "datatype": "String",
+              "description": "nationality ; nationality of drivers ; text",
+              "ai_context": {
+                "synonyms": [
+                  "nationality"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "nationality"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "url",
+              "datatype": "String",
+              "description": "url ; the introduction website of the drivers ; text",
+              "ai_context": {
+                "synonyms": [
+                  "url"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "url"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "laptimes",
+          "source": "facts.laptimes",
+          "primary_key": [
+            "raceid",
+            "driverid",
+            "lap"
+          ],
+          "description": "Complete original BIRD Formula 1 table lapTimes; 400524 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "lapTimes"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; race ID ; the identification number identifying race; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; driver ID ; the identification number identifying each driver ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "lap",
+              "datatype": "Integer",
+              "description": "lap ; lap number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "lap"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "lap"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "position",
+              "datatype": "Integer",
+              "description": "position ; position or track of circuits  ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "position"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "position"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "time",
+              "datatype": "String",
+              "description": "time ; lap time  ; text; in minutes / seconds / ... ",
+              "ai_context": {
+                "synonyms": [
+                  "time"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "time"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "milliseconds",
+              "datatype": "Integer",
+              "description": "milliseconds ; milliseconds ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "milliseconds"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "milliseconds"
+                  }
+                ]
+              },
+              "custom_extensions": [
+                {
+                  "vendor_name": "SEMANTIC_DB",
+                  "data": "{\"kind\":\"unit\",\"unit\":{\"kind\":\"named\",\"id\":\"millisecond\"}}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "pitstops",
+          "source": "facts.pitstops",
+          "primary_key": [
+            "raceid",
+            "driverid",
+            "stop"
+          ],
+          "description": "Complete original BIRD Formula 1 table pitStops; 5815 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "pitStops"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; race ID ; the identification number identifying race ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; driver ID ; the identification number identifying each driver ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "stop",
+              "datatype": "Integer",
+              "description": "stop ; stop number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "stop"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "stop"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "lap",
+              "datatype": "Integer",
+              "description": "lap ; lap number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "lap"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "lap"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "time",
+              "datatype": "String",
+              "description": "time ; time ; text; exact time  ",
+              "ai_context": {
+                "synonyms": [
+                  "time"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "time"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "duration",
+              "datatype": "String",
+              "description": "duration ; duration time ; text; seconds/ ",
+              "ai_context": {
+                "synonyms": [
+                  "duration"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "duration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "milliseconds",
+              "datatype": "Integer",
+              "description": "milliseconds ; milliseconds ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "milliseconds"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "milliseconds"
+                  }
+                ]
+              },
+              "custom_extensions": [
+                {
+                  "vendor_name": "SEMANTIC_DB",
+                  "data": "{\"kind\":\"unit\",\"unit\":{\"kind\":\"named\",\"id\":\"millisecond\"}}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "qualifying",
+          "source": "facts.qualifying",
+          "primary_key": [
+            "qualifyid"
+          ],
+          "description": "Complete original BIRD Formula 1 table qualifying; 6967 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "qualifying"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "qualifyid",
+              "datatype": "Integer",
+              "description": "qualifyId ; qualify Id ; the unique identification number identifying qualifying ; integer ; How does F1 Sprint qualifying work? Sprint qualifying is essentially a short-form Grand Prix � a race that is one-third the number of laps of the main event on Sunday. However, the drivers are battling for positions on the grid for the start of Sunday's race. ",
+              "ai_context": {
+                "synonyms": [
+                  "qualifyId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "qualifyid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; race Id ; the identification number identifying each race ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; driver Id; the identification number identifying each driver ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "constructorid",
+              "datatype": "Integer",
+              "description": "constructorId ; constructor id ; constructor Id ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "constructorId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "number",
+              "datatype": "Integer",
+              "description": "number ; number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "number"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "number"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "position",
+              "datatype": "Integer",
+              "description": "position ; position or track of circuit ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "position"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "position"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "q1",
+              "datatype": "String",
+              "description": "q1 ; qualifying 1 ; time in qualifying 1 ; text; in minutes / seconds / ... commonsense evidence: Q1 lap times determine pole position and the order of the front 10 positions on the grid. The slowest driver in Q1 starts 10th, the next starts ninth and so on. All 20 F1 drivers participate in the first period, called Q1, with each trying to set the fastest time possible. Those in the top 15 move on to the next period of qualifying, called Q2. The five slowest drivers are eliminated and will start the race in the last five positions on the grid. ",
+              "ai_context": {
+                "synonyms": [
+                  "q1"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "q1"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "q2",
+              "datatype": "String",
+              "description": "q2 ; qualifying 2 ; time in qualifying 2 ; text; in minutes / seconds / ... commonsense evidence: only top 15 in the q1 has the record of q2 Q2 is slightly shorter but follows the same format. Drivers try to put down their best times to move on to Q1 as one of the 10 fastest cars. The five outside of the top 10 are eliminated and start the race from 11th to 15th based on their best lap time. ",
+              "ai_context": {
+                "synonyms": [
+                  "q2"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "q2"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "q3",
+              "datatype": "String",
+              "description": "q3 ; qualifying 3 ; time in qualifying 3 ; text; in minutes / seconds / ... commonsense evidence: only top 10 in the q2 has the record of q3 ",
+              "ai_context": {
+                "synonyms": [
+                  "q3"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "q3"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "races",
+          "source": "facts.races",
+          "primary_key": [
+            "raceid"
+          ],
+          "description": "Complete original BIRD Formula 1 table races; 954 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "races"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId ; race ID ; the unique identification number identifying the race ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "year",
+              "datatype": "Integer",
+              "description": "year ; year ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "year"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "year"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "round",
+              "datatype": "Integer",
+              "description": "round ; round ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "round"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "round"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "circuitid",
+              "datatype": "Integer",
+              "description": "circuitId ; Circuit Id ; circuit Id ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "circuitId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "circuitid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "name",
+              "datatype": "String",
+              "description": "name ; name of the race ; text",
+              "ai_context": {
+                "synonyms": [
+                  "name"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "name"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "date",
+              "datatype": "Date",
+              "description": "date ; duration time ; date",
+              "ai_context": {
+                "synonyms": [
+                  "date"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "date"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "time",
+              "datatype": "String",
+              "description": "time ; time of the location ; text",
+              "ai_context": {
+                "synonyms": [
+                  "time"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "time"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "url",
+              "datatype": "String",
+              "description": "url ; introduction of races ; text",
+              "ai_context": {
+                "synonyms": [
+                  "url"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "url"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "results",
+          "source": "facts.results",
+          "primary_key": [
+            "resultid"
+          ],
+          "description": "Complete original BIRD Formula 1 table results; 23179 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "results"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "resultid",
+              "datatype": "Integer",
+              "description": "resultId; Result ID ; the unique identification number identifying race result ; integer",
+              "ai_context": {
+                "synonyms": [
+                  "resultId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "resultid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "raceid",
+              "datatype": "Integer",
+              "description": "raceId; race ID ; the identification number identifying the race ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "raceId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "raceid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "driverid",
+              "datatype": "Integer",
+              "description": "driverId ; driver ID; the identification number identifying the driver ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "driverId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "driverid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "constructorid",
+              "datatype": "Integer",
+              "description": "constructorId ; constructor Id ; the identification number identifying which constructors ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "constructorId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "constructorid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "number",
+              "datatype": "Integer",
+              "description": "number ; number  ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "number"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "number"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "grid",
+              "datatype": "Integer",
+              "description": "grid ; the number identifying the area where cars are set into a grid formation in order to start the race. ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "grid"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "grid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "position",
+              "datatype": "Integer",
+              "description": "position ; The finishing position or track of circuits ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "position"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "position"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "positiontext",
+              "datatype": "String",
+              "description": "positionText ; position text ; text; not quite useful ",
+              "ai_context": {
+                "synonyms": [
+                  "positionText"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "positiontext"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "positionorder",
+              "datatype": "Integer",
+              "description": "positionOrder ; position order ; the finishing order of positions ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "positionOrder"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "positionorder"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "points",
+              "datatype": "Float",
+              "description": "points ; points ; real",
+              "ai_context": {
+                "synonyms": [
+                  "points"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "points"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "laps",
+              "datatype": "Integer",
+              "description": "laps ; lap number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "laps"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "laps"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "time",
+              "datatype": "String",
+              "description": "time  ; finish time ; text; commonsense evidence: 1. if the value exists, it means the driver finished the race. 2. Only the time of the champion shows in the format of \"minutes: seconds.millionsecond\", the time of the other drivers shows as \"seconds.millionsecond\" , which means their actual time is the time of the champion adding the value in this cell.",
+              "ai_context": {
+                "synonyms": [
+                  "time"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "time"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "milliseconds",
+              "datatype": "Integer",
+              "description": "milliseconds ; the actual finishing time of drivers in milliseconds  ; integer ; the actual finishing time of drivers  ",
+              "ai_context": {
+                "synonyms": [
+                  "milliseconds"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "milliseconds"
+                  }
+                ]
+              },
+              "custom_extensions": [
+                {
+                  "vendor_name": "SEMANTIC_DB",
+                  "data": "{\"kind\":\"unit\",\"unit\":{\"kind\":\"named\",\"id\":\"millisecond\"}}"
+                }
+              ]
+            },
+            {
+              "name": "fastestlap",
+              "datatype": "Integer",
+              "description": "fastestLap ; fastest lap ; fastest lap number ; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "fastestLap"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "fastestlap"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "rank",
+              "datatype": "Integer",
+              "description": "rank ; starting rank positioned by fastest lap speed; integer ",
+              "ai_context": {
+                "synonyms": [
+                  "rank"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "rank"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "fastestlaptime",
+              "datatype": "String",
+              "description": "fastestLapTime ; fastest Lap Time; fastest Lap Time; text; faster (smaller in the value) \"fastestLapTime\" leads to higher rank (smaller is higher rank) ",
+              "ai_context": {
+                "synonyms": [
+                  "fastestLapTime"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "fastestlaptime"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "fastestlapspeed",
+              "datatype": "String",
+              "description": "fastestLapSpeed ; fastest Lap Speed ; fastest Lap Speed ; text;  (km / h) ",
+              "ai_context": {
+                "synonyms": [
+                  "fastestLapSpeed"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "fastestlapspeed"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "statusid",
+              "datatype": "Integer",
+              "description": "statusId ; status Id ; status ID ; integer; its category description appear in the table status ",
+              "ai_context": {
+                "synonyms": [
+                  "statusId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "statusid"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "seasons",
+          "source": "csv.seasons",
+          "primary_key": [
+            "year"
+          ],
+          "description": "Complete original BIRD Formula 1 table seasons; 68 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "seasons"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "year",
+              "datatype": "Integer",
+              "description": "year ; race ID ; the unique identification number identifying the race; integer",
+              "ai_context": {
+                "synonyms": [
+                  "year"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "year"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "url",
+              "datatype": "String",
+              "description": "url ; website link of season race introduction ; text",
+              "ai_context": {
+                "synonyms": [
+                  "url"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "url"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "status",
+          "source": "csv.status",
+          "primary_key": [
+            "statusid"
+          ],
+          "description": "Complete original BIRD Formula 1 table status; 134 source records. No subsampling or synthetic replacement.",
+          "ai_context": {
+            "synonyms": [
+              "status"
+            ],
+            "instructions": "Preserve original row multiplicity; missing values are unknown. Fields such as result rank, finishing position, championship standing, and qualifying position are distinct."
+          },
+          "fields": [
+            {
+              "name": "statusid",
+              "datatype": "Integer",
+              "description": "statusId ; status ID; the unique identification number identifying status; integer",
+              "ai_context": {
+                "synonyms": [
+                  "statusId"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "statusid"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "status",
+              "datatype": "String",
+              "description": "status ; full name of status ; text",
+              "ai_context": {
+                "synonyms": [
+                  "status"
+                ]
+              },
+              "expression": {
+                "dialects": [
+                  {
+                    "dialect": "ANSI_SQL",
+                    "expression": "status"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "name": "constructorresults_constructorid_constructors",
+          "from": "constructorresults",
+          "to": "constructors",
+          "from_columns": [
+            "constructorid"
+          ],
+          "to_columns": [
+            "constructorid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key constructorResults.constructorId -> constructors.constructorId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "constructorresults_raceid_races",
+          "from": "constructorresults",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key constructorResults.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "constructorstandings_constructorid_constructors",
+          "from": "constructorstandings",
+          "to": "constructors",
+          "from_columns": [
+            "constructorid"
+          ],
+          "to_columns": [
+            "constructorid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key constructorStandings.constructorId -> constructors.constructorId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "constructorstandings_raceid_races",
+          "from": "constructorstandings",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key constructorStandings.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "driverstandings_driverid_drivers",
+          "from": "driverstandings",
+          "to": "drivers",
+          "from_columns": [
+            "driverid"
+          ],
+          "to_columns": [
+            "driverid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key driverStandings.driverId -> drivers.driverId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "driverstandings_raceid_races",
+          "from": "driverstandings",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key driverStandings.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "laptimes_driverid_drivers",
+          "from": "laptimes",
+          "to": "drivers",
+          "from_columns": [
+            "driverid"
+          ],
+          "to_columns": [
+            "driverid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key lapTimes.driverId -> drivers.driverId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "laptimes_raceid_races",
+          "from": "laptimes",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key lapTimes.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "pitstops_driverid_drivers",
+          "from": "pitstops",
+          "to": "drivers",
+          "from_columns": [
+            "driverid"
+          ],
+          "to_columns": [
+            "driverid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key pitStops.driverId -> drivers.driverId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "pitstops_raceid_races",
+          "from": "pitstops",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key pitStops.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "qualifying_constructorid_constructors",
+          "from": "qualifying",
+          "to": "constructors",
+          "from_columns": [
+            "constructorid"
+          ],
+          "to_columns": [
+            "constructorid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key qualifying.constructorId -> constructors.constructorId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "qualifying_driverid_drivers",
+          "from": "qualifying",
+          "to": "drivers",
+          "from_columns": [
+            "driverid"
+          ],
+          "to_columns": [
+            "driverid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key qualifying.driverId -> drivers.driverId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "qualifying_raceid_races",
+          "from": "qualifying",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key qualifying.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "races_circuitid_circuits",
+          "from": "races",
+          "to": "circuits",
+          "from_columns": [
+            "circuitid"
+          ],
+          "to_columns": [
+            "circuitid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key races.circuitId -> circuits.circuitId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "races_year_seasons",
+          "from": "races",
+          "to": "seasons",
+          "from_columns": [
+            "year"
+          ],
+          "to_columns": [
+            "year"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key races.year -> seasons.year; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "results_statusid_status",
+          "from": "results",
+          "to": "status",
+          "from_columns": [
+            "statusid"
+          ],
+          "to_columns": [
+            "statusid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key results.statusId -> status.statusId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "results_constructorid_constructors",
+          "from": "results",
+          "to": "constructors",
+          "from_columns": [
+            "constructorid"
+          ],
+          "to_columns": [
+            "constructorid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key results.constructorId -> constructors.constructorId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "results_driverid_drivers",
+          "from": "results",
+          "to": "drivers",
+          "from_columns": [
+            "driverid"
+          ],
+          "to_columns": [
+            "driverid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key results.driverId -> drivers.driverId; exact equality, null keys do not match."
+          }
+        },
+        {
+          "name": "results_raceid_races",
+          "from": "results",
+          "to": "races",
+          "from_columns": [
+            "raceid"
+          ],
+          "to_columns": [
+            "raceid"
+          ],
+          "ai_context": {
+            "instructions": "Original declared foreign key results.raceId -> races.raceId; exact equality, null keys do not match."
+          }
+        }
+      ],
+      "custom_extensions": [
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"circuits\",\"id\":\"bird/formula1/circuits\",\"keys\":[\"circuitid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"constructorresults\",\"id\":\"bird/formula1/constructorresults\",\"keys\":[\"constructorresultsid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"constructorstandings\",\"id\":\"bird/formula1/constructorstandings\",\"keys\":[\"constructorstandingsid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"constructors\",\"id\":\"bird/formula1/constructors\",\"keys\":[\"constructorid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"driverstandings\",\"id\":\"bird/formula1/driverstandings\",\"keys\":[\"driverstandingsid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"drivers\",\"id\":\"bird/formula1/drivers\",\"keys\":[\"driverid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"laptimes\",\"id\":\"bird/formula1/laptimes\",\"keys\":[\"raceid\",\"driverid\",\"lap\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"pitstops\",\"id\":\"bird/formula1/pitstops\",\"keys\":[\"raceid\",\"driverid\",\"stop\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"qualifying\",\"id\":\"bird/formula1/qualifying\",\"keys\":[\"qualifyid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"races\",\"id\":\"bird/formula1/races\",\"keys\":[\"raceid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"results\",\"id\":\"bird/formula1/results\",\"keys\":[\"resultid\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"seasons\",\"id\":\"bird/formula1/seasons\",\"keys\":[\"year\"]}"
+        },
+        {
+          "vendor_name": "SEMANTIC_DB",
+          "data": "{\"kind\":\"entity_identity\",\"dataset\":\"status\",\"id\":\"bird/formula1/status\",\"keys\":[\"statusid\"]}"
+        }
+      ]
+    }
+  ]
+}

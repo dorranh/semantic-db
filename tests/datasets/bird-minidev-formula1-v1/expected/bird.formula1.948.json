@@ -1,0 +1,18 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "max",
+      "type": "float64",
+      "tolerance": {
+        "absolute": 1e-07,
+        "relative": 1e-09
+      }
+    }
+  ],
+  "rows": [
+    [
+      497.0
+    ]
+  ]
+}

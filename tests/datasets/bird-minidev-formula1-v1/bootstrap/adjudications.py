@@ -1,0 +1,45 @@
+"""Reviewed BIRD-derived corrections, independent of product capabilities.
+Both dialects use the same task resolution; upstream bytes remain immutable.
+"""
+def duration(field,dialect):
+ if dialect=='postgres':
+  first=f"SPLIT_PART({field}, ':', 1)";rest=f"SPLIT_PART({field}, ':', 2)";third=f"SPLIT_PART({field}, ':', 3)"
+  return f"CASE WHEN {third} <> '' THEN CAST({first} AS DOUBLE PRECISION)*3600 + CAST({rest} AS DOUBLE PRECISION)*60 + CAST({third} AS DOUBLE PRECISION) WHEN {rest} <> '' THEN CAST({first} AS DOUBLE PRECISION)*60 + CAST({rest} AS DOUBLE PRECISION) ELSE CAST({field} AS DOUBLE PRECISION) END"
+ first=f"SUBSTR({field},1,INSTR({field},':')-1)";tail=f"SUBSTR({field},INSTR({field},':')+1)";second=f"SUBSTR({tail},1,INSTR({tail},':')-1)";third=f"SUBSTR({tail},INSTR({tail},':')+1)"
+ return f"CASE WHEN INSTR({tail},':')>0 THEN CAST({first} AS REAL)*3600+CAST({second} AS REAL)*60+CAST({third} AS REAL) WHEN INSTR({field},':')>0 THEN CAST({first} AS REAL)*60+CAST({tail} AS REAL) ELSE CAST({field} AS REAL) END"
+REASONS={880:'Measurement numeric output is explicitly Float64; arithmetic/reference meaning retained.',895:'Average millisecond measurement output is explicitly Float64; arithmetic/reference meaning retained.',898:'Fixed request clock and officially evidenced year-difference age; integral age transported as Int64.',960:'Average speed measurement output is explicitly Float64; arithmetic/reference meaning retained.',964:'Official PostgreSQL evidence nationality America is corrected to American using original SQLite evidence and actual declared nationality values; SQL meaning retained.',847:'Missing q2 is unknown, not the best observed lap; stable driver identity breaks equal observed durations.',906:'First available race is chronological date/round/raceId; reviewed interpretation preserves the original reference metric cumulative driverStandings.points; evidence itself does not specify this metric.',928:'Race winner means finishing positionOrder, not fastest-lap rank.',937:'Second finishing driver means positionOrder=2, not fastest-lap rank.',951:'Requested number of constructors requires counting qualifying constructor groups.',963:'Requested drivers are distinct driver identities; parse all duration components.',967:'Return all three requested codes and count Dutch drivers among exactly those three; four scalar columns.',972:'Requested driver identities, not repeated race-result rows.',978:'Reviewed geographic-grain interpretation preserves original DISTINCT(location,lat,lng), counting Austrian geographic venues rather than circuit IDs or race occurrences; return total count alongside each requested location and coordinate.',988:'Inclusive birth years are corroborated by official SQLite evidence; parse seconds and minute/hour duration formats faithfully.',989:'Return the requested champion full name as well as finish time; finishing positionOrder identifies champion.',1002:'Youngest known DOB first, then earliest available participation race by date/round/raceId; driver identity breaks DOB ties.',1011:'Parse every duration component; rank each driver minimum observed duration, identity breaks ties; project requested full names.',1014:'Plural Italian circuits requires one minimum observed nonnull lap record per circuit with circuit identity/name; race/result identity breaks equal-duration ties.'}
+def corrections(dialect):
+ yr=lambda f:f"EXTRACT(YEAR FROM {f})" if dialect=='postgres' else f"CAST(STRFTIME('%Y',{f}) AS INTEGER)"
+ d=duration('l.time',dialect);p=duration('p.duration',dialect);f=duration('x.fastestlaptime',dialect)
+ return {
+ 847:"SELECT d.surname FROM qualifying q JOIN drivers d ON d.driverid=q.driverid WHERE q.raceid=19 AND q.q2 IS NOT NULL ORDER BY q.q2,d.driverid LIMIT 1",
+ 906:"SELECT r.name,s.points FROM races r JOIN driverstandings s ON s.raceid=r.raceid JOIN drivers d ON d.driverid=s.driverid WHERE d.forename='Lewis' AND d.surname='Hamilton' ORDER BY r.date,r.round,r.raceid LIMIT 1",
+ 928:"SELECT d.forename,d.surname,d.driverref FROM races r JOIN results x ON x.raceid=r.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.name='Canadian Grand Prix' AND r.year=2007 AND x.positionorder=1",
+ 937:"SELECT x.time FROM results x JOIN races r ON r.raceid=x.raceid WHERE r.name='Chinese Grand Prix' AND r.year=2008 AND x.positionorder=2",
+ 951:"SELECT COUNT(*) FROM (SELECT s.constructorid FROM constructorstandings s JOIN constructors c ON c.constructorid=s.constructorid WHERE s.points=0 AND c.nationality='Japanese' GROUP BY s.constructorid HAVING COUNT(s.raceid)=2) eligible",
+ 963:f"SELECT COUNT(DISTINCT d.driverid) FROM drivers d JOIN laptimes l ON l.driverid=d.driverid WHERE d.nationality='French' AND ({d})<120",
+ 967:"WITH ranked AS (SELECT code,nationality,ROW_NUMBER() OVER (ORDER BY dob DESC,driverid) n FROM drivers WHERE dob IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE n<=3) SELECT MAX(CASE WHEN n=1 THEN code END) code1,MAX(CASE WHEN n=2 THEN code END) code2,MAX(CASE WHEN n=3 THEN code END) code3,SUM(CASE WHEN nationality='Dutch' THEN 1 ELSE 0 END) dutch_count FROM top3",
+ 972:f"SELECT DISTINCT d.driverid,d.code FROM results x JOIN drivers d ON d.driverid=x.driverid WHERE {yr('d.dob')}=1971 AND x.fastestlaptime IS NOT NULL",
+ 978:"WITH venues AS (SELECT DISTINCT location,lat,lng FROM circuits WHERE country='Austria') SELECT COUNT(*) OVER () venue_count,location,lat,lng FROM venues ORDER BY location,lat,lng",
+ 988:f"SELECT d.forename,d.surname FROM pitstops p JOIN drivers d ON d.driverid=p.driverid WHERE d.nationality='German' AND {yr('d.dob')} BETWEEN 1980 AND 1985 GROUP BY d.driverid,d.forename,d.surname ORDER BY AVG({p}),d.driverid LIMIT 3",
+ 989:"SELECT d.forename,d.surname,x.time FROM results x JOIN races r ON r.raceid=x.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.name='Canadian Grand Prix' AND r.year=2008 AND x.positionorder=1",
+ 1002:"WITH youngest AS (SELECT driverid,forename,surname,nationality FROM drivers WHERE dob IS NOT NULL ORDER BY dob DESC,driverid LIMIT 1) SELECT d.forename,d.surname,d.nationality,r.name FROM youngest d JOIN driverstandings s ON s.driverid=d.driverid JOIN races r ON r.raceid=s.raceid ORDER BY r.date,r.round,r.raceid LIMIT 1",
+ 1011:f"WITH minimums AS (SELECT l.driverid,MIN({d}) seconds FROM laptimes l GROUP BY l.driverid) SELECT d.forename,d.surname FROM minimums m JOIN drivers d ON d.driverid=m.driverid ORDER BY m.seconds,d.driverid LIMIT 20",
+ 1014:f"WITH ranked AS (SELECT c.circuitid,c.name,x.fastestlaptime,ROW_NUMBER() OVER (PARTITION BY c.circuitid ORDER BY ({f}),r.date,r.raceid,x.resultid) n FROM results x JOIN races r ON r.raceid=x.raceid JOIN circuits c ON c.circuitid=r.circuitid WHERE c.country='Italy' AND x.fastestlaptime IS NOT NULL) SELECT circuitid,name,fastestlaptime lap_record FROM ranked WHERE n=1 ORDER BY circuitid"
+ }
+
+PORTABILITY_REASONS={901:'Portable Gregorian EXTRACT year/month predicates replace PostgreSQL TO_CHAR format tokens, whose meanings differ from Chrono. Original questions and golds retained.',884:'Portable Gregorian EXTRACT year/month compare earliest source date, preserving ascending NULLS FIRST policy and original golds.',909:'Explicit DOUBLE PRECISION measurement intermediates preserve the Float64 percentage contract; deliberate coercion adaptation avoids engine-specific REAL intermediate narrowing.',955:'Explicit DOUBLE PRECISION throughout duration arithmetic preserves the Float64 mean measurement contract; original timing meaning and golds retained.'}
+REASONS.update(PORTABILITY_REASONS)
+def portable_sql(ident,sql,dialect):
+ import re
+ sql=re.sub(r'\bAS\s+REAL\b','AS DOUBLE PRECISION',sql,flags=re.I)
+ year=lambda field:f"EXTRACT(YEAR FROM {field})" if dialect=='postgres' else f"CAST(STRFTIME('%Y',{field}) AS INTEGER)"
+ month=lambda field:f"EXTRACT(MONTH FROM {field})" if dialect=='postgres' else f"CAST(STRFTIME('%m',{field}) AS INTEGER)"
+ if ident==962:return f"SELECT CAST(SUM(CASE WHEN {year('d.dob')}<1985 AND x.laps>50 THEN 1 ELSE 0 END) AS DOUBLE PRECISION)*100/NULLIF(COUNT(*),0) FROM results x JOIN races r ON r.raceid=x.raceid JOIN drivers d ON d.driverid=x.driverid WHERE r.year BETWEEN 2000 AND 2005"
+ if ident==901:return f"SELECT DISTINCT r.name,c.name,c.location FROM circuits c JOIN races r ON r.circuitid=c.circuitid WHERE {year('r.date')}=2005 AND {month('r.date')}=9"
+ if ident==884:return f"SELECT name FROM races WHERE {year('date')}=(SELECT {year('date')} FROM races ORDER BY date ASC NULLS FIRST LIMIT 1) AND {month('date')}=(SELECT {month('date')} FROM races ORDER BY date ASC NULLS FIRST LIMIT 1)"
+ return sql
+
+for ident in [881,896,944,954,1001]:
+ REASONS[ident]='Full-family measurement precision audit: every semantic REAL cast explicitly uses DOUBLE PRECISION, retaining Float64 measurement/ranking semantics and unchanged existing gold tolerance.'
+REASONS[962]='Portable Gregorian EXTRACT birth year replaces PostgreSQL TO_CHAR tokens; full-family measurement arithmetic explicitly DOUBLE PRECISION. Birth-year/lap/race-year predicates and existing gold remain unchanged.'

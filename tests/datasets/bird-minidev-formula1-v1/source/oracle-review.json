@@ -1,0 +1,335 @@
+{
+  "method": "Corrected native SQLite vs independent native PostgreSQL multiset agreement. Exact strings/integers; measurement floating tolerance absolute1e-7 relative1e-9. No product output.",
+  "cases": [
+    {
+      "question_id": 846,
+      "row_count": 5,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 847,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 850,
+      "row_count": 3,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 854,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 857,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 859,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 861,
+      "row_count": 2,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 862,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 865,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 866,
+      "row_count": 9,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 868,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 869,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 872,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 875,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 877,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 879,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 880,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 881,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 884,
+      "row_count": 3,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 892,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 894,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 895,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 896,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 897,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 898,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 901,
+      "row_count": 3,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 902,
+      "row_count": 15,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 904,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 906,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 909,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 910,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 912,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 915,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 928,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 930,
+      "row_count": 37,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 931,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 933,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 937,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 940,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 944,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 945,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 948,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 950,
+      "row_count": 6,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 951,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 954,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 955,
+      "row_count": 25,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 959,
+      "row_count": 16,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 960,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 962,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 963,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 964,
+      "row_count": 157,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 967,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 971,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 972,
+      "row_count": 4,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 977,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 978,
+      "row_count": 2,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 981,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 988,
+      "row_count": 3,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 989,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 990,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 994,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 1001,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 1002,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 1003,
+      "row_count": 1,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 1011,
+      "row_count": 20,
+      "native_reference_agreement": true
+    },
+    {
+      "question_id": 1014,
+      "row_count": 2,
+      "native_reference_agreement": true
+    }
+  ]
+}

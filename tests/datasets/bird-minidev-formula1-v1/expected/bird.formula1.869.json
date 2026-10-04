@@ -1,0 +1,14 @@
+{
+  "outcome": "result",
+  "columns": [
+    {
+      "name": "url",
+      "type": "utf8"
+    }
+  ],
+  "rows": [
+    [
+      "http://en.wikipedia.org/wiki/Red_Bull_Racing"
+    ]
+  ]
+}
